@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="flex items-center mb-4">
+<h1 class="text-2xl font-semibold">Ankündigungen</h1>
+<span class="flex-1"></span>
+{% if current_user.is_authenticated and current_user.role=='admin' %}
+<a class="px-3 py-2 bg-slate-900 text-white rounded" href="/announcements/new">Neu</a>
+{% endif %}
+</div>
+<ul class="space-y-3">
+{% for a in anns %}
+<li class="p-4 bg-white shadow rounded">
+<div class="font-semibold">{{ a.title }}</div>
+<div class="text-sm opacity-70">{{ a.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+<p class="mt-2">{{ a.body }}</p>
+</li>
+{% else %}
+<li class="opacity-70">Keine Ankündigungen.</li>
+{% endfor %}
+</ul>
+{% endblock %}

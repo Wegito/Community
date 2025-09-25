@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Putzplan / Aufgaben</h1>
+<ul class="space-y-2">
+{% for c in items %}
+<li class="p-3 bg-white rounded shadow flex items-center">
+<div class="flex-1">
+<div class="font-medium">{{ c.title }}</div>
+<div class="text-sm opacity-70">Fällig: {{ c.due_date or '—' }}</div>
+</div>
+<a class="text-slate-700 underline" href="/chores/edit/{{ c.id }}">Bearbeiten</a>
+</li>
+{% else %}
+<li class="opacity-70">Noch keine Aufgaben.</li>
+{% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Buchungen</h1>
+<form method="post" class="space-y-3 mb-6">
+{{ form.hidden_tag() }}
+<div>
+{{ form.resource.label }}
+{{ form.resource(class='border p-2 rounded w-full', placeholder='z.B. Saal') }}
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div>
+{{ form.start.label }}
+{{ form.start(class='border p-2 rounded w-full') }}
+</div>
+<div>
+{{ form.end.label }}
+{{ form.end(class='border p-2 rounded w-full') }}
+</div>
+</div>
+{{ form.submit(class='px-4 py-2 bg-slate-900 text-white rounded') }}
+</form>
+
+
+<ul class="space-y-2">
+{% for b, r, u in items %}
+<li class="p-3 bg-white rounded shadow">
+<div class="font-medium">{{ r.name }} – {{ b.start.strftime('%d.%m.%Y %H:%M') }} → {{ b.end.strftime('%d.%m.%Y %H:%M') }}</div>
+<div class="text-sm opacity-70">von {{ u.name }} ({{ u.email }})</div>
+</li>
+{% else %}
+<li class="opacity-70">Noch keine Buchungen.</li>
+{% endfor %}
+</ul>
+{% endblock %}

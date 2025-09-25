@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Neueste Ankündigungen</h1>
+<ul class="space-y-3">
+{% for a in anns %}
+<li class="p-4 bg-white shadow rounded">
+<div class="font-semibold">{{ a.title }}</div>
+<div class="text-sm opacity-70">{{ a.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+<p class="mt-2">{{ a.body }}</p>
+</li>
+{% else %}
+<li class="opacity-70">Noch nichts hier.</li>
+{% endfor %}
+</ul>
+{% endblock %}
