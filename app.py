@@ -3,6 +3,7 @@ from flask import Flask, render_template, redirect, url_for, flash, request
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import DB, User, Announcement, Chore, Booking, Resource, Role
 from forms import RegisterForm, LoginForm, AnnouncementForm, ChoreForm, BookingForm
+from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config
 from datetime import datetime
 from sqlalchemy import select
@@ -17,6 +18,7 @@ def load_user(user_id):
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=0, x_port=0, x_prefix=0)
     DB.init_app(app)
     login_manager.init_app(app)
 
