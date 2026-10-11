@@ -1,6 +1,6 @@
 # Community: Master Roadmap
 
-> Status: plan v1 (2026-10-11). No code has been written yet. This file is the single source of truth for future coding sessions. Every task has an ID, for example `M0-9`. Reference that ID in branch names and commits.
+> Status: plan v1 (2026-10-11). **M0 is implemented** (M0-2 … M0-13, see §8.3); M0-1 is server work for the owner (see README). This file is the single source of truth for future coding sessions. Every task has an ID, for example `M0-9`. Reference that ID in branch names and commits.
 > Points marked **[verify]** were not confirmed and must be checked before implementation. Points marked **[Q n]** depend on an open question in §10.
 
 ---
@@ -748,6 +748,8 @@ The contract is published early as `docs/api/openapi.yaml` (M6-2) so the user ca
 | N17 State of the server at `~/community` unknown | M0-1 |
 
 ### 8.3 M0 — Rescue & foundations → Release **R0 "Läuft wieder"**
+**Status (2026-10-11):** M0-2 … M0-13 are implemented in Wegito/Community#1, one commit per task. Deviations are listed in `docs/decisions.md`. **M0-1 is still open**: it is server work for the owner, with a checklist in `README.md`.
+
 **Ordering rule:** M0-1 (rotation and server audit) **must be finished before deploying anything that makes the app start** (M0-4 or later).
 
 | ID | Title | Scope | Depends on | Size | Parallel-safe with |
