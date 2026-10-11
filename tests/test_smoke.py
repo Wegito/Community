@@ -11,6 +11,7 @@ import pytest
 
 from community import create_app
 from community.config import TestingConfig
+from community.core.identity.services import create_invitation
 from community.core.org.services import add_to_group, assign_office, create_group, create_semester, office_by_key
 from community.core.platform.jobs import enqueue
 from community.core.platform.notify import notify
@@ -20,7 +21,7 @@ from community.modules.bookings.models import Resource
 from community.modules.bookings.services import create_booking
 from community.modules.tasks.models import Chore
 
-from .factories import give_permissions, make_user
+from .factories import give_permissions, make_member, make_user
 
 
 def _rules():
@@ -57,6 +58,7 @@ def data(app):
     membership = add_to_group(group, member.member, date(2026, 10, 1))
     job = enqueue('test.smoke', {})
     notification = notify(member.member, 'rank_changed', 'Test')
+    invitation, _ = create_invitation(make_member('Neu Ling'), 'link', created_by=member)
     db.session.commit()
     # URL parameters by name, filled in for rules like /chores/edit/<int:cid>.
     return {
@@ -71,6 +73,8 @@ def data(app):
         'membership_id': membership.id,
         'job_id': job.id,
         'notification_id': notification.id,
+        'invitation_id': invitation.id,
+        'token': 'not-a-valid-token',
     }
 
 
@@ -85,7 +89,13 @@ def test_every_route_declares_access():
 
 @pytest.mark.parametrize(('rule', 'method', 'access'), [r for r in RULES if r[2][0] == 'public'], ids=ids)
 def test_public_routes_render(client, rule, method, access):
-    assert client.open(rule, method=method).status_code == 200
+    response = client.open(rule, method=method)
+    if '<' in rule:
+        # A public rule with a parameter (/join/<token>) gets the literal placeholder: an unknown
+        # token is a friendly "not found", never an error.
+        assert response.status_code in (404, 410)
+    else:
+        assert response.status_code == 200
 
 
 @pytest.mark.parametrize(('rule', 'method', 'access'), [r for r in RULES if r[2][0] != 'public'], ids=ids)

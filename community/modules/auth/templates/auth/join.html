@@ -1,0 +1,21 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% block title %}Willkommen{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-2">Willkommen bei {{ club_name }}</h1>
+<p class="mb-4">Hallo {{ member.first_name }}{% if invitation.created_by %}, {{ invitation.created_by.member.full_name }} hat dich eingeladen{% else %}, du bist eingeladen{% endif %}.
+Lege hier dein Konto an, dann bist du gleich angemeldet.</p>
+<div class="p-3 bg-white rounded shadow mb-4 max-w-md">
+<p><span class="opacity-70">Mitglied:</span> <strong>{{ member.full_name }}</strong>{% if member.biername %} ({{ member.biername }}){% endif %}</p>
+<p class="text-sm opacity-70">Der Link gilt bis {{ invitation.expires_at|dt }} und nur einmal.</p>
+</div>
+<form method="post" class="space-y-3 max-w-md" novalidate>
+{{ form.hidden_tag() }}
+{{ field(form.login_email, autocomplete='username') }}
+{{ field(form.password, autocomplete='new-password', minlength=min_password_length) }}
+{{ field(form.confirm, autocomplete='new-password') }}
+<p class="text-sm opacity-70">Mindestens {{ min_password_length }} Zeichen; ein Satz aus mehreren Wörtern ist gut zu merken.</p>
+{{ submit(form.submit) }}
+</form>
+<p class="mt-4 text-sm opacity-70">Du hast schon ein Konto? Dann <a class="underline" href="{{ url_for('auth.login') }}">hier einloggen</a>.</p>
+{% endblock %}

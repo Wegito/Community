@@ -1,0 +1,10 @@
+{% extends 'layout.html' %}
+{% block title %}Einladung{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Einladung</h1>
+<p class="p-3 rounded border border-yellow-300 bg-yellow-50 mb-4">Du bist schon als {{ current_user.member.full_name }} angemeldet. Eine Einladung legt ein neues Konto an: bitte zuerst abmelden und den Link dann noch einmal öffnen.</p>
+<form method="post" action="{{ url_for('auth.logout') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+<button type="submit" class="px-4 py-2 bg-slate-900 text-white rounded">Abmelden</button>
+</form>
+{% endblock %}

@@ -1,0 +1,16 @@
+{# Open invitations of `member` with a revoke button each. Needs `invitations` and `button_form`. #}
+{% if invitations %}
+<ul class="space-y-1">
+{% for inv in invitations %}
+<li class="flex flex-wrap items-center gap-2">
+<span>{{ inv.channel_label }}{% if inv.channel == 'email' %} an {{ inv.email }}{% endif %}, gültig bis {{ inv.expires_at|dt }}{% if inv.created_by %} · von {{ inv.created_by.member.full_name }}{% endif %}</span>
+<form method="post" action="{{ url_for('members.revoke_invitation', invitation_id=inv.id) }}">
+{{ button_form.hidden_tag() }}
+<button type="submit" class="px-2 py-0.5 rounded border border-red-300 text-red-700 text-sm">Widerrufen</button>
+</form>
+</li>
+{% endfor %}
+</ul>
+{% else %}
+<p class="opacity-70">Keine offene Einladung.</p>
+{% endif %}

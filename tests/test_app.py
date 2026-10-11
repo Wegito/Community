@@ -8,7 +8,7 @@ def test_app_registers_all_routes(app):
     endpoints = {rule.endpoint for rule in app.url_map.iter_rules()}
     assert {
         'auth.login',
-        'auth.register',
+        'auth.join',
         'auth.logout',
         'announcements.index',
         'announcements.list',
@@ -55,23 +55,37 @@ def test_proxy_fix_only_when_hops_configured(tmp_path):
 
 
 def test_config_has_safe_defaults_without_env(monkeypatch):
-    """K7: no default invite code; blank values fall back to the defaults."""
+    """K7: no shared invite code at all (M1-7: personal invitations); blank values fall back to the defaults."""
     import importlib
 
     import community.config as config
 
-    monkeypatch.delenv('INVITE_CODE', raising=False)
+    monkeypatch.setenv('INVITE_CODE', 'invite')
+    monkeypatch.delenv('INVITE_LINK_DAYS', raising=False)
+    monkeypatch.delenv('INVITE_QR_HOURS', raising=False)
     monkeypatch.setenv('SESSION_COOKIE_SAMESITE', '')
     monkeypatch.setenv('SESSION_COOKIE_SECURE', '')
     try:
         fresh = importlib.reload(config)
-        assert fresh.ProductionConfig.INVITE_CODE == ''
+        assert not hasattr(fresh.ProductionConfig, 'INVITE_CODE')
+        assert fresh.ProductionConfig.INVITE_LINK_DAYS == 14
+        assert fresh.ProductionConfig.INVITE_QR_HOURS == 24
         assert fresh.ProductionConfig.SESSION_COOKIE_SAMESITE == 'Lax'
         assert fresh.ProductionConfig.SESSION_COOKIE_SECURE is True
         assert fresh.DevelopmentConfig.SESSION_COOKIE_SECURE is False
     finally:
         monkeypatch.undo()
         importlib.reload(config)
+
+
+@pytest.mark.parametrize('setting', ['INVITE_LINK_DAYS', 'INVITE_QR_HOURS'])
+def test_invitation_lifetime_must_be_positive(setting):
+    class Config(DevelopmentConfig):
+        pass
+
+    setattr(Config, setting, 0)
+    with pytest.raises(RuntimeError, match='INVITE_'):
+        create_app(Config)
 
 
 def test_invalid_samesite_is_rejected():

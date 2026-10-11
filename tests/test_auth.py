@@ -2,7 +2,7 @@ from datetime import timedelta
 
 import pytest
 from flask_migrate import upgrade
-from sqlalchemy import select, text
+from sqlalchemy import text
 
 from community import create_app
 from community.config import TestingConfig
@@ -111,35 +111,6 @@ def test_logout_without_csrf_token_is_rejected(app, client, login):
     login('max@example.org')
     app.config['WTF_CSRF_ENABLED'] = True
     assert client.post('/logout').status_code == 400
-
-
-def test_register_lowercases_email_and_blocks_case_duplicates(client):
-    data = {
-        'name': 'Max',
-        'email': ' Max@Example.org ',
-        'invite': 'test-invite',
-        'password': 'long enough pw',
-        'confirm': 'long enough pw',
-    }
-    client.post('/register', data=data)
-    assert db.session.scalar(select(User.login_email)) == 'max@example.org'
-    client.post('/register', data={**data, 'email': 'MAX@example.org'})
-    assert len(db.session.scalars(select(User)).all()) == 1
-
-
-def test_register_rejects_short_password_with_message(client):
-    response = client.post(
-        '/register',
-        data={
-            'name': 'Max',
-            'email': 'max@example.org',
-            'invite': 'test-invite',
-            'password': 'short',
-            'confirm': 'short',
-        },
-    )
-    assert 'Mindestens 10 Zeichen' in response.get_data(as_text=True)
-    assert db.session.scalar(select(User)) is None
 
 
 def _app_at_revision(tmp_path, revision):

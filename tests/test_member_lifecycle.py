@@ -301,6 +301,7 @@ def test_exit_ends_everything_and_notifies_the_kassenwart(app, club):
             'offices': ['schriftwart'],
             'groups': ['Küche A', 'Neue Gruppe'],
             'roles': [SYSADMIN],
+            'invitations': [],
         },
         'notified_member_ids': [club['kassenwart'].member_id],
     }

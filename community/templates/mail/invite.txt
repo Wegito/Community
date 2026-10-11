@@ -1,0 +1,12 @@
+{#- Personal invitation (members.services.invite). Sent to the address on the invitation. -#}
+{% extends 'mail/base.txt' %}
+{% block subject %}Einladung zu {{ club_name }}{% endblock %}
+{% block body -%}
+{% if inviter %}{{ inviter }} hat dich{% else %}Du wurdest{% endif %} zu {{ club_name }} eingeladen.
+Mit diesem Link legst du dein Konto an (E-Mail-Adresse und Passwort):
+
+{{ join_url }}
+
+Der Link gilt bis {{ expires_at|dt }} und nur einmal. Gib ihn nicht weiter.
+Ist er abgelaufen, bitte um einen neuen.
+{%- endblock %}

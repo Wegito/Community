@@ -24,7 +24,8 @@ The repository is public, and an old `.env` with `SECRET_KEY`, `INVITE_CODE` and
 4. **Set new secrets** in the server's `.env` (compare with `.env.example`):
    - `SECRET_KEY`: new random value, at least 32 characters:
      `python -c "import secrets; print(secrets.token_hex(32))"`
-   - `INVITE_CODE`: a new code, or leave it empty to close registration.
+   - Remove `INVITE_CODE`: the shared registration code is gone. New members get personal
+     invitation links (Mitglieder → Neues Mitglied).
    - Remove `ADMIN_EMAIL` and any `cd …` / `cat > .env << 'ENV'` lines.
    Rotating the key logs everyone out once. That is intended.
    The new version refuses to start in production with a `SECRET_KEY` shorter than 32 characters.
@@ -49,6 +50,11 @@ flask run --debug
 
 Open http://127.0.0.1:5000 and log in with the admin account.
 
+There is no self-registration. To add someone, open *Mitglieder → Neues Mitglied* (permission
+`members.invite`): the member is created without login, and they get a personal, single-use
+link (copy it, show it as a QR code, or let the app email it) at `/join/<token>`, where they
+choose their login email and password.
+
 ### Checks (the same ones CI runs)
 
 ```bash
@@ -65,9 +71,8 @@ All settings come from environment variables or `.env` (see [`.env.example`](.en
 |---|---|
 | `APP_ENV` | `production` (default), `development` or `testing` |
 | `SECRET_KEY` | Required in production, at least 32 random characters. The app refuses to start otherwise. |
-| `INVITE_CODE` | Shared registration code. Empty = registration closed. Replaced by personal invites in M1-7. |
 | `CLUB_NAME` | Name shown in the UI |
-| `BASE_URL` | Public URL, e.g. `https://community.example.org`. Used for links in emails; set it in production. |
+| `BASE_URL` | Public URL, e.g. `https://community.example.org`. Used for links in emails and invitation links; set it in production. |
 | `SQLALCHEMY_DATABASE_URI` | Default `sqlite:///community.db` (in `instance/`) |
 | `TRUSTED_PROXY_HOPS` | `1` behind one Nginx, `0` without a proxy (default) |
 | `SESSION_COOKIE_SECURE` | Empty = default: `true` in production, `false` in development. Set `false` only for production without HTTPS. |
@@ -78,6 +83,8 @@ All settings come from environment variables or `.env` (see [`.env.example`](.en
 | `MAIL_USE_SSL` | Implicit TLS, usually port 465 (default `false`). Not together with `MAIL_USE_TLS`. |
 | `MAIL_USERNAME`, `MAIL_PASSWORD` | SMTP login; empty username = no login |
 | `MAIL_FROM` | Sender, default `Community <noreply@localhost>` |
+| `INVITE_LINK_DAYS` | Days an invitation link (copied or sent by email) stays valid (default 14) |
+| `INVITE_QR_HOURS` | Hours an invitation shown as a QR code stays valid (default 24) |
 | `JOB_MAX_ATTEMPTS` | Tries per background job before it is marked failed (default 5; waits 2, 4, 8, 16 minutes in between) |
 
 ## Background jobs and email
@@ -134,10 +141,10 @@ community/
 ├── config.py          settings per environment
 ├── extensions.py      db, migrate, login_manager, csrf
 ├── core/              shared code; never imports from modules/
-│   ├── identity/      Member and User models, login loader, create-admin command
+│   ├── identity/      Member, User and Invitation models, login loader, create-admin command
 │   ├── authz/         permissions: registry, roles, @require_perm, can()
 │   ├── org/           semesters, ranks, Ämter, groups
-│   ├── platform/      audit log, background jobs, mail, notifications (bell)
+│   ├── platform/      audit log, background jobs, mail, notifications (bell), QR codes
 │   ├── db.py time.py money.py security.py errors.py
 ├── modules/           one blueprint per feature: models, forms, routes, templates
 │   ├── auth/ members/ announcements/ tasks/ bookings/ admin/

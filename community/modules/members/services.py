@@ -1,4 +1,4 @@
-"""Directory queries, who sees which contact data, and editing member data."""
+"""Directory queries, who sees which contact data, editing member data, new members and invitations."""
 
 import unicodedata
 from typing import NamedTuple
@@ -7,10 +7,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from community.core.authz.service import clear_cache, end_all_member_roles
-from community.core.identity.models import ExitReason, Member, MemberStatus, User, normalize_email
+from community.core.identity import services as identity
+from community.core.identity.models import ExitReason, InvitationChannel, Member, MemberStatus, User, normalize_email
 from community.core.identity.services import end_all_sessions
 from community.core.org import services as org
 from community.core.platform import audit
+from community.core.platform.mail import absolute_url, queue_mail
 from community.core.platform.notify import notify
 from community.core.time import today_local
 from community.extensions import db
@@ -152,10 +154,16 @@ def visible_contact(member, permissions, *, is_self=False):
 # --- Editing ---------------------------------------------------------------------
 
 
-def email_in_use(email, member):
-    """True if another member has this contact email, or another member's login uses it."""
-    contact = select(Member.id).where(Member.email == email, Member.id != member.id)
-    login = select(User.id).where(User.login_email == email, User.member_id != member.id)
+def email_in_use(email, member=None):
+    """True if another member has this contact email, or another member's login uses it.
+
+    member=None (a member not created yet): any member counts as another.
+    """
+    contact = select(Member.id).where(Member.email == email)
+    login = select(User.id).where(User.login_email == email)
+    if member is not None:
+        contact = contact.where(Member.id != member.id)
+        login = login.where(User.member_id != member.id)
     return db.session.scalar(contact.limit(1)) is not None or db.session.scalar(login.limit(1)) is not None
 
 
@@ -266,7 +274,8 @@ def exit_member(member, ended_on, reason, *, recorded_by, note=None):
 
     The member becomes ENDED and from then on only has the former-member role; the login stays
     usable (own profile, own Saldo). Rank, Ämter, groups and direct roles still running after
-    `ended_on` end that day, or on their first day if they start later. The current Kassenwart
+    `ended_on` end that day, or on their first day if they start later; open invitations are
+    revoked. The current Kassenwart
     is notified (kind member_exit) to settle the Saldo. Returns the notified members.
 
     recorded_by=None means the server operator (CLI); otherwise nobody records their own exit.
@@ -284,6 +293,7 @@ def exit_member(member, ended_on, reason, *, recorded_by, note=None):
 
     ended = org.end_member_periods(member, ended_on, reason=OFFICE_END_REASON, ended_by=recorded_by)
     ended['roles'] = end_all_member_roles(member, ended_on)
+    ended['invitations'] = identity.revoke_open_invitations(member)
     member.status = MemberStatus.ENDED
     member.ended_on = ended_on
     member.ended_reason = reason
@@ -338,3 +348,113 @@ def reactivate_member(member, *, actor):
     audit.record('members.reactivate', member, actor=actor, diff=before)
     clear_cache()
     return member
+
+
+# --- New members and invitations -------------------------------------------------
+
+# Without members.rank.change a new member can only start as Spefux (roadmap §3.3).
+STARTING_RANK = 'spefux'
+
+# "Neues Mitglied" can also create the member now and invite later from the member page.
+DELIVERY_NONE = 'none'
+
+EMAIL_NEEDED = 'Für den Versand per E-Mail bitte eine E-Mail-Adresse angeben.'
+
+
+def starting_ranks(permissions):
+    """Ranks a new member may start in: every rank for holders of members.rank.change, else Spefux."""
+    if 'members.rank.change' in permissions:
+        return org.ranks()
+    rank = org.rank_by_key(STARTING_RANK)
+    return [rank] if rank is not None and rank.archived_at is None else []
+
+
+def add_member(data, rank, delivery, *, invited_by, permissions):
+    """Neues Mitglied: create a member without login, start their rank and invite them. Commits nothing.
+
+    data: first_name, last_name, biername, email (contact address, optional), joined_on.
+    The rank starts on joined_on and must be one of starting_ranks(permissions).
+    delivery: DELIVERY_NONE or an InvitationChannel (see invite()).
+    Returns (member, invitation or None, raw token or None).
+    """
+    if rank.id not in {r.id for r in starting_ranks(permissions)}:
+        raise MemberError(f'Als Startrang darfst du {rank.label} nicht vergeben.')
+    first_name = (data.get('first_name') or '').strip()
+    if not first_name:
+        raise MemberError('Der Vorname darf nicht leer sein.')
+    email = normalize_email(data.get('email')) or None
+    if delivery == InvitationChannel.EMAIL and not email:
+        raise MemberError(EMAIL_NEEDED)
+    if email and email_in_use(email):
+        raise EmailInUse(EMAIL_IN_USE)
+    joined_on = data.get('joined_on') or today_local()
+
+    member = identity.create_member(
+        first_name,
+        data.get('last_name') or '',
+        email=email,
+        biername=(data.get('biername') or '').strip() or None,
+        joined_on=joined_on,
+    )
+    audit.record(
+        'members.create',
+        member,
+        actor=invited_by,
+        diff={
+            'first_name': member.first_name,
+            'last_name': member.last_name,
+            'biername': member.biername,
+            'email': member.email,
+            'joined_on': joined_on,
+            'payment_ref': member.payment_ref,
+        },
+    )
+    try:
+        org.change_rank(member, rank, joined_on, changed_by=invited_by)
+    except org.OrgError as error:
+        raise MemberError(str(error)) from None
+    if delivery == DELIVERY_NONE:
+        return member, None, None
+    invitation, raw_token = invite(member, delivery, invited_by=invited_by, email=email)
+    return member, invitation, raw_token
+
+
+def invite(member, channel, *, invited_by, email=None):
+    """Invite a member without login. Returns (invitation, raw token). Commits nothing.
+
+    channel: link (the inviter copies it), qr (shown on the inviter's screen) or email (needs
+    `email`; the mail is queued now and sent by the job runner). `email` is also suggested as
+    the login email on the join page. Older open invitations of the member are revoked.
+    """
+    email = normalize_email(email) or None
+    if channel == InvitationChannel.EMAIL and not email:
+        raise MemberError(EMAIL_NEEDED)
+    if email and email_in_use(email, member):
+        raise EmailInUse(EMAIL_IN_USE)
+    try:
+        invitation, raw_token = identity.create_invitation(member, channel, created_by=invited_by, email=email)
+    except identity.InvitationError as error:
+        raise MemberError(str(error)) from None
+    if channel == InvitationChannel.EMAIL:
+        queue_mail(
+            email,
+            'invite',
+            name=member.first_name,
+            inviter=invited_by.member.full_name if invited_by is not None else None,
+            join_url=join_url(raw_token),
+            expires_at=invitation.expires_at,
+        )
+    return invitation, raw_token
+
+
+def join_url(raw_token):
+    """The full link for an invitation (BASE_URL, else the current request's host)."""
+    return absolute_url('auth.join', token=raw_token)
+
+
+def revoke_invitation(invitation, *, actor):
+    """Make an invitation link unusable. Commits nothing."""
+    try:
+        return identity.revoke_invitation(invitation, revoked_by=actor)
+    except identity.InvitationError as error:
+        raise MemberError(str(error)) from None

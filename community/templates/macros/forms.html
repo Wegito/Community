@@ -15,6 +15,20 @@
 </label>
 {%- endmacro %}
 
+{% macro radios(f) -%}
+<fieldset>
+<legend class="block text-sm font-medium mb-1">{{ f.label.text }}</legend>
+<div class="space-y-1">
+{% for option in f %}
+<label class="flex items-center gap-2">{{ option() }}<span>{{ option.label.text }}</span></label>
+{% endfor %}
+</div>
+{% for error in f.errors %}
+<p class="text-sm text-red-700 mt-1">{{ error }}</p>
+{% endfor %}
+</fieldset>
+{%- endmacro %}
+
 {% macro submit(f) -%}
 {{ f(class='px-4 py-2 bg-slate-900 text-white rounded') }}
 {%- endmacro %}

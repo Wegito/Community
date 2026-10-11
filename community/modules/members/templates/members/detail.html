@@ -29,9 +29,19 @@
 
 {% set manage_login = can('members.edit_any') and member.user and not is_self %}
 {% set manage_exit = can('members.exit.record') and not is_self %}
-{% if manage_login or manage_exit %}
+{% if manage_login or manage_exit or can_invite %}
 <h2 class="text-lg font-semibold mt-6 mb-2">Verwaltung</h2>
 <div class="p-3 bg-white rounded shadow space-y-3">
+{% if can_invite %}
+<div class="flex flex-wrap items-center gap-2">
+<p>Kein Login.</p>
+<a class="px-3 py-1 rounded border" href="{{ url_for('members.invite', public_id=member.public_id) }}">Einladen</a>
+</div>
+<div>
+<p class="text-sm font-medium mb-1">Offene Einladungen</p>
+{% include 'members/_invitations.html' %}
+</div>
+{% endif %}
 {% if manage_login %}
 <p>Login: {{ member.user.login_email }} · {% if member.user.is_enabled %}aktiv{% else %}<strong>gesperrt</strong>{% endif %}</p>
 <div class="flex flex-wrap gap-2">
@@ -51,7 +61,7 @@
 </form>
 {% endif %}
 </div>
-{% elif can('members.edit_any') and not member.user %}
+{% elif can('members.edit_any') and not member.user and not can_invite %}
 <p class="opacity-70">Kein Login.</p>
 {% endif %}
 {% if manage_exit %}

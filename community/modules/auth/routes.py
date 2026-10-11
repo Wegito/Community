@@ -1,49 +1,77 @@
-import hmac
 from datetime import timedelta
 
-from flask import current_app, flash, redirect, render_template, request, url_for
+from flask import current_app, flash, make_response, redirect, render_template, request, url_for
 from flask_login import current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from community.core.authz import public, require_login
-from community.core.identity.models import User, split_name
-from community.core.identity.services import create_member, create_user, find_user_by_login_email
+from community.core.identity.models import MIN_PASSWORD_LENGTH, User
+from community.core.identity.services import (
+    EmailInUse,
+    InvitationError,
+    find_user_by_login_email,
+    find_valid_invitation,
+)
 from community.core.platform import audit
 from community.core.security import safe_next
 from community.core.time import utcnow
 from community.extensions import db
 
-from . import bp
-from .forms import LoginForm, RegisterForm
+from . import bp, services
+from .forms import JoinForm, LoginForm
 
 LOGIN_FAILED = 'Login fehlgeschlagen. Nach mehreren Fehlversuchen wird der Login für kurze Zeit gesperrt.'
+INVALID_LINK = 'Link ungültig oder abgelaufen – bitte einen neuen anfordern.'
+LOGIN_EMAIL_IN_USE = 'Diese E-Mail-Adresse gehört schon zu einem anderen Konto. Bitte eine andere angeben.'
 
 # Checked when the email is unknown, so both cases take about the same time.
 _DUMMY_HASH = generate_password_hash('timing-equaliser')
 
 
-@bp.route('/register', methods=['GET', 'POST'])
+def _private(body, status=200):
+    """The page's URL holds the invitation token: keep it out of caches and Referer headers."""
+    response = make_response(body, status)
+    response.headers['Cache-Control'] = 'no-store'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    return response
+
+
+@bp.route('/join/<token>', methods=['GET', 'POST'])
 @public
-def register():
+def join(token):
+    """Accept a personal invitation: set the login email and password, then log in."""
     if current_user.is_authenticated:
-        return redirect(url_for('announcements.index'))
-    form = RegisterForm()
+        return _private(render_template('auth/join_logged_in.html'))
+    invitation = find_valid_invitation(token)
+    if invitation is None:
+        # Unknown, expired, revoked and used links all look the same.
+        return _private(render_template('auth/join_invalid.html', message=INVALID_LINK), 404)
+    form = JoinForm()
+    if request.method == 'GET':
+        form.login_email.data = invitation.email or invitation.member.email
     if form.validate_on_submit():
-        invite_code = current_app.config.get('INVITE_CODE')
-        if not invite_code or not hmac.compare_digest(form.invite.data.encode(), invite_code.encode()):
-            flash('Falscher Invite-Code', 'danger')
-            return render_template('auth/register.html', form=form)
-        if find_user_by_login_email(form.email.data) is not None:
-            flash('E-Mail bereits registriert', 'warning')
-            return render_template('auth/register.html', form=form)
-        first, last = split_name(form.name.data)
-        member = create_member(first, last, email=form.email.data)
-        user = create_user(member, form.email.data, password=form.password.data)
-        audit.record('auth.register', user, actor=user)
-        db.session.commit()
-        flash('Registrierung erfolgreich. Bitte einloggen.', 'success')
-        return redirect(url_for('auth.login'))
-    return render_template('auth/register.html', form=form)
+        try:
+            user = services.join(invitation, form.login_email.data, form.password.data)
+        except EmailInUse:
+            db.session.rollback()
+            form.login_email.errors.append(LOGIN_EMAIL_IN_USE)
+        except InvitationError:
+            db.session.rollback()
+            return _private(render_template('auth/join_invalid.html', message=INVALID_LINK), 404)
+        else:
+            db.session.commit()
+            login_user(user)
+            flash(f'Willkommen, {user.member.first_name}! Dein Konto ist angelegt und du bist angemeldet.', 'success')
+            return redirect(url_for('members.profile'))
+    return _private(
+        render_template(
+            'auth/join.html',
+            form=form,
+            invitation=invitation,
+            member=invitation.member,
+            min_password_length=MIN_PASSWORD_LENGTH,
+        )
+    )
 
 
 @bp.route('/login', methods=['GET', 'POST'])

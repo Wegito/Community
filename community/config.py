@@ -41,9 +41,6 @@ class BaseConfig:
     SQLALCHEMY_ECHO = False
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # Shared registration code; empty = registration closed. Removed in M1-7.
-    INVITE_CODE = os.getenv('INVITE_CODE', '')
-
     CLUB_NAME = os.getenv('CLUB_NAME', 'Community')
     BASE_URL = os.getenv('BASE_URL', '').rstrip('/')
     PREFERRED_URL_SCHEME = env_str('PREFERRED_URL_SCHEME', 'https')
@@ -63,6 +60,11 @@ class BaseConfig:
     # Login throttling, counted per account in the database (works across workers).
     MAX_FAILED_LOGINS = env_int('MAX_FAILED_LOGINS', 5)
     LOGIN_LOCKOUT_MINUTES = env_int('LOGIN_LOCKOUT_MINUTES', 15)
+
+    # Personal invitations (/join/<token>): how long a link stays valid. Links sent by email or
+    # copied by the inviter last days; a QR code shown on the inviter's phone only hours.
+    INVITE_LINK_DAYS = env_int('INVITE_LINK_DAYS', 14)
+    INVITE_QR_HOURS = env_int('INVITE_QR_HOURS', 24)
 
     # IP addresses in the audit log are removed after this many days (flask audit purge-ips).
     AUDIT_IP_RETENTION_DAYS = env_int('AUDIT_IP_RETENTION_DAYS', 90)
@@ -93,6 +95,8 @@ class BaseConfig:
             raise RuntimeError('Set either MAIL_USE_SSL (port 465) or MAIL_USE_TLS (STARTTLS, port 587), not both')
         if cls.JOB_MAX_ATTEMPTS < 1:
             raise RuntimeError('JOB_MAX_ATTEMPTS must be at least 1')
+        if cls.INVITE_LINK_DAYS < 1 or cls.INVITE_QR_HOURS < 1:
+            raise RuntimeError('INVITE_LINK_DAYS and INVITE_QR_HOURS must be at least 1')
 
 
 class DevelopmentConfig(BaseConfig):
@@ -111,7 +115,6 @@ class TestingConfig(BaseConfig):
     SECRET_KEY = 'testing-key'  # noqa: S105 (tests only)
     SQLALCHEMY_DATABASE_URI = 'sqlite://'
     WTF_CSRF_ENABLED = False
-    INVITE_CODE = 'test-invite'
     PREFERRED_URL_SCHEME = 'http'
     SESSION_COOKIE_SECURE = False
     REMEMBER_COOKIE_SECURE = False
@@ -123,6 +126,8 @@ class TestingConfig(BaseConfig):
     MAIL_USE_TLS = True
     MAIL_FROM = 'Community <noreply@localhost>'
     JOB_MAX_ATTEMPTS = 5
+    INVITE_LINK_DAYS = 14
+    INVITE_QR_HOURS = 24
 
 
 class ProductionConfig(BaseConfig):

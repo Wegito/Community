@@ -1,0 +1,27 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, radios, submit %}
+{% block title %}Neues Mitglied{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Neues Mitglied</h1>
+<p class="mb-4 max-w-xl">Das Mitglied wird ohne Login angelegt und bekommt einen persönlichen Einladungslink. Damit legt es selbst E-Mail-Adresse und Passwort fest.</p>
+<form method="post" class="space-y-3 max-w-md" novalidate>
+{{ form.hidden_tag() }}
+{{ field(form.first_name, autocomplete='off') }}
+{{ field(form.last_name, autocomplete='off') }}
+{{ field(form.biername, autocomplete='off') }}
+{{ field(form.email, autocomplete='off') }}
+<p class="text-sm opacity-70">Optional; nötig für die Einladung per E-Mail.</p>
+{{ field(form.joined_on) }}
+{% if ranks %}
+{{ field(form.rank_id) }}
+{% if ranks|length == 1 %}<p class="text-sm opacity-70">Andere Ränge vergibt, wer Ränge ändern darf.</p>{% endif %}
+{% else %}
+<p class="p-3 rounded border border-yellow-300 bg-yellow-50">Es gibt keinen Rang, den du vergeben darfst.</p>
+{% endif %}
+{{ radios(form.delivery) }}
+<div class="flex gap-2 items-center">
+{{ submit(form.submit) }}
+<a class="underline" href="{{ url_for('members.directory') }}">Abbrechen</a>
+</div>
+</form>
+{% endblock %}

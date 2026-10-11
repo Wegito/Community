@@ -92,3 +92,13 @@ def make_officer(office_key, email=None, name=None, valid_from=date(2020, 1, 1))
     assign_office(office_by_key(office_key), user.member, valid_from)
     db.session.commit()
     return user
+
+
+def make_invitation(member=None, channel='link', created_by=None, email=None):
+    """An open invitation for a member without login (a new one by default). Returns (invitation, raw token)."""
+    from community.core.identity.services import create_invitation
+
+    member = member or make_member('Neu Ling')
+    invitation, raw_token = create_invitation(member, channel, created_by=created_by, email=email)
+    db.session.commit()
+    return invitation, raw_token

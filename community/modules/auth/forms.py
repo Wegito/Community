@@ -1,18 +1,18 @@
 from flask_wtf import FlaskForm
-from wtforms import BooleanField, EmailField, PasswordField, StringField, SubmitField
+from wtforms import BooleanField, EmailField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length
 
 from community.core.identity.models import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, normalize_email
 
 
-def strip(value):
-    return value.strip() if value else value
+class JoinForm(FlaskForm):
+    """Create the login from an invitation (/join/<token>)."""
 
-
-class RegisterForm(FlaskForm):
-    name = StringField('Name', filters=[strip], validators=[DataRequired(), Length(max=120)])
-    email = EmailField('E-Mail', filters=[normalize_email], validators=[DataRequired(), Email(), Length(max=255)])
-    invite = StringField('Invite-Code', filters=[strip], validators=[DataRequired()])
+    login_email = EmailField(
+        'E-Mail-Adresse für den Login',
+        filters=[normalize_email],
+        validators=[DataRequired(), Email(), Length(max=255)],
+    )
     password = PasswordField(
         'Passwort',
         validators=[
@@ -25,9 +25,10 @@ class RegisterForm(FlaskForm):
         ],
     )
     confirm = PasswordField(
-        'Bestätigen', validators=[DataRequired(), EqualTo('password', message='Passwörter stimmen nicht überein.')]
+        'Passwort wiederholen',
+        validators=[DataRequired(), EqualTo('password', message='Passwörter stimmen nicht überein.')],
     )
-    submit = SubmitField('Registrieren')
+    submit = SubmitField('Konto anlegen')
 
 
 class LoginForm(FlaskForm):

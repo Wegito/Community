@@ -6,6 +6,7 @@ from sqlalchemy import case, literal, or_, update
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from community.core.db import TimestampMixin, UTCDateTime
+from community.core.time import utcnow
 from community.extensions import db
 
 MIN_PASSWORD_LENGTH = 10
@@ -156,3 +157,66 @@ class User(UserMixin, TimestampMixin, db.Model):
             .execution_options(synchronize_session=False)
         )
         db.session.commit()
+
+
+class InvitationChannel:
+    """How the invitation link reaches the new member."""
+
+    LINK = 'link'  # the inviter copies the link and passes it on
+    EMAIL = 'email'  # the app mails it
+    QR = 'qr'  # shown as a QR code on the inviter's phone; short-lived
+    ALL = (LINK, EMAIL, QR)
+    LABELS = {LINK: 'Link', EMAIL: 'E-Mail', QR: 'QR-Code'}
+
+
+class InvitationState:
+    OPEN = 'open'
+    ACCEPTED = 'accepted'
+    REVOKED = 'revoked'
+    EXPIRED = 'expired'
+    LABELS = {OPEN: 'offen', ACCEPTED: 'angenommen', REVOKED: 'widerrufen', EXPIRED: 'abgelaufen'}
+
+
+class Invitation(db.Model):
+    """A personal, single-use link (/join/<token>) with which a member without login creates one.
+
+    Only the SHA-256 hash of the token is stored. The raw token exists once, when the
+    invitation is created, so a database leak does not reveal usable links.
+    """
+
+    id = db.Column(db.Integer, primary_key=True)
+    member_id = db.Column(db.Integer, db.ForeignKey('member.id'), nullable=False, index=True)
+    email = db.Column(db.String(255))  # where the mail went; suggested as the login email
+    token_hash = db.Column(db.String(64), unique=True, nullable=False)  # sha256 hex of the raw token
+    channel = db.Column(db.String(10), nullable=False)
+    expires_at = db.Column(UTCDateTime, nullable=False)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'))  # NULL = server operator (CLI)
+    created_at = db.Column(UTCDateTime, nullable=False, default=utcnow)
+    accepted_at = db.Column(UTCDateTime)
+    revoked_at = db.Column(UTCDateTime)
+
+    member = db.relationship('Member', lazy='joined')
+    created_by = db.relationship('User')
+
+    def state(self, now=None):
+        if self.accepted_at is not None:
+            return InvitationState.ACCEPTED
+        if self.revoked_at is not None:
+            return InvitationState.REVOKED
+        if self.expires_at <= (now or utcnow()):
+            return InvitationState.EXPIRED
+        return InvitationState.OPEN
+
+    def is_open(self, now=None):
+        return self.state(now) == InvitationState.OPEN
+
+    @property
+    def state_label(self):
+        return InvitationState.LABELS[self.state()]
+
+    @property
+    def channel_label(self):
+        return InvitationChannel.LABELS.get(self.channel, self.channel)
+
+    def __repr__(self):
+        return f'<Invitation {self.id} member={self.member_id} {self.channel}>'
