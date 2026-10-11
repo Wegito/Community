@@ -1,34 +1,46 @@
 {% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% block title %}Buchungen{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Buchungen</h1>
+<div class="flex items-center mb-4">
+<h1 class="text-2xl font-semibold">Buchungen</h1>
+<span class="flex-1"></span>
+{% if current_user.role == 'admin' %}
+<a class="underline" href="{{ url_for('bookings.resources') }}">Ressourcen verwalten</a>
+{% endif %}
+</div>
+
+{% if resources %}
 <form method="post" class="space-y-3 mb-6">
 {{ form.hidden_tag() }}
-<div>
-{{ form.resource.label }}
-{{ form.resource(class='border p-2 rounded w-full', placeholder='z.B. Saal') }}
-</div>
+{{ field(form.resource_id) }}
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-<div>
-{{ form.start.label }}
-{{ form.start(class='border p-2 rounded w-full') }}
+{{ field(form.start) }}
+{{ field(form.end) }}
 </div>
-<div>
-{{ form.end.label }}
-{{ form.end(class='border p-2 rounded w-full') }}
-</div>
-</div>
-{{ form.submit(class='px-4 py-2 bg-slate-900 text-white rounded') }}
+{{ submit(form.submit) }}
 </form>
+{% else %}
+<p class="mb-6 opacity-70">Noch keine Ressourcen zum Buchen. Ein Admin kann sie unter „Ressourcen verwalten“ anlegen.</p>
+{% endif %}
 
-
+<h2 class="text-lg font-semibold mb-2">Kommende Buchungen</h2>
 <ul class="space-y-2">
-{% for b, r, u in items %}
-<li class="p-3 bg-white rounded shadow">
-<div class="font-medium">{{ r.name }} – {{ b.start|dt }} → {{ b.end|dt }}</div>
-<div class="text-sm opacity-70">von {{ u.name }} ({{ u.email }})</div>
+{% for b in items %}
+<li class="p-3 bg-white rounded shadow flex flex-wrap items-center gap-3">
+<div class="flex-1">
+<div class="font-medium">{{ b.resource.name }} – {{ b.start|dt }} → {{ b.end|dt }}</div>
+<div class="text-sm opacity-70">von {{ b.user.name }}</div>
+</div>
+{% if b.can_cancel(current_user) %}
+<form method="post" action="{{ url_for('bookings.cancel', booking_id=b.id) }}">
+{{ button_form.hidden_tag() }}
+<button type="submit" class="px-3 py-1 rounded border text-red-700">Stornieren</button>
+</form>
+{% endif %}
 </li>
 {% else %}
-<li class="opacity-70">Noch keine Buchungen.</li>
+<li class="opacity-70">Keine kommenden Buchungen.</li>
 {% endfor %}
 </ul>
 {% endblock %}

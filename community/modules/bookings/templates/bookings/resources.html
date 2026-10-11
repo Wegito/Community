@@ -1,0 +1,25 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% block title %}Ressourcen{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Ressourcen</h1>
+<form method="post" class="space-y-3 mb-6 max-w-md">
+{{ form.hidden_tag() }}
+{{ field(form.name, placeholder='z. B. Saal') }}
+{{ submit(form.submit) }}
+</form>
+<ul class="space-y-2">
+{% for r in items %}
+<li class="p-3 bg-white rounded shadow flex items-center gap-3">
+<div class="flex-1{{ '' if r.is_active else ' opacity-50' }}">{{ r.name }}{% if not r.is_active %} (deaktiviert){% endif %}</div>
+<form method="post" action="{{ url_for('bookings.toggle_resource', resource_id=r.id) }}">
+{{ button_form.hidden_tag() }}
+<button type="submit" class="px-3 py-1 rounded border">{{ 'Deaktivieren' if r.is_active else 'Aktivieren' }}</button>
+</form>
+</li>
+{% else %}
+<li class="opacity-70">Noch keine Ressourcen.</li>
+{% endfor %}
+</ul>
+<p class="mt-4"><a class="underline" href="{{ url_for('bookings.calendar') }}">Zurück zu den Buchungen</a></p>
+{% endblock %}
