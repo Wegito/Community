@@ -1,14 +1,32 @@
 {% extends 'layout.html' %}
+{% block title %}Putzplan{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Putzplan / Aufgaben</h1>
+<div class="flex items-center mb-4">
+<h1 class="text-2xl font-semibold">Putzplan / Aufgaben</h1>
+<span class="flex-1"></span>
+{% if current_user.role == 'admin' %}
+<a class="px-3 py-2 bg-slate-900 text-white rounded" href="{{ url_for('tasks.create') }}">Neu</a>
+{% endif %}
+</div>
 <ul class="space-y-2">
 {% for c in items %}
-<li class="p-3 bg-white rounded shadow flex items-center">
+<li class="p-3 bg-white rounded shadow flex flex-wrap items-center gap-3">
 <div class="flex-1">
-<div class="font-medium">{{ c.title }}</div>
-<div class="text-sm opacity-70">Fällig: {{ c.due_date|d or '—' }}</div>
+<div class="font-medium{{ ' line-through opacity-60' if c.is_done else '' }}">{{ c.title }}</div>
+<div class="text-sm opacity-70">
+Zuständig: {{ c.assigned_to.name if c.assigned_to else '—' }} · Fällig: {{ c.due_date|d or '—' }}
+{% if c.is_done %} · erledigt{% endif %}
 </div>
+</div>
+{% if c.can_toggle_done(current_user) %}
+<form method="post" action="{{ url_for('tasks.toggle_done', cid=c.id) }}">
+{{ toggle_form.hidden_tag() }}
+<button type="submit" class="px-3 py-1 rounded border">{{ 'Wieder öffnen' if c.is_done else 'Erledigt' }}</button>
+</form>
+{% endif %}
+{% if c.can_edit(current_user) %}
 <a class="text-slate-700 underline" href="{{ url_for('tasks.edit', cid=c.id) }}">Bearbeiten</a>
+{% endif %}
 </li>
 {% else %}
 <li class="opacity-70">Noch keine Aufgaben.</li>

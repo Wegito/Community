@@ -1,19 +1,14 @@
 {% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, checkbox, submit %}
+{% block title %}{{ 'Aufgabe bearbeiten' if item else 'Neue Aufgabe' }}{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Aufgabe bearbeiten</h1>
-<form method="post" class="space-y-3">
+<h1 class="text-2xl font-semibold mb-4">{{ 'Aufgabe bearbeiten' if item else 'Neue Aufgabe' }}</h1>
+<form method="post" class="space-y-3 max-w-md">
 {{ form.hidden_tag() }}
-<div>
-{{ form.title.label }}
-{{ form.title(class='border p-2 rounded w-full') }}
-</div>
-<div>
-{{ form.due_date.label }}
-{{ form.due_date(class='border p-2 rounded w-full') }}
-</div>
-<label class="flex items-center gap-2">
-{{ form.is_done() }}<span>Erledigt</span>
-</label>
-{{ form.submit(class='px-4 py-2 bg-slate-900 text-white rounded') }}
+{{ field(form.title) }}
+{{ field(form.assigned_to_id) }}
+{{ field(form.due_date) }}
+{{ checkbox(form.is_done) }}
+{{ submit(form.submit) }}
 </form>
 {% endblock %}
