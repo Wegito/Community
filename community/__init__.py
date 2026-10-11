@@ -3,7 +3,7 @@
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from community.extensions import db, login_manager
+from community.extensions import db, login_manager, migrate
 
 # Blueprints in registration order. A new module is added here (roadmap §4.4).
 MODULES = [
@@ -31,7 +31,10 @@ def create_app(config=None):
         # Host is not taken from X-Forwarded-Host: Nginx passes it as the Host header.
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops)
 
+    import community.core.db  # noqa: F401  (SQLite connection settings)
+
     db.init_app(app)
+    migrate.init_app(app, db)
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'
 
