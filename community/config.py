@@ -64,6 +64,9 @@ class BaseConfig:
     MAX_FAILED_LOGINS = env_int('MAX_FAILED_LOGINS', 5)
     LOGIN_LOCKOUT_MINUTES = env_int('LOGIN_LOCKOUT_MINUTES', 15)
 
+    # IP addresses in the audit log are removed after this many days (flask audit purge-ips).
+    AUDIT_IP_RETENTION_DAYS = env_int('AUDIT_IP_RETENTION_DAYS', 90)
+
     @classmethod
     def validate(cls):
         """Raise RuntimeError when the configuration is unsafe to run."""

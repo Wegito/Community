@@ -11,6 +11,7 @@ MODULES = [
     'community.modules.announcements',
     'community.modules.tasks',
     'community.modules.bookings',
+    'community.modules.admin',
 ]
 
 
@@ -43,8 +44,11 @@ def create_app(config=None):
 
     import community.core.identity  # noqa: F401  (registers the user loader)
     from community.core.identity.cli import create_admin
+    from community.core.platform.audit import audit_cli, init_request_ids
 
     app.cli.add_command(create_admin)
+    app.cli.add_command(audit_cli)
+    init_request_ids(app)
 
     for name in MODULES:
         app.register_blueprint(import_module(name).bp)

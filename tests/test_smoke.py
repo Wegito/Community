@@ -35,6 +35,7 @@ ROUTES = {
     '/bookings/<int:booking_id>/cancel': ('POST', 'owner'),
     '/bookings/resources': ('GET', 'admin'),
     '/bookings/resources/<int:resource_id>/toggle': ('POST', 'admin'),
+    '/admin/audit': ('GET', 'admin'),
 }
 
 

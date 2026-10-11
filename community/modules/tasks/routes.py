@@ -3,12 +3,15 @@ from flask_login import current_user, login_required
 from sqlalchemy import select
 
 from community.core.identity.models import Member, User
+from community.core.platform import audit
 from community.core.security import admin_required
 from community.extensions import db
 
 from . import bp
 from .forms import ChoreForm, ToggleDoneForm
 from .models import Chore
+
+AUDITED_FIELDS = ('title', 'assigned_to_id', 'due_date', 'is_done')
 
 
 def _assignee_choices():
@@ -32,6 +35,8 @@ def create():
         item = Chore()
         form.populate_obj(item)
         db.session.add(item)
+        db.session.flush()
+        audit.record('chore.create', item, diff=audit.snapshot(item, AUDITED_FIELDS))
         db.session.commit()
         flash('Aufgabe angelegt', 'success')
         return redirect(url_for('tasks.list'))
@@ -47,7 +52,9 @@ def edit(cid):
     form = ChoreForm(obj=item)
     form.assigned_to_id.choices = _assignee_choices()
     if form.validate_on_submit():
+        before = audit.snapshot(item, AUDITED_FIELDS)
         form.populate_obj(item)
+        audit.record('chore.update', item, diff=audit.changes(item, AUDITED_FIELDS, before))
         db.session.commit()
         flash('Gespeichert', 'success')
         return redirect(url_for('tasks.list'))
@@ -62,6 +69,7 @@ def toggle_done(cid):
         abort(403)
     if ToggleDoneForm().validate_on_submit():
         item.is_done = not item.is_done
+        audit.record('chore.toggle_done', item, diff={'is_done': item.is_done})
         db.session.commit()
         flash('Als erledigt markiert' if item.is_done else 'Wieder offen', 'success')
     return redirect(url_for('tasks.list'))

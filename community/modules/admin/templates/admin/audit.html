@@ -1,0 +1,35 @@
+{% extends 'layout.html' %}
+{% block title %}Protokoll{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Protokoll</h1>
+<form method="get" class="flex gap-2 mb-4">
+<input name="action" value="{{ action }}" placeholder="Aktion, z. B. auth." class="border p-2 rounded flex-1" />
+<button class="px-3 py-2 bg-slate-900 text-white rounded">Filtern</button>
+</form>
+<p class="text-sm opacity-70 mb-2">{{ total }} Einträge</p>
+<div class="overflow-x-auto">
+<table class="w-full text-sm bg-white shadow rounded">
+<thead><tr class="text-left border-b">
+<th class="p-2">Zeit</th><th class="p-2">Wer</th><th class="p-2">Aktion</th><th class="p-2">Objekt</th><th class="p-2">Details</th><th class="p-2">IP</th>
+</tr></thead>
+<tbody>
+{% for e in entries %}
+<tr class="border-b align-top">
+<td class="p-2 whitespace-nowrap">{{ e.occurred_at|dt('%d.%m.%Y %H:%M:%S') }}</td>
+<td class="p-2">{{ e.actor.display_name if e.actor else 'System' }}</td>
+<td class="p-2 font-mono">{{ e.action }}</td>
+<td class="p-2">{{ e.entity_type or '' }}{% if e.entity_id %} #{{ e.entity_id }}{% endif %}</td>
+<td class="p-2 font-mono text-xs break-all">{{ e.diff_json or '' }}</td>
+<td class="p-2 font-mono text-xs">{{ e.ip or '' }}</td>
+</tr>
+{% else %}
+<tr><td class="p-2 opacity-70" colspan="6">Keine Einträge.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+<div class="flex gap-4 mt-4">
+{% if page > 1 %}<a class="underline" href="{{ url_for('admin.audit', action=action, page=page - 1) }}">← Neuere</a>{% endif %}
+{% if has_next %}<a class="underline" href="{{ url_for('admin.audit', action=action, page=page + 1) }}">Ältere →</a>{% endif %}
+</div>
+{% endblock %}

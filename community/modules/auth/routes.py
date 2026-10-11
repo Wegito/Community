@@ -7,6 +7,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from community.core.identity.models import User, split_name
 from community.core.identity.services import create_member, create_user, find_user_by_login_email
+from community.core.platform import audit
 from community.core.security import safe_next
 from community.core.time import utcnow
 from community.extensions import db
@@ -35,7 +36,8 @@ def register():
             return render_template('auth/register.html', form=form)
         first, last = split_name(form.name.data)
         member = create_member(first, last, email=form.email.data)
-        create_user(member, form.email.data, password=form.password.data)
+        user = create_user(member, form.email.data, password=form.password.data)
+        audit.record('auth.register', user, actor=user)
         db.session.commit()
         flash('Registrierung erfolgreich. Bitte einloggen.', 'success')
         return redirect(url_for('auth.login'))
@@ -51,8 +53,10 @@ def login():
     if form.validate_on_submit():
         now = utcnow()
         user = find_user_by_login_email(form.email.data)
+        reason = None
         if user is None:
             check_password_hash(_DUMMY_HASH, form.password.data)
+            reason = 'unknown_email'
         elif not User.reserve_login_attempt(
             user.id,
             now,
@@ -62,10 +66,24 @@ def login():
             # Locked: same message and same cost as a wrong password, so the response
             # does not reveal that the account exists. The lock expires on its own.
             check_password_hash(_DUMMY_HASH, form.password.data)
-        elif user.check_password(form.password.data) and user.is_active:
+            reason = 'locked'
+        elif not user.check_password(form.password.data):
+            reason = 'wrong_password'
+        elif not user.is_active:
+            reason = 'disabled'
+        else:
             User.record_successful_login(user.id, now)
             login_user(user, remember=form.remember.data)
+            audit.record('auth.login', user, actor=user)
+            db.session.commit()
             return redirect(next_url or url_for('announcements.index'))
+        audit.record(
+            'auth.login_failed',
+            entity_type='user',
+            entity_id=user.id if user else None,
+            diff={'reason': reason, **({} if user else {'email': form.email.data})},
+        )
+        db.session.commit()
         flash(LOGIN_FAILED, 'danger')
     return render_template('auth/login.html', form=form)
 
@@ -73,6 +91,8 @@ def login():
 @bp.route('/logout', methods=['POST'])
 @login_required
 def logout():
+    audit.record('auth.logout', current_user._get_current_object())
+    db.session.commit()
     logout_user()
     flash('Abgemeldet.', 'success')
     return redirect(url_for('auth.login'))

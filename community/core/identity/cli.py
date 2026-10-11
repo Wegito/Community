@@ -2,6 +2,7 @@ import click
 from email_validator import EmailNotValidError, validate_email
 from flask.cli import with_appcontext
 
+from community.core.platform import audit
 from community.extensions import db
 
 from .models import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, Role, normalize_email, split_name
@@ -47,5 +48,6 @@ def create_admin(email, name, password):
     user.is_enabled = True
     user.failed_logins = 0
     user.locked_until = None
+    audit.record('identity.create_admin', user, diff={'via': 'cli'})
     db.session.commit()
     click.echo(f'Admin ready: {email}')

@@ -2,6 +2,7 @@ from flask import flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import select
 
+from community.core.platform import audit
 from community.core.security import admin_required
 from community.extensions import db
 
@@ -31,6 +32,8 @@ def create():
     if form.validate_on_submit():
         a = Announcement(title=form.title.data, body=form.body.data, author_id=current_user.id)
         db.session.add(a)
+        db.session.flush()
+        audit.record('announcement.create', a, diff={'title': a.title})
         db.session.commit()
         flash('Ankündigung erstellt', 'success')
         return redirect(url_for('announcements.list'))

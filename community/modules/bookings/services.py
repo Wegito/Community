@@ -2,6 +2,7 @@
 
 from sqlalchemy import select, update
 
+from community.core.platform import audit
 from community.extensions import db
 
 from .models import Booking, BookingStatus, Resource
@@ -37,10 +38,13 @@ def create_booking(resource_id, user_id, start, end):
         raise BookingConflict
     booking = Booking(resource_id=resource_id, user_id=user_id, start=start, end=end)
     db.session.add(booking)
+    db.session.flush()
+    audit.record('booking.create', booking, diff={'resource_id': resource_id, 'start': start, 'end': end})
     db.session.commit()
     return booking
 
 
 def cancel_booking(booking):
     booking.status = BookingStatus.CANCELLED
+    audit.record('booking.cancel', booking)
     db.session.commit()

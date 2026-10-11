@@ -2,6 +2,7 @@ from flask import abort, flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import select
 
+from community.core.platform import audit
 from community.core.security import admin_required
 from community.core.time import local_to_utc, utcnow
 from community.extensions import db
@@ -65,7 +66,10 @@ def resources():
         if db.session.scalar(select(Resource).where(Resource.name == name)):
             flash('Diese Ressource gibt es schon', 'warning')
         else:
-            db.session.add(Resource(name=name))
+            resource = Resource(name=name)
+            db.session.add(resource)
+            db.session.flush()
+            audit.record('resource.create', resource, diff={'name': name})
             db.session.commit()
             flash('Ressource angelegt', 'success')
             return redirect(url_for('bookings.resources'))
@@ -79,5 +83,6 @@ def toggle_resource(resource_id):
     resource = db.get_or_404(Resource, resource_id)
     if ButtonForm().validate_on_submit():
         resource.is_active = not resource.is_active
+        audit.record('resource.toggle_active', resource, diff={'is_active': resource.is_active})
         db.session.commit()
     return redirect(url_for('bookings.resources'))
