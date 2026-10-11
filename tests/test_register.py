@@ -33,3 +33,12 @@ def test_registration_closed_without_invite_code(app, client):
     register(client, invite='')
     register(client, invite='anything')
     assert db.session.scalar(select(User)) is None
+
+
+def test_admin_email_does_not_promote(app, client, monkeypatch):
+    """K8/N1: registering with the old ADMIN_EMAIL address must not create an admin."""
+    monkeypatch.setenv('ADMIN_EMAIL', 'neu@example.org')
+    app.config['ADMIN_EMAIL'] = 'neu@example.org'
+    register(client)
+    user = db.session.scalar(select(User).where(User.email == 'neu@example.org'))
+    assert user.role == Role.RESIDENT

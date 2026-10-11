@@ -88,3 +88,13 @@ def test_other_member_cannot_toggle(client, login):
     page = client.get('/chores').get_data(as_text=True)
     assert 'Bearbeiten' not in page
     assert f'/chores/{chore.id}/toggle' not in page
+
+
+def test_undated_chores_are_listed_last(client, login):
+    """N15: chores without a due date come after dated ones (SQLite sorts NULL first by default)."""
+    make_admin()
+    db.session.add_all([Chore(title='Ohne Datum'), Chore(title='Mit Datum', due_date=date(2026, 11, 1))])
+    db.session.commit()
+    login('admin@example.org')
+    page = client.get('/chores').get_data(as_text=True)
+    assert page.index('Mit Datum') < page.index('Ohne Datum')

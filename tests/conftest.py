@@ -1,4 +1,5 @@
 import pytest
+from flask.testing import FlaskClient
 from flask_migrate import upgrade
 
 from community import create_app
@@ -8,6 +9,18 @@ from community.extensions import db
 from .factories import DEFAULT_PASSWORD
 
 
+class FreshContextClient(FlaskClient):
+    """Run each request in its own app context, as in production.
+
+    Otherwise requests reuse the fixture's app context: Flask-Login would keep the
+    user cached in `g`, and the session cookie and user loader would never be tested.
+    """
+
+    def open(self, *args, **kwargs):
+        with self.application.app_context():
+            return super().open(*args, **kwargs)
+
+
 @pytest.fixture
 def app(tmp_path):
     class Config(TestingConfig):
@@ -15,6 +28,7 @@ def app(tmp_path):
         SQLALCHEMY_DATABASE_URI = f'sqlite:///{tmp_path / "test.db"}'
 
     app = create_app(Config)
+    app.test_client_class = FreshContextClient
     with app.app_context():
         upgrade()
         yield app
