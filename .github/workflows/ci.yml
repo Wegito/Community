@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: ruff format --check .
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The server's Python version is not confirmed yet (roadmap question 2).
+        python-version: ['3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest --cov --cov-report=term-missing
+
+  migrations:
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: development
+      SQLALCHEMY_DATABASE_URI: sqlite:////tmp/ci-migrations.db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Exactly one migration head
+        run: |
+          heads=$(flask db heads | grep -c '(head)')
+          echo "heads: $heads"
+          test "$heads" -eq 1
+      - name: Upgrade an empty database
+        run: flask db upgrade
+      - name: Models and migrations agree
+        run: flask db check
+      - name: Downgrade to empty and upgrade again
+        run: flask db downgrade base && flask db upgrade
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install pip-audit
+      - run: pip-audit -r requirements.txt
