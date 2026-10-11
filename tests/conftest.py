@@ -46,7 +46,7 @@ def login(client):
     """Log a user in through the real login form: login(user) or login(email, password)."""
 
     def do_login(user_or_email, password=DEFAULT_PASSWORD):
-        email = getattr(user_or_email, 'email', user_or_email)
+        email = getattr(user_or_email, 'login_email', user_or_email)
         return client.post('/login', data={'email': email, 'password': password})
 
     return do_login

@@ -14,7 +14,7 @@
 <div class="flex-1">
 <div class="font-medium{{ ' line-through opacity-60' if c.is_done else '' }}">{{ c.title }}</div>
 <div class="text-sm opacity-70">
-Zuständig: {{ c.assigned_to.name if c.assigned_to else '—' }} · Fällig: {{ c.due_date|d or '—' }}
+Zuständig: {{ c.assigned_to.display_name if c.assigned_to else '—' }} · Fällig: {{ c.due_date|d or '—' }}
 {% if c.is_done %} · erledigt{% endif %}
 </div>
 </div>

@@ -12,7 +12,7 @@ def test_create_admin_command_creates_admin(app):
         create_admin, ['--email', ' Boss@Example.org ', '--name', 'Boss', '--password', 'long enough pw']
     )
     assert result.exit_code == 0, result.output
-    user = db.session.scalar(select(User).where(User.email == 'boss@example.org'))
+    user = db.session.scalar(select(User).where(User.login_email == 'boss@example.org'))
     assert user.role == Role.ADMIN
     assert user.check_password('long enough pw')
 
@@ -23,7 +23,7 @@ def test_create_admin_command_promotes_existing_user(app):
         create_admin, ['--email', 'max@example.org', '--name', 'ignored', '--password', 'new password!']
     )
     assert result.exit_code == 0, result.output
-    user = db.session.scalar(select(User).where(User.email == 'max@example.org'))
+    user = db.session.scalar(select(User).where(User.login_email == 'max@example.org'))
     db.session.refresh(user)
     assert user.role == Role.ADMIN
 

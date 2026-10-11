@@ -17,7 +17,7 @@
 {% endif %}
 <span class="flex-1"></span>
 {% if current_user.is_authenticated %}
-<span>Hi, {{ current_user.name }}</span>
+<span>Hi, {{ current_user.member.first_name }}</span>
 <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
 <button type="submit" class="text-red-600">Logout</button>

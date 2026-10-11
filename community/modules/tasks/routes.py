@@ -2,7 +2,7 @@ from flask import abort, flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
 from sqlalchemy import select
 
-from community.core.identity.models import User
+from community.core.identity.models import Member, User
 from community.core.security import admin_required
 from community.extensions import db
 
@@ -12,8 +12,8 @@ from .models import Chore
 
 
 def _assignee_choices():
-    users = db.session.scalars(select(User).order_by(User.name)).all()
-    return [(None, '— niemand —')] + [(u.id, u.name) for u in users]
+    users = db.session.scalars(select(User).join(User.member).order_by(Member.first_name, Member.last_name)).all()
+    return [(None, '— niemand —')] + [(u.id, u.display_name) for u in users]
 
 
 @bp.route('/chores', endpoint='list')

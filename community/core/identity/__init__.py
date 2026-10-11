@@ -1,4 +1,4 @@
-"""People and their login accounts."""
+"""People (members) and their login accounts (users)."""
 
 from community.extensions import db, login_manager
 
@@ -6,5 +6,12 @@ from .models import User
 
 
 @login_manager.user_loader
-def load_user(user_id):
-    return db.session.get(User, int(user_id))
+def load_user(user_token):
+    """The token is "id:session_version"; an old version means the login was revoked."""
+    user_id, _, version = str(user_token).partition(':')
+    if not user_id.isdigit() or not version.isdigit():
+        return None
+    user = db.session.get(User, int(user_id))
+    if user is None or user.session_version != int(version):
+        return None
+    return user

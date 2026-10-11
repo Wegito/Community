@@ -5,7 +5,19 @@ from sqlalchemy import text
 
 from community import create_app
 from community.config import TestingConfig
-from community.extensions import db
+from community.extensions import MIGRATIONS_DIR, db
+
+
+def _head():
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    config = Config()
+    config.set_main_option('script_location', MIGRATIONS_DIR)
+    return ScriptDirectory.from_config(config).get_current_head()
+
+
+HEAD = _head()
 
 
 def test_upgrade_and_downgrade_with_data(tmp_path):
@@ -38,12 +50,19 @@ def test_upgrade_and_downgrade_with_data(tmp_path):
             upgrade()
 
             with db.engine.connect() as conn:
-                assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar() == '0003'
+                assert conn.execute(text('SELECT version_num FROM alembic_version')).scalar() == HEAD
                 assert conn.execute(text('PRAGMA foreign_key_check')).all() == []
                 leftovers = conn.execute(text("SELECT name FROM sqlite_master WHERE name LIKE '_alembic_tmp%'")).all()
                 assert leftovers == []
                 assert conn.execute(text('SELECT status FROM booking WHERE id = 1')).scalar() == 'active'
-                assert conn.execute(text('SELECT email FROM "user" WHERE id = 1')).scalar() == 'max@example.org'
+                login_email, first, last, ref = conn.execute(
+                    text(
+                        'SELECT u.login_email, m.first_name, m.last_name, m.payment_ref '
+                        'FROM "user" u JOIN member m ON m.id = u.member_id WHERE u.id = 1'
+                    )
+                ).one()
+                assert (login_email, first, last) == ('max@example.org', 'Max', '')
+                assert ref.startswith('M-')
             # The app's connections still enforce foreign keys after migrating.
             assert db.session.execute(text('PRAGMA foreign_keys')).scalar() == 1
         finally:

@@ -19,7 +19,7 @@ def register(client, **overrides):
 def test_register_with_invite_code(client):
     response = register(client)
     assert response.status_code == 302
-    user = db.session.scalar(select(User).where(User.email == 'neu@example.org'))
+    user = db.session.scalar(select(User).where(User.login_email == 'neu@example.org'))
     assert user.role == Role.RESIDENT
 
 
@@ -40,5 +40,5 @@ def test_admin_email_does_not_promote(app, client, monkeypatch):
     monkeypatch.setenv('ADMIN_EMAIL', 'neu@example.org')
     app.config['ADMIN_EMAIL'] = 'neu@example.org'
     register(client)
-    user = db.session.scalar(select(User).where(User.email == 'neu@example.org'))
+    user = db.session.scalar(select(User).where(User.login_email == 'neu@example.org'))
     assert user.role == Role.RESIDENT

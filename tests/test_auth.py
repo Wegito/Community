@@ -122,7 +122,7 @@ def test_register_lowercases_email_and_blocks_case_duplicates(client):
         'confirm': 'long enough pw',
     }
     client.post('/register', data=data)
-    assert db.session.scalar(select(User.email)) == 'max@example.org'
+    assert db.session.scalar(select(User.login_email)) == 'max@example.org'
     client.post('/register', data={**data, 'email': 'MAX@example.org'})
     assert len(db.session.scalars(select(User)).all()) == 1
 
