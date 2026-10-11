@@ -36,6 +36,10 @@ _NULLABLE_TEXT = {'biername', 'email', 'phone', 'address'}
 
 EMAIL_IN_USE = 'Diese E-Mail-Adresse gehört schon zu einem anderen Mitglied.'
 
+# Phone numbers as typed by people: digits, spaces and + ( ) / . - (profile form and import).
+PHONE_PATTERN = r'^[0-9 +()/.-]+$'
+PHONE_HINT = 'Nur Ziffern, Leerzeichen und + ( ) / . -'
+
 
 class MemberError(Exception):
     """A rule was broken; the message is shown to the user (German)."""
@@ -389,25 +393,13 @@ def add_member(data, rank, delivery, *, invited_by, permissions):
         raise EmailInUse(EMAIL_IN_USE)
     joined_on = data.get('joined_on') or today_local()
 
-    member = identity.create_member(
+    member = new_member(
         first_name,
         data.get('last_name') or '',
+        actor=invited_by,
         email=email,
         biername=(data.get('biername') or '').strip() or None,
         joined_on=joined_on,
-    )
-    audit.record(
-        'members.create',
-        member,
-        actor=invited_by,
-        diff={
-            'first_name': member.first_name,
-            'last_name': member.last_name,
-            'biername': member.biername,
-            'email': member.email,
-            'joined_on': joined_on,
-            'payment_ref': member.payment_ref,
-        },
     )
     try:
         org.change_rank(member, rank, joined_on, changed_by=invited_by)
@@ -417,6 +409,29 @@ def add_member(data, rank, delivery, *, invited_by, permissions):
         return member, None, None
     invitation, raw_token = invite(member, delivery, invited_by=invited_by, email=email)
     return member, invitation, raw_token
+
+
+def new_member(first_name, last_name='', *, actor, source=None, email=None, **fields):
+    """Create a member without login and audit it (members.create). Commits nothing.
+
+    fields: biername, phone, joined_on. source says where the data came from ('import').
+    The caller has checked the email (email_in_use).
+    """
+    member = identity.create_member(first_name, last_name, email=email, **fields)
+    diff = {
+        'first_name': member.first_name,
+        'last_name': member.last_name,
+        'biername': member.biername,
+        'email': member.email,
+        'joined_on': member.joined_on,
+        'payment_ref': member.payment_ref,
+    }
+    if member.phone:
+        diff['phone'] = member.phone
+    if source:
+        diff['source'] = source
+    audit.record('members.create', member, actor=actor, diff=diff)
+    return member
 
 
 def invite(member, channel, *, invited_by, email=None):

@@ -57,6 +57,10 @@ class BaseConfig:
     REMEMBER_COOKIE_SECURE = SESSION_COOKIE_SECURE
     REMEMBER_COOKIE_SAMESITE = SESSION_COOKIE_SAMESITE
 
+    # Largest request body (file uploads such as the member import). Bigger uploads get a
+    # friendly message (413 handler in core/errors.py). Nginx's client_max_body_size must be higher.
+    MAX_CONTENT_LENGTH = 2 * 1024 * 1024
+
     # Login throttling, counted per account in the database (works across workers).
     MAX_FAILED_LOGINS = env_int('MAX_FAILED_LOGINS', 5)
     LOGIN_LOCKOUT_MINUTES = env_int('LOGIN_LOCKOUT_MINUTES', 15)

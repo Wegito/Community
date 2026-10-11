@@ -1,0 +1,53 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import checkbox %}
+{% block title %}Import prüfen{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-1">Import prüfen</h1>
+<p class="text-sm opacity-70 mb-4">{% if filename %}{{ filename }} · {% endif %}{{ rows|length }} {{ 'Zeile' if rows|length == 1 else 'Zeilen' }}, davon <span data-valid="{{ valid|length }}">{{ valid|length }} gültig</span>{% if rows|length > valid|length %}, {{ rows|length - valid|length }} mit Fehlern (werden nicht importiert){% endif %}</p>
+
+{% if unknown_columns %}
+<p class="p-3 rounded border border-yellow-300 bg-yellow-50 mb-4">Nicht erkannte Spalten (ignoriert): {{ unknown_columns|join(', ') }}</p>
+{% endif %}
+
+<div class="overflow-x-auto mb-4">
+<table class="w-full text-sm bg-white shadow rounded">
+<thead><tr class="text-left border-b">
+<th class="p-2">Zeile</th><th class="p-2">Status</th><th class="p-2">Vorname</th><th class="p-2">Nachname</th><th class="p-2">Biername</th><th class="p-2">E-Mail</th><th class="p-2">Telefon</th><th class="p-2">Rang</th><th class="p-2">Eintritt</th>
+</tr></thead>
+<tbody>
+{% for row in rows %}
+<tr class="border-b align-top {{ 'bg-red-50' if not row.is_valid else ('bg-yellow-50' if row.warnings else '') }}" data-line="{{ row.line }}">
+<td class="p-2">{{ row.line }}</td>
+<td class="p-2">
+{% if not row.is_valid %}<span class="font-medium text-red-700">Fehler</span>
+{% elif row.warnings %}<span class="font-medium">OK, Hinweis</span>
+{% else %}<span class="text-green-700">OK</span>{% endif %}
+{% for error in row.errors %}<div class="text-red-700">{{ error }}</div>{% endfor %}
+{% for warning in row.warnings %}<div>{{ warning }}</div>{% endfor %}
+</td>
+<td class="p-2">{{ row.values.first_name }}</td>
+<td class="p-2">{{ row.values.last_name }}</td>
+<td class="p-2">{{ row.values.biername }}</td>
+<td class="p-2 break-all">{{ row.values.email }}</td>
+<td class="p-2 whitespace-nowrap">{{ row.values.phone }}</td>
+<td class="p-2">{{ row.rank.label if row.rank else row.values.rank }}</td>
+<td class="p-2 whitespace-nowrap">{{ row.joined_on|d if row.joined_on else row.values.joined_on }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<form method="post" action="{{ url_for('members.import_confirm') }}" class="space-y-3">
+{{ form.hidden_tag() }}
+{% if can_invite %}
+{{ checkbox(form.send_invites) }}
+<p class="text-sm opacity-70">Jede Zeile mit E-Mail-Adresse bekommt einen persönlichen Einladungslink ({{ config['INVITE_LINK_DAYS'] }} Tage gültig).</p>
+{% endif %}
+<p class="text-sm opacity-70">Die Vorschau gilt eine Stunde. Ränge beginnen am Eintrittsdatum, ohne Datum heute.</p>
+<div class="flex flex-wrap gap-2 items-center">
+<button type="submit" class="px-4 py-2 bg-slate-900 text-white rounded disabled:opacity-50"{% if not valid %} disabled{% endif %}>{{ valid|length }} {{ 'Mitglied' if valid|length == 1 else 'Mitglieder' }} importieren</button>
+<a class="underline" href="{{ url_for('members.import_upload') }}">Andere Datei hochladen</a>
+</div>
+</form>
+{% endblock %}

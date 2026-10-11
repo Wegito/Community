@@ -1,9 +1,11 @@
 from flask import current_app
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileAllowed, FileField, FileRequired
 from wtforms import (
     BooleanField,
     DateField,
     EmailField,
+    HiddenField,
     RadioField,
     SelectField,
     StringField,
@@ -14,7 +16,7 @@ from wtforms.validators import DataRequired, Email, Length, Optional, Regexp
 
 from community.core.identity.models import ExitReason, InvitationChannel, normalize_email
 
-from .services import DELIVERY_NONE, EMAIL_NEEDED
+from .services import DELIVERY_NONE, EMAIL_NEEDED, PHONE_HINT, PHONE_PATTERN
 
 
 def strip(value):
@@ -31,7 +33,7 @@ class ProfileForm(FlaskForm):
         validators=[
             Optional(),
             Length(max=40),
-            Regexp(r'^[0-9 +()/.-]+$', message='Nur Ziffern, Leerzeichen und + ( ) / . -'),
+            Regexp(PHONE_PATTERN, message=PHONE_HINT),
         ],
     )
     address = TextAreaField('Adresse', filters=[strip], validators=[Optional(), Length(max=300)])
@@ -108,6 +110,27 @@ class NewMemberForm(InviteForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, with_none=True, **kwargs)
+
+
+class ImportUploadForm(FlaskForm):
+    """Bulk import, step 1: the member list as CSV or Excel file."""
+
+    file = FileField(
+        'Datei (CSV oder Excel)',
+        validators=[
+            FileRequired('Bitte eine Datei auswählen.'),
+            FileAllowed(['csv', 'xlsx'], 'Nur CSV- oder Excel-Dateien (.csv, .xlsx).'),
+        ],
+    )
+    submit = SubmitField('Vorschau anzeigen')
+
+
+class ImportConfirmForm(FlaskForm):
+    """Bulk import, step 2: the checked rows (signed) and whether to invite them by email."""
+
+    payload = HiddenField(validators=[DataRequired()])
+    send_invites = BooleanField('Einladungen per E-Mail an Zeilen mit E-Mail senden')
+    submit = SubmitField('Importieren')
 
 
 class ButtonForm(FlaskForm):

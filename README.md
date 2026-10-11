@@ -57,6 +57,10 @@ There is no self-registration. To add someone, open *Mitglieder → Neues Mitgli
 link (copy it, show it as a QR code, or let the app email it) at `/join/<token>`, where they
 choose their login email and password.
 
+Many members at once (go-live): *Mitglieder → Importieren* (permission `members.import`) reads a
+CSV or Excel list (a template is on the page), shows a preview with every error and then creates
+all valid rows as members without login, with their rank and, optionally, email invitations.
+
 Forgotten passwords are reset by the members themselves (*Passwort vergessen?* on the login
 page; the link is mailed). In development the mail only appears in the log of `flask jobs tick`.
 Password and login email are changed on *Mein Profil*.
@@ -136,6 +140,8 @@ gunicorn --workers 2 --bind 127.0.0.1:8000 wsgi:app
 Notes:
 - The entry point is now `wsgi:app` (the old `app.py` is gone). Update the gunicorn command or systemd unit.
 - Behind Nginx set `TRUSTED_PROXY_HOPS=1`, and make Nginx pass `Host`, `X-Forwarded-For` and `X-Forwarded-Proto`.
+- Uploads (member import) may be up to 2 MB. Set `client_max_body_size 3m;` in Nginx: its default of 1 MB would
+  refuse larger lists with a bare error page before the app can show its own message.
 - Without HTTPS, login only works with `SESSION_COOKIE_SECURE=false`. Use HTTPS for anything real (roadmap M8-1).
 - The database tables were never created by the old code. If you created them by hand, back up the file, compare it with `migrations/versions/0001_baseline.py`, then run `flask db stamp 0001` before `flask db upgrade`.
 - A full deploy kit (systemd units, Nginx example, backups) is roadmap task M8-2.

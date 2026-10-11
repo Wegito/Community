@@ -9,8 +9,17 @@ from community.core.platform.qr import qr_svg
 from community.core.time import today_local
 from community.extensions import db
 
-from . import bp, services
-from .forms import ButtonForm, ExitForm, InviteForm, MemberForm, NewMemberForm, ProfileForm
+from . import bp, importer, services
+from .forms import (
+    ButtonForm,
+    ExitForm,
+    ImportConfirmForm,
+    ImportUploadForm,
+    InviteForm,
+    MemberForm,
+    NewMemberForm,
+    ProfileForm,
+)
 
 # The raw token of the newest link/QR invitation, so the result page survives a reload
 # (only the hash is stored in the database). Bound to the inviter's user id.
@@ -231,6 +240,96 @@ def revoke_invitation(invitation_id):
     if ButtonForm().validate_on_submit():
         _apply(lambda: services.revoke_invitation(invitation, actor=current_user), 'Einladung widerrufen.')
     return redirect(url_for('members.detail', public_id=invitation.member.public_id))
+
+
+# --- Bulk import ------------------------------------------------------------------
+
+
+@bp.route('/members/import', methods=['GET', 'POST'])
+@require_perm('members.import')
+def import_upload():
+    """Step 1: upload a CSV or Excel file; a valid file shows the preview (step 2)."""
+    form = ImportUploadForm()
+    if form.validate_on_submit():
+        upload = form.file.data
+        filename = upload.filename or ''
+        try:
+            preview = importer.read_upload(filename, upload.read())
+        except importer.ImportFileError as error:
+            form.file.errors.append(str(error))
+        else:
+            return _import_preview(preview.rows, filename, preview.unknown_columns)
+    return render_template(
+        'members/import.html', form=form, columns=importer.COLUMNS.values(), max_rows=importer.MAX_ROWS
+    )
+
+
+def _import_preview(rows, filename, unknown_columns=(), status=200, send_invites=False):
+    """The checked rows with their problems; the valid ones travel signed in the confirm form."""
+    valid = [row for row in rows if row.is_valid]
+    form = ImportConfirmForm(formdata=None)  # never the posted payload: this one is signed anew
+    form.payload.data = importer.sign(rows, user=current_user, filename=filename)
+    form.send_invites.data = send_invites
+    response = make_response(
+        render_template(
+            'members/import_preview.html',
+            rows=rows,
+            valid=valid,
+            filename=filename,
+            unknown_columns=unknown_columns,
+            can_invite=can('members.invite') and any(row.values['email'] for row in valid),
+            form=form,
+        ),
+        status,
+    )
+    response.headers['Cache-Control'] = 'no-store'  # personal data from the file
+    return response
+
+
+@bp.route('/members/import/confirm', methods=['POST'])
+@require_perm('members.import')
+def import_confirm():
+    """Step 3: check the signed rows again and create all members, or none."""
+    form = ImportConfirmForm()
+    if not form.validate_on_submit():
+        flash(importer.PREVIEW_INVALID, 'danger')
+        return redirect(url_for('members.import_upload'))
+    try:
+        filename, rows = importer.load(form.payload.data, user=current_user)
+    except importer.PreviewInvalid as error:
+        flash(str(error), 'danger')
+        return redirect(url_for('members.import_upload'))
+    if not rows:
+        flash('Keine gültigen Zeilen: es wurde nichts importiert.', 'warning')
+        return redirect(url_for('members.import_upload'))
+    if not all(row.is_valid for row in rows):
+        flash('Seit der Vorschau hat sich etwas geändert. Es wurde nichts importiert; bitte erneut prüfen.', 'danger')
+        return _import_preview(rows, filename, status=409, send_invites=bool(form.send_invites.data))
+    send_invites = bool(form.send_invites.data) and can('members.invite')
+    try:
+        result = importer.import_members(rows, imported_by=current_user, send_invites=send_invites, filename=filename)
+    except importer.MemberImportError as error:
+        db.session.rollback()
+        flash(str(error), 'danger')
+        return redirect(url_for('members.import_upload'))
+    db.session.commit()
+    count = len(result.members)
+    message = f'{count} {"Mitglied" if count == 1 else "Mitglieder"} importiert, {result.ranked} mit Rang.'
+    if result.invited == 1:
+        message += ' 1 Einladung per E-Mail wird verschickt.'
+    elif result.invited:
+        message += f' {result.invited} Einladungen per E-Mail werden verschickt.'
+    flash(message, 'success')
+    return redirect(url_for('members.directory'))
+
+
+@bp.route('/members/import/vorlage.csv')
+@require_perm('members.import')
+def import_template():
+    response = make_response(importer.template_csv())
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    response.headers['Content-Disposition'] = 'attachment; filename=mitglieder-vorlage.csv'
+    return response
 
 
 @bp.route('/profile', methods=['GET', 'POST'])
