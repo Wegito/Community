@@ -3,7 +3,7 @@
 <div class="flex items-center mb-4">
 <h1 class="text-2xl font-semibold">Ankündigungen</h1>
 <span class="flex-1"></span>
-{% if current_user.is_authenticated and current_user.role=='admin' %}
+{% if can('announcements.create') %}
 <a class="px-3 py-2 bg-slate-900 text-white rounded" href="{{ url_for('announcements.create') }}">Neu</a>
 {% endif %}
 </div>

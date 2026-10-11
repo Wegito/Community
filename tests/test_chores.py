@@ -5,7 +5,7 @@ from sqlalchemy import select
 from community.extensions import db
 from community.modules.tasks.models import Chore
 
-from .factories import make_admin, make_user
+from .factories import make_manager, make_user
 
 
 def make_chore(title='Küche putzen', assigned_to=None, due_date=None):
@@ -16,8 +16,8 @@ def make_chore(title='Küche putzen', assigned_to=None, due_date=None):
 
 
 def test_unknown_chore_is_404(client, login):
-    make_admin()
-    login('admin@example.org')
+    make_manager()
+    login('chef@example.org')
     assert client.get('/chores/edit/999').status_code == 404
     assert client.post('/chores/edit/999', data={'title': 'x'}).status_code == 404
 
@@ -33,9 +33,9 @@ def test_member_cannot_edit_chore(client, login):
 
 
 def test_admin_creates_chore_with_assignee_and_without_due_date(client, login):
-    make_admin()
+    make_manager()
     max_ = make_user()
-    login('admin@example.org')
+    login('chef@example.org')
     response = client.post('/chores/new', data={'title': 'Bad putzen', 'assigned_to_id': str(max_.id), 'due_date': ''})
     assert response.status_code == 302
     chore = db.session.scalar(select(Chore))
@@ -48,10 +48,10 @@ def test_admin_creates_chore_with_assignee_and_without_due_date(client, login):
 
 
 def test_admin_edits_chore_and_clears_assignee(client, login):
-    make_admin()
+    make_manager()
     max_ = make_user()
     chore = make_chore(assigned_to=max_)
-    login('admin@example.org')
+    login('chef@example.org')
     response = client.post(
         f'/chores/edit/{chore.id}', data={'title': 'Flur', 'assigned_to_id': 'None', 'due_date': '2026-11-01'}
     )
@@ -92,9 +92,9 @@ def test_other_member_cannot_toggle(client, login):
 
 def test_undated_chores_are_listed_last(client, login):
     """N15: chores without a due date come after dated ones (SQLite sorts NULL first by default)."""
-    make_admin()
+    make_manager()
     db.session.add_all([Chore(title='Ohne Datum'), Chore(title='Mit Datum', due_date=date(2026, 11, 1))])
     db.session.commit()
-    login('admin@example.org')
+    login('chef@example.org')
     page = client.get('/chores').get_data(as_text=True)
     assert page.index('Mit Datum') < page.index('Ohne Datum')

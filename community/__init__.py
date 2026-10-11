@@ -42,12 +42,15 @@ def create_app(config=None):
     login_manager.login_message = 'Bitte einloggen.'
     login_manager.login_message_category = 'warning'
 
+    import community.core.authz  # noqa: F401  (declares core permission codes)
     import community.core.identity  # noqa: F401  (registers the user loader)
+    from community.core.authz.cli import authz_cli
     from community.core.identity.cli import create_admin
     from community.core.platform.audit import audit_cli, init_request_ids
 
     app.cli.add_command(create_admin)
     app.cli.add_command(audit_cli)
+    app.cli.add_command(authz_cli)
     init_request_ids(app)
 
     for name in MODULES:
@@ -60,8 +63,10 @@ def create_app(config=None):
     register_error_handlers(app)
     app.jinja_env.filters.update(dt=format_datetime, d=format_date, cents=format_cents)
 
+    from community.core.authz import can, policies
+
     @app.context_processor
-    def inject_club_name():
-        return {'club_name': app.config['CLUB_NAME']}
+    def inject_globals():
+        return {'club_name': app.config['CLUB_NAME'], 'can': can, 'policies': policies}
 
     return app

@@ -5,7 +5,7 @@
 <div class="flex items-center mb-4">
 <h1 class="text-2xl font-semibold">Buchungen</h1>
 <span class="flex-1"></span>
-{% if current_user.role == 'admin' %}
+{% if can('bookings.manage_any') %}
 <a class="underline" href="{{ url_for('bookings.resources') }}">Ressourcen verwalten</a>
 {% endif %}
 </div>
@@ -32,7 +32,7 @@
 <div class="font-medium">{{ b.resource.name }} – {{ b.start|dt }} → {{ b.end|dt }}</div>
 <div class="text-sm opacity-70">von {{ b.user.display_name }}</div>
 </div>
-{% if b.can_cancel(current_user) %}
+{% if policies.can_cancel_booking(current_user, b) %}
 <form method="post" action="{{ url_for('bookings.cancel', booking_id=b.id) }}">
 {{ button_form.hidden_tag() }}
 <button type="submit" class="px-3 py-1 rounded border text-red-700">Stornieren</button>

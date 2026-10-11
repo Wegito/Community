@@ -1,6 +1,7 @@
 from sqlalchemy import select
 
-from community.core.identity.models import Role, User
+from community.core.authz.service import active_roles
+from community.core.identity.models import User
 from community.extensions import db
 
 
@@ -20,7 +21,7 @@ def test_register_with_invite_code(client):
     response = register(client)
     assert response.status_code == 302
     user = db.session.scalar(select(User).where(User.login_email == 'neu@example.org'))
-    assert user.role == Role.RESIDENT
+    assert active_roles(user.member) == []
 
 
 def test_register_with_wrong_invite_code(client):
@@ -41,4 +42,4 @@ def test_admin_email_does_not_promote(app, client, monkeypatch):
     app.config['ADMIN_EMAIL'] = 'neu@example.org'
     register(client)
     user = db.session.scalar(select(User).where(User.login_email == 'neu@example.org'))
-    assert user.role == Role.RESIDENT
+    assert active_roles(user.member) == []

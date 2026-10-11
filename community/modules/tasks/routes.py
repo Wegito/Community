@@ -1,10 +1,11 @@
 from flask import abort, flash, redirect, render_template, url_for
-from flask_login import current_user, login_required
+from flask_login import current_user
 from sqlalchemy import select
 
+from community.core.authz import can, require_perm
+from community.core.authz.policies import can_complete_task
 from community.core.identity.models import Member, User
 from community.core.platform import audit
-from community.core.security import admin_required
 from community.extensions import db
 
 from . import bp
@@ -20,14 +21,17 @@ def _assignee_choices():
 
 
 @bp.route('/chores', endpoint='list')
-@login_required
+@require_perm('tasks.view_own')
 def list_chores():
-    items = db.session.scalars(select(Chore).order_by(Chore.due_date.is_(None), Chore.due_date, Chore.id)).all()
+    query = select(Chore).order_by(Chore.due_date.is_(None), Chore.due_date, Chore.id)
+    if not can('tasks.view_all'):
+        query = query.where(Chore.assigned_to_id == current_user.id)
+    items = db.session.scalars(query).all()
     return render_template('tasks/list.html', items=items, toggle_form=ToggleDoneForm())
 
 
 @bp.route('/chores/new', methods=['GET', 'POST'])
-@admin_required
+@require_perm('tasks.manage')
 def create():
     form = ChoreForm()
     form.assigned_to_id.choices = _assignee_choices()
@@ -44,11 +48,9 @@ def create():
 
 
 @bp.route('/chores/edit/<int:cid>', methods=['GET', 'POST'])
-@login_required
+@require_perm('tasks.manage')
 def edit(cid):
     item = db.get_or_404(Chore, cid)
-    if not item.can_edit(current_user):
-        abort(403)
     form = ChoreForm(obj=item)
     form.assigned_to_id.choices = _assignee_choices()
     if form.validate_on_submit():
@@ -62,10 +64,10 @@ def edit(cid):
 
 
 @bp.route('/chores/<int:cid>/toggle', methods=['POST'])
-@login_required
+@require_perm('tasks.complete_own')
 def toggle_done(cid):
     item = db.get_or_404(Chore, cid)
-    if not item.can_toggle_done(current_user):
+    if not can_complete_task(current_user, item):
         abort(403)
     if ToggleDoneForm().validate_on_submit():
         item.is_done = not item.is_done

@@ -10,11 +10,10 @@
 <body class="bg-slate-50 text-slate-900">
 <nav class="p-4 bg-white shadow flex flex-wrap gap-4">
 <a class="font-semibold" href="{{ url_for('announcements.index') }}">{{ club_name }}</a>
-{% if current_user.is_authenticated %}
-<a href="{{ url_for('announcements.list') }}">Ankündigungen</a>
-<a href="{{ url_for('tasks.list') }}">Putzplan</a>
-<a href="{{ url_for('bookings.calendar') }}">Buchungen</a>
-{% endif %}
+{% if can('announcements.view') %}<a href="{{ url_for('announcements.list') }}">Ankündigungen</a>{% endif %}
+{% if can('tasks.view_own') %}<a href="{{ url_for('tasks.list') }}">Putzplan</a>{% endif %}
+{% if can('bookings.create_own') %}<a href="{{ url_for('bookings.calendar') }}">Buchungen</a>{% endif %}
+{% if can('audit.view') %}<a href="{{ url_for('admin.audit') }}">Protokoll</a>{% endif %}
 <span class="flex-1"></span>
 {% if current_user.is_authenticated %}
 <span>Hi, {{ current_user.member.first_name }}</span>

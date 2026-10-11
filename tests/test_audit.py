@@ -7,7 +7,7 @@ from community.core.time import utcnow
 from community.extensions import db
 from community.modules.tasks.models import Chore
 
-from .factories import DEFAULT_PASSWORD, make_admin, make_user
+from .factories import DEFAULT_PASSWORD, make_admin, make_manager, make_user
 
 
 def actions():
@@ -28,7 +28,7 @@ def test_login_success_and_failure_are_recorded(client):
 
 
 def test_chore_changes_are_recorded_with_diff(client, login):
-    admin = make_admin()
+    admin = make_manager()
     login(admin)
     client.post('/chores/new', data={'title': 'Küche', 'assigned_to_id': 'None', 'due_date': ''})
     chore = db.session.scalar(select(Chore))

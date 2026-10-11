@@ -32,7 +32,7 @@ def test_upgrade_and_downgrade_with_data(tmp_path):
                 conn.execute(
                     text(
                         'INSERT INTO "user" (id, email, name, password_hash, role) '
-                        "VALUES (1, 'Max@Example.org', 'Max', 'x', 'resident')"
+                        "VALUES (1, 'Max@Example.org', 'Max', 'x', 'admin')"
                     )
                 )
                 conn.execute(text("INSERT INTO resource (id, name) VALUES (1, 'Saal')"))
@@ -63,6 +63,13 @@ def test_upgrade_and_downgrade_with_data(tmp_path):
                 ).one()
                 assert (login_email, first, last) == ('max@example.org', 'Max', '')
                 assert ref.startswith('M-')
+                # The old admin flag became the sysadmin role.
+                assert conn.execute(
+                    text(
+                        'SELECT r.key FROM member_role mr JOIN role r ON r.id = mr.role_id '
+                        'JOIN "user" u ON u.member_id = mr.member_id WHERE u.id = 1'
+                    )
+                ).scalars().all() == ['custom.sysadmin']
             # The app's connections still enforce foreign keys after migrating.
             assert db.session.execute(text('PRAGMA foreign_keys')).scalar() == 1
         finally:

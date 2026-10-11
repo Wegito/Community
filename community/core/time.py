@@ -11,6 +11,11 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def today_local() -> date:
+    """Today's date in Berlin (dates like valid_from/valid_to are club dates, not UTC)."""
+    return datetime.now(LOCAL_TZ).date()
+
+
 def to_local(value: datetime) -> datetime:
     """Convert an aware datetime to Berlin time. Naive values are treated as UTC."""
     if value.tzinfo is None:

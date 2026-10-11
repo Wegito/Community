@@ -2,9 +2,10 @@ import hmac
 from datetime import timedelta
 
 from flask import current_app, flash, redirect, render_template, request, url_for
-from flask_login import current_user, login_required, login_user, logout_user
+from flask_login import current_user, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from community.core.authz import public, require_login
 from community.core.identity.models import User, split_name
 from community.core.identity.services import create_member, create_user, find_user_by_login_email
 from community.core.platform import audit
@@ -22,6 +23,7 @@ _DUMMY_HASH = generate_password_hash('timing-equaliser')
 
 
 @bp.route('/register', methods=['GET', 'POST'])
+@public
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('announcements.index'))
@@ -45,6 +47,7 @@ def register():
 
 
 @bp.route('/login', methods=['GET', 'POST'])
+@public
 def login():
     next_url = safe_next(request.args.get('next'))
     if current_user.is_authenticated:
@@ -89,7 +92,7 @@ def login():
 
 
 @bp.route('/logout', methods=['POST'])
-@login_required
+@require_login
 def logout():
     audit.record('auth.logout', current_user._get_current_object())
     db.session.commit()

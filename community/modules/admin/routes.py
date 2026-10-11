@@ -1,8 +1,8 @@
 from flask import render_template, request
 from sqlalchemy import func, select
 
+from community.core.authz import require_perm
 from community.core.platform.audit import AuditLog
-from community.core.security import admin_required
 from community.extensions import db
 
 from . import bp
@@ -11,7 +11,7 @@ PAGE_SIZE = 50
 
 
 @bp.route('/audit')
-@admin_required
+@require_perm('audit.view')
 def audit():
     action = request.args.get('action', '').strip()
     page = max(request.args.get('page', 1, type=int), 1)

@@ -1,9 +1,10 @@
 from flask import abort, flash, redirect, render_template, url_for
-from flask_login import current_user, login_required
+from flask_login import current_user
 from sqlalchemy import select
 
+from community.core.authz import require_login, require_perm
+from community.core.authz.policies import can_cancel_booking
 from community.core.platform import audit
-from community.core.security import admin_required
 from community.core.time import local_to_utc, utcnow
 from community.extensions import db
 
@@ -14,7 +15,7 @@ from .services import BookingConflict, cancel_booking, create_booking
 
 
 @bp.route('/bookings', methods=['GET', 'POST'])
-@login_required
+@require_perm('bookings.create_own')
 def calendar():
     resources = db.session.scalars(select(Resource).where(Resource.is_active).order_by(Resource.name)).all()
     form = BookingForm()
@@ -46,10 +47,10 @@ def calendar():
 
 
 @bp.route('/bookings/<int:booking_id>/cancel', methods=['POST'])
-@login_required
+@require_login
 def cancel(booking_id):
     booking = db.get_or_404(Booking, booking_id)
-    if not booking.can_cancel(current_user):
+    if not can_cancel_booking(current_user, booking):
         abort(403)
     if ButtonForm().validate_on_submit():
         cancel_booking(booking)
@@ -58,7 +59,7 @@ def cancel(booking_id):
 
 
 @bp.route('/bookings/resources', methods=['GET', 'POST'])
-@admin_required
+@require_perm('bookings.manage_any')
 def resources():
     form = ResourceForm()
     if form.validate_on_submit():
@@ -78,7 +79,7 @@ def resources():
 
 
 @bp.route('/bookings/resources/<int:resource_id>/toggle', methods=['POST'])
-@admin_required
+@require_perm('bookings.manage_any')
 def toggle_resource(resource_id):
     resource = db.get_or_404(Resource, resource_id)
     if ButtonForm().validate_on_submit():

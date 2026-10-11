@@ -25,6 +25,3 @@ class Booking(TimestampMixin, db.Model):
 
     resource = db.relationship('Resource', lazy='joined')
     user = db.relationship('User', lazy='joined')
-
-    def can_cancel(self, user):
-        return self.status == BookingStatus.ACTIVE and (user.id == self.user_id or user.role == 'admin')

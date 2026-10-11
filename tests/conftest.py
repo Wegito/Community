@@ -4,6 +4,7 @@ from flask_migrate import upgrade
 
 from community import create_app
 from community.config import TestingConfig
+from community.core.authz.service import seed_grants, sync_permissions
 from community.extensions import db
 
 from .factories import DEFAULT_PASSWORD
@@ -31,6 +32,8 @@ def app(tmp_path):
     app.test_client_class = FreshContextClient
     with app.app_context():
         upgrade()
+        sync_permissions()
+        seed_grants()
         yield app
         db.session.remove()
         db.engine.dispose()

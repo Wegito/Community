@@ -12,11 +12,6 @@ MIN_PASSWORD_LENGTH = 10
 MAX_PASSWORD_LENGTH = 256
 
 
-class Role:
-    RESIDENT = 'resident'
-    ADMIN = 'admin'
-
-
 def normalize_email(value):
     """Emails are stored and compared trimmed and lowercase."""
     return value.strip().lower() if value else value
@@ -87,7 +82,6 @@ class User(UserMixin, TimestampMixin, db.Model):
     member_id = db.Column(db.Integer, db.ForeignKey('member.id'), unique=True, nullable=False)
     login_email = db.Column(db.String(255), unique=True, nullable=False)
     password_hash = db.Column(db.String(255))  # NULL = no password set (e.g. Google-only later)
-    role = db.Column(db.String(20), default=Role.RESIDENT, nullable=False)
     is_enabled = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
     session_version = db.Column(db.Integer, nullable=False, default=1, server_default='1')
     failed_logins = db.Column(db.Integer, nullable=False, default=0, server_default='0')

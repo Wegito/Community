@@ -1,5 +1,11 @@
 {% extends 'layout.html' %}
 {% block content %}
+{% if not can('announcements.view') %}
+<div class="p-4 bg-white shadow rounded mb-4">
+<p>Willkommen, {{ current_user.member.first_name }}! Dein Konto hat noch keine Rechte (kein Rang, kein Amt).
+Bitte wende dich an den Senior oder einen Admin.</p>
+</div>
+{% endif %}
 <h1 class="text-2xl font-semibold mb-4">Neueste Ankündigungen</h1>
 <ul class="space-y-3">
 {% for a in anns %}

@@ -1,7 +1,7 @@
-"""Every route: anonymous visitors are sent to login, members and admins get what they may see.
+"""Every route declares who may use it (@public, @require_login, @require_perm) and behaves accordingly.
 
-ROUTES must list every route of the app; test_every_route_is_listed fails when a new one is added
-without deciding who may use it.
+The checks are generated from the routes themselves, so a new route is tested automatically,
+and test_every_route_declares_access fails for a route without a declaration.
 """
 
 import re
@@ -9,93 +9,91 @@ from datetime import timedelta
 
 import pytest
 
+from community import create_app
+from community.config import TestingConfig
 from community.core.time import utcnow
 from community.extensions import db
 from community.modules.bookings.models import Resource
 from community.modules.bookings.services import create_booking
 from community.modules.tasks.models import Chore
 
-from .factories import make_admin, make_user
+from .factories import give_permissions, make_user
 
-# rule -> (method, who may use it)
-#   public: anyone; member: any logged-in user; admin: admins only;
-#   owner: the member the object belongs to (or an admin); post-only routes are checked anonymously only here.
-ROUTES = {
-    '/login': ('GET', 'public'),
-    '/register': ('GET', 'public'),
-    '/logout': ('POST', 'member'),
-    '/': ('GET', 'member'),
-    '/announcements': ('GET', 'member'),
-    '/announcements/new': ('GET', 'admin'),
-    '/chores': ('GET', 'member'),
-    '/chores/new': ('GET', 'admin'),
-    '/chores/edit/<int:cid>': ('GET', 'admin'),
-    '/chores/<int:cid>/toggle': ('POST', 'owner'),
-    '/bookings': ('GET', 'member'),
-    '/bookings/<int:booking_id>/cancel': ('POST', 'owner'),
-    '/bookings/resources': ('GET', 'admin'),
-    '/bookings/resources/<int:resource_id>/toggle': ('POST', 'admin'),
-    '/admin/audit': ('GET', 'admin'),
-}
+
+def _rules():
+    app = create_app(TestingConfig)
+    result = []
+    for rule in app.url_map.iter_rules():
+        if rule.endpoint == 'static':
+            continue
+        view = app.view_functions[rule.endpoint]
+        method = 'GET' if 'GET' in rule.methods else 'POST'
+        result.append((rule.rule, method, getattr(view, '_access', None)))
+    return sorted(result)
+
+
+RULES = _rules()
+
+
+def ids(value):
+    return value[0] if isinstance(value, tuple) else None
 
 
 @pytest.fixture
 def data(app):
-    admin = make_admin()
-    member = make_user()
+    member = make_user(email='owner@example.org', name='Owner Person')
     chore = Chore(title='Küche', assigned_to_id=member.id)
     resource = Resource(name='Saal')
     db.session.add_all([chore, resource])
     db.session.commit()
     start = (utcnow() + timedelta(days=1)).replace(microsecond=0)
     booking = create_booking(resource.id, member.id, start, start + timedelta(hours=1))
-    return {'admin': admin, 'member': member, 'cid': chore.id, 'booking_id': booking.id, 'resource_id': resource.id}
+    # URL parameters by name, filled in for rules like /chores/edit/<int:cid>.
+    return {'cid': chore.id, 'booking_id': booking.id, 'resource_id': resource.id}
 
 
-def url_for_rule(rule, data):
-    return re.sub(r'<int:(\w+)>', lambda m: str(data[m.group(1)]), rule)
+def url(rule, data):
+    return re.sub(r'<(?:int:)?(\w+)>', lambda m: str(data[m.group(1)]), rule)
 
 
-def routes(*access):
-    return [rule for rule, (_, who) in ROUTES.items() if who in access]
+def test_every_route_declares_access():
+    missing = [rule for rule, _, access in RULES if access is None]
+    assert missing == [], f'Routes without @public, @require_login or @require_perm: {missing}'
 
 
-def test_every_route_is_listed(app):
-    rules = {rule.rule for rule in app.url_map.iter_rules() if rule.endpoint != 'static'}
-    assert rules == set(ROUTES)
+@pytest.mark.parametrize(('rule', 'method', 'access'), [r for r in RULES if r[2][0] == 'public'], ids=ids)
+def test_public_routes_render(client, rule, method, access):
+    assert client.open(rule, method=method).status_code == 200
 
 
-@pytest.mark.parametrize('rule', routes('public'))
-def test_public_pages_render(client, rule):
-    assert client.get(rule).status_code == 200
-
-
-@pytest.mark.parametrize('rule', routes('member', 'admin', 'owner'))
-def test_anonymous_is_sent_to_login(client, data, rule):
-    method, _ = ROUTES[rule]
-    response = client.open(url_for_rule(rule, data), method=method)
+@pytest.mark.parametrize(('rule', 'method', 'access'), [r for r in RULES if r[2][0] != 'public'], ids=ids)
+def test_anonymous_is_sent_to_login(client, data, rule, method, access):
+    response = client.open(url(rule, data), method=method)
     assert response.status_code == 302
     assert '/login' in response.location
 
 
-@pytest.mark.parametrize('rule', [r for r in routes('member', 'admin') if ROUTES[r][0] == 'GET'])
-def test_admin_gets_every_page(client, login, data, rule):
-    login(data['admin'])
-    assert client.get(url_for_rule(rule, data)).status_code == 200
+@pytest.mark.parametrize(('rule', 'method', 'access'), [r for r in RULES if r[2][0] == 'perm'], ids=ids)
+def test_permission_is_required(client, login, data, rule, method, access):
+    make_user(email='nobody@example.org', name='No Rights', perms=[])
+    login('nobody@example.org')
+    assert client.open(url(rule, data), method=method).status_code == 403
 
 
-@pytest.mark.parametrize('rule', [r for r in routes('member') if ROUTES[r][0] == 'GET'])
-def test_member_gets_member_pages(client, login, data, rule):
-    login(data['member'])
-    assert client.get(url_for_rule(rule, data)).status_code == 200
+@pytest.mark.parametrize(
+    ('rule', 'method', 'access'), [r for r in RULES if r[2][0] == 'perm' and r[1] == 'GET'], ids=ids
+)
+def test_permission_is_enough(client, login, data, rule, method, access):
+    user = make_user(email='holder@example.org', name='Perm Holder', perms=[])
+    give_permissions(user.member, access[1])
+    login(user)
+    assert client.get(url(rule, data)).status_code == 200
 
 
-@pytest.mark.parametrize('rule', routes('admin'))
-def test_member_is_refused_admin_routes(client, login, data, rule):
-    method, _ = ROUTES[rule]
-    login(data['member'])
-    response = client.open(url_for_rule(rule, data), method=method)
-    # admin_required redirects to the start page; object checks answer 403.
-    assert response.status_code in (302, 403)
-    if response.status_code == 302:
-        assert '/login' not in response.location
+@pytest.mark.parametrize(
+    ('rule', 'method', 'access'), [r for r in RULES if r[2][0] == 'login' and r[1] == 'GET'], ids=ids
+)
+def test_login_routes_work_without_permissions(client, login, data, rule, method, access):
+    make_user(email='nobody@example.org', name='No Rights', perms=[])
+    login('nobody@example.org')
+    assert client.get(url(rule, data)).status_code == 200
