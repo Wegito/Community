@@ -5,6 +5,7 @@ from pathlib import Path
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
 from sqlalchemy import MetaData
 
 # Deterministic constraint names, so migrations can alter them later
@@ -17,8 +18,9 @@ NAMING_CONVENTION = {
     'pk': 'pk_%(table_name)s',
 }
 
-db = SQLAlchemy(metadata=MetaData(naming_convention=NAMING_CONVENTION))
 MIGRATIONS_DIR = str(Path(__file__).resolve().parent.parent / 'migrations')
 
+db = SQLAlchemy(metadata=MetaData(naming_convention=NAMING_CONVENTION))
 migrate = Migrate(directory=MIGRATIONS_DIR, render_as_batch=True, compare_type=True)
 login_manager = LoginManager()
+csrf = CSRFProtect()

@@ -1,0 +1,20 @@
+{# Form helpers: label, input and validation errors in one place. #}
+{% macro field(f, class='border p-2 rounded w-full') -%}
+<div>
+{{ f.label(class='block text-sm font-medium mb-1') }}
+{{ f(class=class ~ (' border-red-500' if f.errors else ''), **kwargs) }}
+{% for error in f.errors %}
+<p class="text-sm text-red-700 mt-1">{{ error }}</p>
+{% endfor %}
+</div>
+{%- endmacro %}
+
+{% macro checkbox(f) -%}
+<label class="flex items-center gap-2">
+{{ f(**kwargs) }}<span>{{ f.label.text }}</span>
+</label>
+{%- endmacro %}
+
+{% macro submit(f) -%}
+{{ f(class='px-4 py-2 bg-slate-900 text-white rounded') }}
+{%- endmacro %}

@@ -11,6 +11,7 @@ from .models import Announcement
 
 
 @bp.route('/')
+@login_required
 def index():
     anns = db.session.scalars(select(Announcement).order_by(Announcement.created_at.desc()).limit(10)).all()
     return render_template('announcements/index.html', anns=anns)

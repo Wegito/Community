@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from community.extensions import db
 
-from .models import Role, User
+from .models import Role, User, normalize_email
 
 
 @click.command('create-admin')
@@ -14,7 +14,7 @@ from .models import Role, User
 @with_appcontext
 def create_admin(email, name, password):
     """Create an admin account, or promote an existing one."""
-    email = email.strip().lower()
+    email = normalize_email(email)
     user = db.session.scalar(select(User).where(User.email == email))
     if user is None:
         user = User(email=email, name=name)

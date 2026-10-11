@@ -1,16 +1,13 @@
 {% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, checkbox, submit %}
+{% block title %}Login{% endblock %}
 {% block content %}
 <h1 class="text-2xl font-semibold mb-4">Login</h1>
-<form method="post" class="space-y-3">
+<form method="post" class="space-y-3 max-w-md">
 {{ form.hidden_tag() }}
-<div>
-{{ form.email.label }}
-{{ form.email(class='border p-2 rounded w-full') }}
-</div>
-<div>
-{{ form.password.label }}
-{{ form.password(class='border p-2 rounded w-full') }}
-</div>
-{{ form.submit(class='px-4 py-2 bg-slate-900 text-white rounded') }}
+{{ field(form.email, autocomplete='username') }}
+{{ field(form.password, autocomplete='current-password') }}
+{{ checkbox(form.remember) }}
+{{ submit(form.submit) }}
 </form>
 {% endblock %}

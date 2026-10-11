@@ -4,7 +4,7 @@ import pytest
 
 from .factories import make_user
 
-PROTECTED_GET = ['/announcements', '/chores', '/bookings']
+PROTECTED_GET = ['/', '/announcements', '/chores', '/bookings']
 PUBLIC_GET = ['/login', '/register']
 
 

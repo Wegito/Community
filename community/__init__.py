@@ -3,7 +3,7 @@
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from community.extensions import db, login_manager, migrate
+from community.extensions import csrf, db, login_manager, migrate
 
 # Blueprints in registration order. A new module is added here (roadmap §4.4).
 MODULES = [
@@ -35,8 +35,11 @@ def create_app(config=None):
 
     db.init_app(app)
     migrate.init_app(app, db)
+    csrf.init_app(app)
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'
+    login_manager.login_message = 'Bitte einloggen.'
+    login_manager.login_message_category = 'warning'
 
     import community.core.identity  # noqa: F401  (registers the user loader)
     from community.core.identity.cli import create_admin

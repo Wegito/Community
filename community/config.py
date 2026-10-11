@@ -56,6 +56,10 @@ class BaseConfig:
     REMEMBER_COOKIE_SECURE = SESSION_COOKIE_SECURE
     REMEMBER_COOKIE_SAMESITE = SESSION_COOKIE_SAMESITE
 
+    # Login throttling, counted per account in the database (works across workers).
+    MAX_FAILED_LOGINS = env_int('MAX_FAILED_LOGINS', 5)
+    LOGIN_LOCKOUT_MINUTES = env_int('LOGIN_LOCKOUT_MINUTES', 15)
+
     @classmethod
     def validate(cls):
         """Raise RuntimeError when the configuration is unsafe to run."""
