@@ -134,6 +134,27 @@ def end_member_role(member, role_key, *, on=None):
     return rows
 
 
+def end_all_member_roles(member, on):
+    """End every direct role of `member` still running after `on` (Austritt). Commits nothing.
+
+    Each ends on `on`, or on its first day if it starts later. Returns the role keys ended.
+    """
+    rows = db.session.scalars(
+        select(MemberRole).where(
+            MemberRole.member_id == member.id, or_(MemberRole.valid_to.is_(None), MemberRole.valid_to > on)
+        )
+    ).all()
+    ended = []
+    for row in rows:
+        last_day = max(on, row.valid_from)
+        if row.valid_to is not None and row.valid_to <= last_day:
+            continue
+        row.valid_to = last_day
+        ended.append(row.role.key)
+    clear_cache()
+    return sorted(ended)
+
+
 def sync_permissions():
     """Copy declared permission codes into the database. Returns (added, updated, stale codes)."""
     now = utcnow()

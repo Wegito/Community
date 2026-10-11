@@ -1,7 +1,7 @@
 {# Rank, Ämter, groups and joined_on of `member`; `overview` comes from services.overview(). #}
 <dl class="p-3 bg-white rounded shadow grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 mb-6">
 <dt class="opacity-70">Rang</dt>
-<dd>{% if overview.rank_entry %}{{ overview.rank_entry.rank.label }} <span class="text-sm opacity-70">seit {{ overview.rank_entry.valid_from|d }}</span>{% else %}kein Rang{% endif %}</dd>
+<dd>{% if overview.rank_entry %}{{ overview.rank_entry.rank.label }} <span class="text-sm opacity-70">seit {{ overview.rank_entry.valid_from|d }}{% if overview.rank_entry.valid_to %} bis {{ overview.rank_entry.valid_to|d }}{% endif %}</span>{% else %}kein Rang{% endif %}</dd>
 <dt class="opacity-70">Ämter</dt>
 <dd>{% for a in overview.offices %}<a class="underline" href="{{ url_for('org.office', key=a.office.key) }}">{{ a.office.label }}</a>{% if a.is_acting %} (kommissarisch){% endif %} <span class="text-sm opacity-70">seit {{ a.valid_from|d }}</span>{{ ', ' if not loop.last }}{% else %}—{% endfor %}</dd>
 <dt class="opacity-70">Gruppen</dt>

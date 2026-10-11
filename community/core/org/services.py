@@ -424,6 +424,10 @@ def member_groups(member, day=None):
 
 
 def add_to_group(group, member, valid_from, *, is_lead=False, added_by=None):
+    from community.core.identity.models import MemberStatus
+
+    if member.status != MemberStatus.ACTIVE:
+        raise OrgError(f'{member.full_name} ist kein aktives Mitglied.')
     running = db.session.scalar(
         select(GroupMembership.id).where(
             GroupMembership.group_id == group.id,
@@ -468,3 +472,39 @@ def _group_roles(member, day):
         )
     )
     return set(rows)
+
+
+# --- Austritt --------------------------------------------------------------------
+
+
+def _last_day(period, on):
+    """The day a period has to end when the member leaves on `on`: that day, or its own first
+    day if it starts later (valid_to >= valid_from)."""
+    return max(on, period.valid_from)
+
+
+def _running_after(model, member, on):
+    rows = db.session.scalars(
+        select(model).where(model.member_id == member.id, overlaps_from(model, on)).order_by(model.valid_from, model.id)
+    ).all()
+    return [row for row in rows if row.valid_to is None or row.valid_to > _last_day(row, on)]
+
+
+def end_member_periods(member, on, *, reason=None, ended_by=None):
+    """End the rank, Ämter and group memberships of `member` still running after `on` (Austritt,
+    roadmap §6.4), so successors are not blocked by max_holders. Commits nothing.
+
+    Returns what was ended: {'rank': [rank keys], 'offices': [office keys], 'groups': [names]}.
+    """
+    ended = {'rank': [], 'offices': [], 'groups': []}
+    for entry in _running_after(RankHistory, member, on):
+        entry.valid_to = _last_day(entry, on)
+        ended['rank'].append(entry.rank.key)
+    for assignment in _running_after(OfficeAssignment, member, on):
+        end_assignment(assignment, _last_day(assignment, on), reason=reason, ended_by=ended_by)
+        ended['offices'].append(assignment.office.key)
+    for membership in _running_after(GroupMembership, member, on):
+        end_membership(membership, _last_day(membership, on), ended_by=ended_by)
+        ended['groups'].append(membership.group.name)
+    clear_cache()
+    return ended

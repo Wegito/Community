@@ -37,3 +37,13 @@ def create_user(member, login_email, password=None):
 
 def find_user_by_login_email(email):
     return db.session.scalar(select(User).where(User.login_email == normalize_email(email)))
+
+
+def end_all_sessions(user):
+    """Log the account out on every device. Commits nothing.
+
+    Sessions and remember-me cookies store "id:session_version" (User.get_id); after the
+    increment the user loader rejects all of them.
+    """
+    user.session_version = (user.session_version or 0) + 1
+    return user.session_version

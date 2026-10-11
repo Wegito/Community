@@ -22,6 +22,16 @@ class MemberStatus:
     ENDED = 'ended'
 
 
+class ExitReason:
+    """Why a member left (member.ended_reason)."""
+
+    AUSTRITT = 'austritt'
+    AUSSCHLUSS = 'ausschluss'
+    VERSTORBEN = 'verstorben'
+    SONSTIGES = 'sonstiges'
+    LABELS = {AUSTRITT: 'Austritt', AUSSCHLUSS: 'Ausschluss', VERSTORBEN: 'Verstorben', SONSTIGES: 'Sonstiges'}
+
+
 class Member(TimestampMixin, db.Model):
     """A person in the club. Exists with or without a login (e.g. an imported Alter Herr)."""
 
@@ -56,6 +66,10 @@ class Member(TimestampMixin, db.Model):
     @property
     def is_active_member(self):
         return self.status == MemberStatus.ACTIVE
+
+    @property
+    def ended_reason_label(self):
+        return ExitReason.LABELS.get(self.ended_reason, self.ended_reason)
 
     def __repr__(self):
         return f'<Member {self.id} {self.full_name}>'

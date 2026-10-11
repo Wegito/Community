@@ -6,9 +6,12 @@ from typing import NamedTuple
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from community.core.identity.models import Member, MemberStatus, User, normalize_email
+from community.core.authz.service import clear_cache, end_all_member_roles
+from community.core.identity.models import ExitReason, Member, MemberStatus, User, normalize_email
+from community.core.identity.services import end_all_sessions
 from community.core.org import services as org
 from community.core.platform import audit
+from community.core.platform.notify import notify
 from community.core.time import today_local
 from community.extensions import db
 
@@ -105,10 +108,16 @@ class Overview(NamedTuple):
 
 
 def overview(member, day=None):
-    """Rank (with its start date), Ämter and groups on `day`, for the profile pages."""
+    """Rank (with its start date), Ämter and groups on `day`, for the profile pages.
+
+    A former member has no current rank; their last rank is shown instead (with its end date).
+    """
     groups = [m for m in org.member_groups(member, day) if m.group.archived_at is None]
     groups.sort(key=lambda m: fold(m.group.name))
-    return Overview(org.current_rank_entry(member, day), org.member_offices(member, day), groups)
+    rank_entry = org.current_rank_entry(member, day)
+    if rank_entry is None and not member.is_active_member:
+        rank_entry = next(iter(org.rank_history(member)), None)
+    return Overview(rank_entry, org.member_offices(member, day), groups)
 
 
 # --- Contact data ----------------------------------------------------------------
@@ -203,3 +212,129 @@ def update_own_profile(member, data, *, actor=None):
     Names and email are not editable here (members.edit_any). Commits nothing.
     """
     return _update(member, data, OWN_FIELDS, 'members.profile.update', actor)
+
+
+# --- Lifecycle: login, sessions, Austritt ----------------------------------------
+
+# Shown in the office history, which every member can read: the real reason stays on the member.
+OFFICE_END_REASON = 'Ausgeschieden'
+
+
+def _is_self(actor, member):
+    return actor is not None and actor.member_id == member.id
+
+
+def disable_login(member, *, actor):
+    """Lock the member's login and end all their sessions. Commits nothing.
+
+    actor=None means the server operator (CLI); otherwise nobody may lock their own login.
+    """
+    user = member.user
+    if user is None:
+        raise MemberError(f'{member.full_name} hat keinen Login.')
+    if _is_self(actor, member):
+        raise MemberError('Den eigenen Login kann man nicht sperren.')
+    if not user.is_enabled:
+        raise MemberError(f'Der Login von {member.full_name} ist bereits gesperrt.')
+    user.is_enabled = False
+    end_all_sessions(user)
+    audit.record('members.login.disable', user, actor=actor, diff={'member_id': member.id})
+    return user
+
+
+def enable_login(member, *, actor):
+    """Unlock the member's login (the password stays as it was). Commits nothing."""
+    user = member.user
+    if user is None:
+        raise MemberError(f'{member.full_name} hat keinen Login.')
+    if user.is_enabled:
+        raise MemberError(f'Der Login von {member.full_name} ist nicht gesperrt.')
+    user.is_enabled = True
+    audit.record('members.login.enable', user, actor=actor, diff={'member_id': member.id})
+    return user
+
+
+def logout_everywhere(user, *, actor):
+    """End all sessions of `user`, including "angemeldet bleiben" on other devices. Commits nothing."""
+    end_all_sessions(user)
+    audit.record('members.logout_everywhere', user, actor=actor, diff={'member_id': user.member_id})
+    return user
+
+
+def exit_member(member, ended_on, reason, *, recorded_by, note=None):
+    """Record that `member` left the club on `ended_on` (Austritt). Commits nothing.
+
+    The member becomes ENDED and from then on only has the former-member role; the login stays
+    usable (own profile, own Saldo). Rank, Ämter, groups and direct roles still running after
+    `ended_on` end that day, or on their first day if they start later. The current Kassenwart
+    is notified (kind member_exit) to settle the Saldo. Returns the notified members.
+
+    recorded_by=None means the server operator (CLI); otherwise nobody records their own exit.
+    """
+    if reason not in ExitReason.LABELS:
+        raise ValueError(f'Unknown exit reason {reason!r}')
+    if _is_self(recorded_by, member):
+        raise MemberError('Den eigenen Austritt kann man nicht selbst eintragen.')
+    if not member.is_active_member:
+        raise MemberError(f'{member.full_name} ist bereits ausgeschieden.')
+    if ended_on > today_local():
+        raise MemberError('Das Datum darf nicht in der Zukunft liegen. Austritte am Tag selbst oder danach eintragen.')
+    if member.joined_on and ended_on < member.joined_on:
+        raise MemberError(f'Das Datum liegt vor dem Eintritt ({member.joined_on:%d.%m.%Y}).')
+
+    ended = org.end_member_periods(member, ended_on, reason=OFFICE_END_REASON, ended_by=recorded_by)
+    ended['roles'] = end_all_member_roles(member, ended_on)
+    member.status = MemberStatus.ENDED
+    member.ended_on = ended_on
+    member.ended_reason = reason
+    db.session.flush()
+    clear_cache()
+
+    notified = _notify_treasurer(member)
+    audit.record(
+        'members.exit',
+        member,
+        actor=recorded_by,
+        diff={
+            'ended_on': ended_on,
+            'reason': reason,
+            'note': (note or '').strip() or None,
+            'ended': ended,
+            'notified_member_ids': [m.id for m in notified],
+        },
+    )
+    return notified
+
+
+def _notify_treasurer(member):
+    """Tell the current Kassenwart (not the member who left) so the Saldo gets settled."""
+    office = org.office_by_key('kassenwart')
+    if office is None:
+        return []
+    holders = [a.member for a in org.office_holders(office) if a.member_id != member.id and a.member.is_active_member]
+    ref = f' ({member.payment_ref})' if member.payment_ref else ''
+    title = (
+        f'{member.full_name}{ref} ist seit {member.ended_on:%d.%m.%Y} kein Mitglied mehr '
+        f'({member.ended_reason_label}). Bitte den Saldo abrechnen.'
+    )
+    for holder in holders:
+        notify(holder, 'member_exit', title)
+    return holders
+
+
+def reactivate_member(member, *, actor):
+    """Undo an Austritt: the member is ACTIVE again. Commits nothing.
+
+    Rank, Ämter, groups and roles ended by the exit are not restored; the rank has to be set again.
+    """
+    if member.is_active_member:
+        raise MemberError(f'{member.full_name} ist aktives Mitglied.')
+    if _is_self(actor, member):
+        raise MemberError('Die eigene Mitgliedschaft kann man nicht selbst wieder aufnehmen.')
+    before = {'ended_on': member.ended_on, 'reason': member.ended_reason}
+    member.status = MemberStatus.ACTIVE
+    member.ended_on = None
+    member.ended_reason = None
+    audit.record('members.reactivate', member, actor=actor, diff=before)
+    clear_cache()
+    return member

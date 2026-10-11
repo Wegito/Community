@@ -1,8 +1,8 @@
 from flask_wtf import FlaskForm
-from wtforms import BooleanField, DateField, EmailField, StringField, SubmitField, TextAreaField
+from wtforms import BooleanField, DateField, EmailField, SelectField, StringField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, Email, Length, Optional, Regexp
 
-from community.core.identity.models import normalize_email
+from community.core.identity.models import ExitReason, normalize_email
 
 
 def strip(value):
@@ -35,3 +35,12 @@ class MemberForm(ProfileForm):
     last_name = StringField('Nachname', filters=[strip], validators=[Optional(), Length(max=80)])
     email = EmailField('Kontakt-E-Mail', filters=[normalize_email], validators=[Optional(), Email(), Length(max=255)])
     joined_on = DateField('Eingetreten am', validators=[Optional()])
+
+
+class ExitForm(FlaskForm):
+    """Austritt: when and why a member left. The note is kept in the audit log only."""
+
+    ended_on = DateField('Ausgeschieden am', validators=[DataRequired()])
+    reason = SelectField('Grund', choices=list(ExitReason.LABELS.items()))
+    note = TextAreaField('Notiz (nur im Protokoll)', filters=[strip], validators=[Optional(), Length(max=500)])
+    submit = SubmitField('Austritt eintragen')

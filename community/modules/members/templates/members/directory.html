@@ -14,7 +14,7 @@
 {% for r in ranks %}<option value="{{ r.key }}"{% if r.key == rank_key %} selected{% endif %}>{{ r.label }}</option>{% endfor %}
 </select>
 </label>
-{% if can('members.edit_any') %}
+{% if can_see_former %}
 <label class="flex items-center gap-2 p-2"><input type="checkbox" name="ended" value="1"{% if include_ended %} checked{% endif %}> Ehemalige</label>
 {% endif %}
 <button type="submit" class="px-4 py-2 bg-slate-900 text-white rounded">Suchen</button>
