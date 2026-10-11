@@ -1,0 +1,36 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, checkbox, submit %}
+{% block title %}Mein Profil{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-start gap-2 mb-4">
+<div class="flex-1">
+<h1 class="text-2xl font-semibold">{{ member.full_name }}</h1>
+{% if member.biername %}<p class="text-lg opacity-80">{{ member.biername }}</p>{% endif %}
+</div>
+{% if can('members.edit_any') %}<a class="px-3 py-1 rounded border" href="{{ url_for('members.edit', public_id=member.public_id) }}">Alles bearbeiten</a>{% endif %}
+</div>
+
+{% include 'members/_overview.html' %}
+
+<h2 class="text-lg font-semibold mb-2">Meine Angaben</h2>
+<form method="post" class="space-y-3 max-w-md mb-6">
+{{ form.hidden_tag() }}
+{{ field(form.biername) }}
+{{ field(form.phone) }}
+{{ checkbox(form.show_phone) }}
+{{ field(form.address, class='border p-2 rounded w-full h-24') }}
+{{ checkbox(form.show_address) }}
+<p class="text-sm opacity-70">Mitglieder mit Kontaktrecht sehen deine E-Mail-Adresse{% if contact_email %} ({{ contact_email }}){% endif %}, Telefon und Adresse nur, wenn du sie freigibst.
+Namen und Kontakt-E-Mail kann nur die Mitgliederverwaltung ändern.</p>
+{{ submit(form.submit) }}
+</form>
+
+<h2 class="text-lg font-semibold mb-2">Anmeldung</h2>
+{# M1-8 adds changing the password and the login email here. #}
+<div class="p-3 bg-white rounded shadow mb-6">
+<p>Login-E-Mail: <strong>{{ current_user.login_email }}</strong></p>
+</div>
+
+<h2 class="text-lg font-semibold mb-2">Benachrichtigungen</h2>
+<p class="mb-6"><a class="underline" href="{{ url_for('notifications.settings') }}">Benachrichtigungen einstellen</a></p>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends 'layout.html' %}
+{% block title %}{{ member.full_name }}{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-start gap-2 mb-4">
+<div class="flex-1">
+<h1 class="text-2xl font-semibold">{{ member.full_name }}</h1>
+{% if member.biername %}<p class="text-lg opacity-80">{{ member.biername }}</p>{% endif %}
+{% if not member.is_active_member %}<p class="text-sm mt-1"><span class="px-2 rounded bg-slate-200">ehemalig{% if member.ended_on %} seit {{ member.ended_on|d }}{% endif %}</span></p>{% endif %}
+</div>
+{% if can('members.edit_any') %}<a class="px-3 py-1 rounded border" href="{{ url_for('members.edit', public_id=member.public_id) }}">Bearbeiten</a>{% endif %}
+{% if can('members.rank.change') and not is_self %}<a class="px-3 py-1 rounded border" href="{{ url_for('org.change_rank', public_id=member.public_id) }}">Rang ändern</a>{% endif %}
+{% if is_self %}<a class="px-3 py-1 rounded border" href="{{ url_for('members.profile') }}">Mein Profil</a>{% endif %}
+</div>
+
+{% include 'members/_overview.html' %}
+
+<h2 class="text-lg font-semibold mb-2">Kontakt</h2>
+{% set hidden_phone = member.phone and not member.show_phone %}
+{% set hidden_address = member.address and not member.show_address %}
+{% if contact.email or contact.phone or contact.address %}
+<dl class="p-3 bg-white rounded shadow grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+{% if contact.email %}<dt class="opacity-70">E-Mail</dt><dd><a class="underline" href="mailto:{{ contact.email }}">{{ contact.email }}</a></dd>{% endif %}
+{% if contact.phone %}<dt class="opacity-70">Telefon</dt><dd><a class="underline" href="tel:{{ contact.phone|replace(' ', '') }}">{{ contact.phone }}</a>{% if hidden_phone %} <span class="text-sm opacity-70">(für andere nicht sichtbar)</span>{% endif %}</dd>{% endif %}
+{% if contact.address %}<dt class="opacity-70">Adresse</dt><dd class="whitespace-pre-line">{{ contact.address }}{% if hidden_address %} <span class="text-sm opacity-70">(für andere nicht sichtbar)</span>{% endif %}</dd>{% endif %}
+</dl>
+{% else %}
+<p class="opacity-70">Keine Kontaktdaten sichtbar.</p>
+{% endif %}
+{% endblock %}

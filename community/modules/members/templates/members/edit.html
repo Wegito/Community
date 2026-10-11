@@ -1,0 +1,23 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, checkbox, submit %}
+{% block title %}Bearbeiten · {{ member.full_name }}{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">{{ member.full_name }} bearbeiten</h1>
+<form method="post" class="space-y-3 max-w-md" novalidate>
+{{ form.hidden_tag() }}
+{{ field(form.first_name) }}
+{{ field(form.last_name) }}
+{{ field(form.biername) }}
+{{ field(form.email) }}
+{% if member.user %}<p class="text-sm opacity-70">Login-E-Mail: {{ member.user.login_email }}</p>{% endif %}
+{{ field(form.phone) }}
+{{ checkbox(form.show_phone) }}
+{{ field(form.address, class='border p-2 rounded w-full h-24') }}
+{{ checkbox(form.show_address) }}
+{{ field(form.joined_on) }}
+<div class="flex gap-2 items-center">
+{{ submit(form.submit) }}
+<a class="underline" href="{{ url_for('members.detail', public_id=member.public_id) }}">Abbrechen</a>
+</div>
+</form>
+{% endblock %}

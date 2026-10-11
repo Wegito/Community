@@ -1,0 +1,39 @@
+{% extends 'layout.html' %}
+{% block title %}Mitglieder{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Mitglieder</h1>
+<form method="get" class="flex flex-wrap gap-2 items-end mb-4" role="search">
+<label class="flex-1 min-w-48">
+<span class="block text-sm font-medium mb-1">Name oder Biername</span>
+<input type="search" name="q" value="{{ q }}" class="border p-2 rounded w-full">
+</label>
+<label>
+<span class="block text-sm font-medium mb-1">Rang</span>
+<select name="rank" class="border p-2 rounded">
+<option value="">Alle</option>
+{% for r in ranks %}<option value="{{ r.key }}"{% if r.key == rank_key %} selected{% endif %}>{{ r.label }}</option>{% endfor %}
+</select>
+</label>
+{% if can('members.edit_any') %}
+<label class="flex items-center gap-2 p-2"><input type="checkbox" name="ended" value="1"{% if include_ended %} checked{% endif %}> Ehemalige</label>
+{% endif %}
+<button type="submit" class="px-4 py-2 bg-slate-900 text-white rounded">Suchen</button>
+</form>
+<p class="text-sm opacity-70 mb-2">{{ rows|length }} {{ 'Mitglied' if rows|length == 1 else 'Mitglieder' }}</p>
+<ul class="space-y-2">
+{% for row in rows %}
+{% set m = row.member %}
+<li class="p-3 bg-white rounded shadow">
+<a class="font-medium underline" href="{{ url_for('members.detail', public_id=m.public_id) }}">{{ m.full_name }}</a>
+{% if m.biername %}<span class="opacity-70">({{ m.biername }})</span>{% endif %}
+{% if not m.is_active_member %}<span class="ml-1 px-2 rounded bg-slate-200 text-xs">ehemalig{% if m.ended_on %} seit {{ m.ended_on|d }}{% endif %}</span>{% endif %}
+<div class="text-sm opacity-70">
+{{ row.rank_entry.rank.label if row.rank_entry else 'kein Rang' }}
+{% for a in row.offices %} · {{ a.office.label }}{% if a.is_acting %} (kommissarisch){% endif %}{% endfor %}
+</div>
+</li>
+{% else %}
+<li class="opacity-70">Niemand gefunden.</li>
+{% endfor %}
+</ul>
+{% endblock %}

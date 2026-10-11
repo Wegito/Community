@@ -3,7 +3,7 @@
 from .registry import declare
 
 declare('members.directory.view', 'Mitgliederverzeichnis ansehen')
-declare('members.contact.view', 'Kontaktdaten (Telefon, Adresse) anderer Mitglieder ansehen')
+declare('members.contact.view', 'Kontaktdaten (E-Mail, Telefon, Adresse) anderer Mitglieder ansehen')
 declare('members.invite', 'Neue Mitglieder anlegen und einladen')
 declare('members.import', 'Mitglieder aus CSV/Excel importieren')
 declare('members.edit_any', 'Daten aller Mitglieder bearbeiten, Logins sperren')

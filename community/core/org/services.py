@@ -102,6 +102,14 @@ def current_rank(member, day=None):
     return entry.rank if entry else None
 
 
+def current_rank_entries(day=None):
+    """{member_id: RankHistory} of everyone's rank on `day`, in one query (for lists)."""
+    day = day or today_local()
+    return {
+        entry.member_id: entry for entry in db.session.scalars(select(RankHistory).where(active_on(RankHistory, day)))
+    }
+
+
 def rank_history(member):
     return db.session.scalars(
         select(RankHistory).where(RankHistory.member_id == member.id).order_by(RankHistory.valid_from.desc())
@@ -201,6 +209,17 @@ def member_offices(member, day=None):
         select(OfficeAssignment)
         .where(OfficeAssignment.member_id == member.id, active_on(OfficeAssignment, day))
         .order_by(OfficeAssignment.valid_from)
+    ).all()
+
+
+def office_assignments_on(day=None):
+    """All Ämter held on `day`, in office order, in one query (for lists)."""
+    day = day or today_local()
+    return db.session.scalars(
+        select(OfficeAssignment)
+        .join(Office, Office.id == OfficeAssignment.office_id)
+        .where(active_on(OfficeAssignment, day))
+        .order_by(Office.sort_order, OfficeAssignment.valid_from)
     ).all()
 
 

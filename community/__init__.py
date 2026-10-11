@@ -8,6 +8,7 @@ from community.extensions import csrf, db, login_manager, migrate
 # Blueprints in registration order. A new module is added here (roadmap §4.4).
 MODULES = [
     'community.modules.auth',
+    'community.modules.members',
     'community.modules.announcements',
     'community.modules.tasks',
     'community.modules.bookings',

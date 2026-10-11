@@ -140,7 +140,7 @@ community/
 │   ├── platform/      audit log, background jobs, mail, notifications (bell)
 │   ├── db.py time.py money.py security.py errors.py
 ├── modules/           one blueprint per feature: models, forms, routes, templates
-│   ├── auth/ announcements/ tasks/ bookings/ admin/
+│   ├── auth/ members/ announcements/ tasks/ bookings/ admin/
 ├── templates/         layout.html, macros/, errors/, mail/ (plain-text email templates)
 migrations/            Alembic migrations (flask db …)
 tests/                 pytest
