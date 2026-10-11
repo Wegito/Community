@@ -1,1 +1,1 @@
-"""Cross-cutting services: audit log (later also jobs, notifications, QR codes)."""
+"""Cross-cutting services: audit log, background jobs, mail and notifications (later also QR codes)."""

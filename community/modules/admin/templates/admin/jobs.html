@@ -1,0 +1,45 @@
+{% extends 'layout.html' %}
+{% block title %}Jobs{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-1">Hintergrund-Jobs</h1>
+<p class="text-sm opacity-70 mb-4">E-Mails und Erinnerungen. Sie laufen, wenn der Server <code>flask jobs tick</code> ausführt (jede Minute).</p>
+<div class="flex flex-wrap gap-3 mb-4 text-sm">
+<a class="{{ 'font-semibold' if not status else 'underline' }}" href="{{ url_for('admin.jobs') }}">Alle</a>
+{% for key, label in labels.items() %}
+<a class="{{ 'font-semibold' if status == key else 'underline' }}" href="{{ url_for('admin.jobs', status=key) }}">{{ label }}</a>
+{% endfor %}
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-sm bg-white shadow rounded">
+<thead><tr class="text-left border-b">
+<th class="p-2">#</th><th class="p-2">Art</th><th class="p-2">Status</th><th class="p-2">Versuche</th><th class="p-2">Fällig</th><th class="p-2">Fertig</th><th class="p-2">Details</th><th class="p-2"></th>
+</tr></thead>
+<tbody>
+{% for job in items %}
+<tr class="border-b align-top">
+<td class="p-2">{{ job.id }}</td>
+<td class="p-2 font-mono">{{ job.kind }}</td>
+<td class="p-2 whitespace-nowrap {{ 'text-red-700 font-medium' if job.status == 'failed' else '' }}">{{ labels[job.status] }}</td>
+<td class="p-2">{{ job.attempts }}</td>
+<td class="p-2 whitespace-nowrap">{{ job.run_at|dt }}</td>
+<td class="p-2 whitespace-nowrap">{{ job.finished_at|dt }}</td>
+<td class="p-2 break-all">
+{{ job.summary }}
+{% if job.last_error and job.status != 'done' %}<div class="font-mono text-xs text-red-700">{{ job.last_error }}</div>{% endif %}
+</td>
+<td class="p-2">
+{% if job.status == 'failed' %}
+<form method="post" action="{{ url_for('admin.retry_job', job_id=job.id) }}">
+{{ form.hidden_tag() }}
+<button type="submit" class="px-3 py-1 rounded border">Wiederholen</button>
+</form>
+{% endif %}
+</td>
+</tr>
+{% else %}
+<tr><td class="p-2 opacity-70" colspan="8">Keine Jobs.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endblock %}

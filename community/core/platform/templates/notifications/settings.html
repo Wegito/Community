@@ -1,0 +1,37 @@
+{% extends 'layout.html' %}
+{% block title %}Benachrichtigungen einstellen{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-1">Benachrichtigungen einstellen</h1>
+<p class="text-sm opacity-70 mb-4">Wichtige Nachrichten (z. B. Passwort zurücksetzen) kommen immer an.</p>
+{% if not has_address %}
+<p class="p-3 rounded border border-yellow-300 bg-yellow-50 mb-4">Für dich ist keine E-Mail-Adresse hinterlegt, deshalb kommen keine E-Mails an.</p>
+{% endif %}
+<form method="post">
+{{ form.hidden_tag() }}
+<div class="overflow-x-auto mb-4">
+<table class="w-full text-sm bg-white shadow rounded">
+<thead><tr class="text-left border-b">
+<th class="p-2">Art</th>
+{% for channel in channels %}<th class="p-2">{{ channel_labels[channel] }}</th>{% endfor %}
+</tr></thead>
+<tbody>
+{% for kind, state in rows %}
+<tr class="border-b">
+<td class="p-2">{{ kind.label }}{% if kind.mandatory %} <span class="opacity-70">(immer)</span>{% endif %}</td>
+{% for channel in channels %}
+<td class="p-2">
+{% if state[channel] is none %}
+<span class="opacity-50">—</span>
+{% else %}
+<input type="checkbox" name="on" value="{{ kind.key }}:{{ channel }}" aria-label="{{ kind.label }}: {{ channel_labels[channel] }}"{% if state[channel] %} checked{% endif %}{% if kind.mandatory %} disabled{% endif %}>
+{% endif %}
+</td>
+{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+<button type="submit" class="px-4 py-2 bg-slate-900 text-white rounded">Speichern</button>
+</form>
+{% endblock %}

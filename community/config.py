@@ -67,11 +67,32 @@ class BaseConfig:
     # IP addresses in the audit log are removed after this many days (flask audit purge-ips).
     AUDIT_IP_RETENTION_DAYS = env_int('AUDIT_IP_RETENTION_DAYS', 90)
 
+    # Background jobs (flask jobs tick): a failing job is retried with backoff, then marked failed.
+    JOB_MAX_ATTEMPTS = env_int('JOB_MAX_ATTEMPTS', 5)
+
+    # Mail: console (log only), memory (tests) or smtp. Empty = smtp if MAIL_SERVER is set, else console.
+    MAIL_BACKEND = env_str('MAIL_BACKEND', '')
+    MAIL_SERVER = env_str('MAIL_SERVER', '')
+    MAIL_USE_SSL = env_bool('MAIL_USE_SSL', False)  # implicit TLS, usually port 465
+    MAIL_USE_TLS = env_bool('MAIL_USE_TLS', not MAIL_USE_SSL)  # STARTTLS, usually port 587
+    MAIL_PORT = env_int('MAIL_PORT', 465 if MAIL_USE_SSL else 587)
+    MAIL_USERNAME = env_str('MAIL_USERNAME', '')
+    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD', '')
+    MAIL_FROM = env_str('MAIL_FROM', 'Community <noreply@localhost>')
+
     @classmethod
     def validate(cls):
         """Raise RuntimeError when the configuration is unsafe to run."""
         if str(cls.SESSION_COOKIE_SAMESITE).title() not in {'Strict', 'Lax', 'None'}:
             raise RuntimeError('SESSION_COOKIE_SAMESITE must be Strict, Lax or None')
+        if cls.MAIL_BACKEND not in {'', 'console', 'memory', 'smtp'}:
+            raise RuntimeError('MAIL_BACKEND must be console, memory or smtp (or empty)')
+        if cls.MAIL_BACKEND == 'smtp' and not cls.MAIL_SERVER:
+            raise RuntimeError('MAIL_BACKEND=smtp needs MAIL_SERVER')
+        if cls.MAIL_USE_SSL and cls.MAIL_USE_TLS:
+            raise RuntimeError('Set either MAIL_USE_SSL (port 465) or MAIL_USE_TLS (STARTTLS, port 587), not both')
+        if cls.JOB_MAX_ATTEMPTS < 1:
+            raise RuntimeError('JOB_MAX_ATTEMPTS must be at least 1')
 
 
 class DevelopmentConfig(BaseConfig):
@@ -81,6 +102,7 @@ class DevelopmentConfig(BaseConfig):
     PREFERRED_URL_SCHEME = env_str('PREFERRED_URL_SCHEME', 'http')
     SESSION_COOKIE_SECURE = env_bool('SESSION_COOKIE_SECURE', False)
     REMEMBER_COOKIE_SECURE = SESSION_COOKIE_SECURE
+    MAIL_BACKEND = env_str('MAIL_BACKEND', 'console')
 
 
 class TestingConfig(BaseConfig):
@@ -94,6 +116,13 @@ class TestingConfig(BaseConfig):
     SESSION_COOKIE_SECURE = False
     REMEMBER_COOKIE_SECURE = False
     TRUSTED_PROXY_HOPS = 0
+    BASE_URL = ''
+    MAIL_BACKEND = 'memory'
+    MAIL_SERVER = ''
+    MAIL_USE_SSL = False
+    MAIL_USE_TLS = True
+    MAIL_FROM = 'Community <noreply@localhost>'
+    JOB_MAX_ATTEMPTS = 5
 
 
 class ProductionConfig(BaseConfig):

@@ -1,4 +1,4 @@
-"""System administration pages: audit log."""
+"""System administration pages: audit log and background jobs."""
 
 from flask import Blueprint
 

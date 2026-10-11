@@ -50,12 +50,19 @@ def create_app(config=None):
     from community.core.org.cli import org_cli
     from community.core.org.routes import bp as org_bp
     from community.core.platform.audit import audit_cli, init_request_ids
+    from community.core.platform.jobs import jobs_cli
+    from community.core.platform.mail import mail_cli
+    from community.core.platform.notify import current_unread_count
+    from community.core.platform.routes import bp as notifications_bp
 
     app.cli.add_command(create_admin)
     app.cli.add_command(audit_cli)
     app.cli.add_command(authz_cli)
     app.cli.add_command(org_cli)
+    app.cli.add_command(jobs_cli)
+    app.cli.add_command(mail_cli)
     app.register_blueprint(org_bp)
+    app.register_blueprint(notifications_bp)
     init_request_ids(app)
 
     for name in MODULES:
@@ -72,6 +79,11 @@ def create_app(config=None):
 
     @app.context_processor
     def inject_globals():
-        return {'club_name': app.config['CLUB_NAME'], 'can': can, 'policies': policies}
+        return {
+            'club_name': app.config['CLUB_NAME'],
+            'can': can,
+            'policies': policies,
+            'unread_notifications': current_unread_count,
+        }
 
     return app

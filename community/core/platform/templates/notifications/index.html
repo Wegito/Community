@@ -1,0 +1,33 @@
+{% extends 'layout.html' %}
+{% block title %}Benachrichtigungen{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-center gap-3 mb-4">
+<h1 class="text-2xl font-semibold">Benachrichtigungen</h1>
+<span class="flex-1"></span>
+<a class="underline" href="{{ url_for('notifications.settings') }}">Einstellungen</a>
+{% if unread %}
+<form method="post" action="{{ url_for('notifications.read_all') }}">
+{{ form.hidden_tag() }}
+<button type="submit" class="px-3 py-1 rounded border">Alle als gelesen markieren</button>
+</form>
+{% endif %}
+</div>
+<ul class="space-y-2">
+{% for n in items %}
+<li class="p-3 rounded shadow flex flex-wrap items-center gap-3 {{ 'bg-white' if n.read_at else 'bg-blue-50 border border-blue-200' }}">
+<div class="flex-1">
+<div class="{{ 'opacity-70' if n.read_at else 'font-medium' }}">{{ n.title }}</div>
+<div class="text-sm opacity-70">{{ n.created_at|dt }}{% if not n.read_at %} · neu{% endif %}</div>
+</div>
+{% if n.link or not n.read_at %}
+<form method="post" action="{{ url_for('notifications.open_notification', notification_id=n.id) }}">
+{{ form.hidden_tag() }}
+<button type="submit" class="px-3 py-1 rounded border">{{ 'Öffnen' if n.link else 'Gelesen' }}</button>
+</form>
+{% endif %}
+</li>
+{% else %}
+<li class="opacity-70">Keine Benachrichtigungen.</li>
+{% endfor %}
+</ul>
+{% endblock %}

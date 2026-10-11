@@ -67,11 +67,44 @@ All settings come from environment variables or `.env` (see [`.env.example`](.en
 | `SECRET_KEY` | Required in production, at least 32 random characters. The app refuses to start otherwise. |
 | `INVITE_CODE` | Shared registration code. Empty = registration closed. Replaced by personal invites in M1-7. |
 | `CLUB_NAME` | Name shown in the UI |
-| `BASE_URL` | Public URL, e.g. `https://community.example.org` |
+| `BASE_URL` | Public URL, e.g. `https://community.example.org`. Used for links in emails; set it in production. |
 | `SQLALCHEMY_DATABASE_URI` | Default `sqlite:///community.db` (in `instance/`) |
 | `TRUSTED_PROXY_HOPS` | `1` behind one Nginx, `0` without a proxy (default) |
 | `SESSION_COOKIE_SECURE` | Empty = default: `true` in production, `false` in development. Set `false` only for production without HTTPS. |
 | `MAX_FAILED_LOGINS`, `LOGIN_LOCKOUT_MINUTES` | Login lock after failed attempts (default 5 attempts, 15 minutes) |
+| `MAIL_BACKEND` | `smtp`, `console` (only logs the mail) or `memory` (tests). Empty = `smtp` if `MAIL_SERVER` is set, else `console`. Development defaults to `console`. |
+| `MAIL_SERVER`, `MAIL_PORT` | SMTP server and port (default 587, or 465 with `MAIL_USE_SSL`) |
+| `MAIL_USE_TLS` | STARTTLS, usually port 587 (default `true` unless `MAIL_USE_SSL`) |
+| `MAIL_USE_SSL` | Implicit TLS, usually port 465 (default `false`). Not together with `MAIL_USE_TLS`. |
+| `MAIL_USERNAME`, `MAIL_PASSWORD` | SMTP login; empty username = no login |
+| `MAIL_FROM` | Sender, default `Community <noreply@localhost>` |
+| `JOB_MAX_ATTEMPTS` | Tries per background job before it is marked failed (default 5; waits 2, 4, 8, 16 minutes in between) |
+
+## Background jobs and email
+
+Emails (and later reminders and Google sync) are never sent inside a web request. The app
+writes them to the `job` table, and `flask jobs tick` sends them. Run it **every minute**:
+
+```bash
+# crontab -e (as the user that runs the app)
+* * * * * cd ~/community && .venv/bin/flask jobs tick >> ~/community-jobs.log 2>&1
+```
+
+or with a systemd timer (`community-jobs.service` with `Type=oneshot`,
+`WorkingDirectory=` the app folder and `ExecStart=<venv>/bin/flask jobs tick`, plus a
+`community-jobs.timer` with `OnCalendar=minutely`). Overlapping runs are safe: each job is
+claimed atomically. Failed jobs are retried with growing pauses and then marked failed.
+
+```bash
+flask jobs tick                      # run due jobs now
+flask jobs list --status failed      # what went wrong (also on /admin/jobs for admins)
+flask jobs retry 42                  # queue a failed job again
+flask mail test you@example.org      # send a test mail right away to check MAIL_*
+```
+
+Without `MAIL_SERVER` the app only logs mails (`MAIL_BACKEND=console`), so invitations and
+password resets do not arrive. Use the club domain's mail host or a transactional provider
+(roadmap §7.4); Gmail needs an app password and has a daily limit.
 
 ## Deploying or updating on the server
 
@@ -83,6 +116,7 @@ pip install -r requirements.txt
 flask db upgrade                     # always before restarting
 # first time only: flask create-admin
 gunicorn --workers 2 --bind 127.0.0.1:8000 wsgi:app
+# first time only: add the cron job or timer for `flask jobs tick` (see "Background jobs and email")
 ```
 
 Notes:
@@ -100,11 +134,14 @@ community/
 ├── config.py          settings per environment
 ├── extensions.py      db, migrate, login_manager, csrf
 ├── core/              shared code; never imports from modules/
-│   ├── identity/      User model, login loader, create-admin command
+│   ├── identity/      Member and User models, login loader, create-admin command
+│   ├── authz/         permissions: registry, roles, @require_perm, can()
+│   ├── org/           semesters, ranks, Ämter, groups
+│   ├── platform/      audit log, background jobs, mail, notifications (bell)
 │   ├── db.py time.py money.py security.py errors.py
 ├── modules/           one blueprint per feature: models, forms, routes, templates
-│   ├── auth/ announcements/ tasks/ bookings/
-├── templates/         layout.html, macros/, errors/
+│   ├── auth/ announcements/ tasks/ bookings/ admin/
+├── templates/         layout.html, macros/, errors/, mail/ (plain-text email templates)
 migrations/            Alembic migrations (flask db …)
 tests/                 pytest
 ```

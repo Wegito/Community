@@ -1,7 +1,10 @@
-from flask import render_template, request
+from flask import flash, redirect, render_template, request, url_for
+from flask_login import current_user
+from flask_wtf import FlaskForm
 from sqlalchemy import func, select
 
 from community.core.authz import require_perm
+from community.core.platform import jobs as job_queue
 from community.core.platform.audit import AuditLog
 from community.extensions import db
 
@@ -30,3 +33,37 @@ def audit():
         has_next=page * PAGE_SIZE < total,
         total=total,
     )
+
+
+class ButtonForm(FlaskForm):
+    """CSRF-only form for single-button actions."""
+
+
+@bp.route('/jobs')
+@require_perm('system.admin')
+def jobs():
+    status = request.args.get('status', '')
+    if status not in job_queue.JobStatus.ALL:
+        status = ''
+    return render_template(
+        'admin/jobs.html',
+        items=job_queue.recent_jobs(status or None),
+        status=status,
+        labels=job_queue.JobStatus.LABELS,
+        form=ButtonForm(),
+    )
+
+
+@bp.route('/jobs/<int:job_id>/retry', methods=['POST'])
+@require_perm('system.admin')
+def retry_job(job_id):
+    job = db.get_or_404(job_queue.Job, job_id)
+    if ButtonForm().validate_on_submit():
+        try:
+            job_queue.retry_job(job, actor=current_user)
+        except job_queue.JobError as error:
+            flash(str(error), 'danger')
+        else:
+            db.session.commit()
+            flash(f'Job {job.id} wird erneut versucht.', 'success')
+    return redirect(url_for('admin.jobs'))

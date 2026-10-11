@@ -2,6 +2,17 @@
 
 Deviations from [`ROADMAP.md`](ROADMAP.md) and other decisions worth remembering. Newest first.
 
+## 2026-10-11 — M1
+
+14. **M1-6: a job's `dedupe_key` stands for work that happens once.** `enqueue()` returns the existing job whatever its status, also when it is done or failed, so a reminder that was sent is never sent again. A failed job runs again only through `flask jobs retry` or the retry button on `/admin/jobs`, which also resets its attempts. Concurrent duplicates are stopped by the unique constraint (the second transaction fails); there is no savepoint retry, because SAVEPOINT handling in pysqlite is unreliable.
+15. **M1-6: `attempts` counts runs started, not only failures.** The claim increments it. A tick that dies mid-job leaves the job `running`; the next tick releases it after its 5-minute lock as a failed attempt. Jobs therefore run at least once, and a crash loop still ends in `failed`.
+16. **M1-6: mails are rendered when queued.** Each `templates/mail/<name>.txt` extends `mail/base.txt` (greeting, signature, footer with `CLUB_NAME`) and defines `subject` and `body` blocks. The subject is the `subject` block rendered alone; the body is the whole template. The job only sends text, so it needs no request. Links use `BASE_URL` and fall back to the request's host; without either (CLI), `notify()` sends the mail without links.
+17. **M1-6: `/admin/jobs` never shows payloads,** only a short summary per job kind (for mails: recipient and subject). Mail bodies will contain password-reset and invitation links, and the technical admin must not be able to take over other accounts such as the Kassenwart's (roadmap §6.3, rule 6).
+18. **M1-6: `office_assigned` and `rank_changed` are sent from the org routes, not the services.** Bootstrap through `flask org set-rank` and the test factories stays silent and needs no request or `BASE_URL`.
+19. **M1-6: notification pages are part of core** (`community/core/platform/routes.py`, blueprint `notifications`), because every module sends notifications. The settings page is `/settings/notifications` until the profile shell (M2-1) has a settings area.
+20. **M1-6: what is audited.** Retrying a job and changing notification settings are audited (only the changed entries). Running jobs and reading notifications are not: the `job` table and `read_at` already record them.
+21. **M1-6: smaller additions and gaps.** `flask mail test <address>` sends one mail right away to check the `MAIL_*` settings. The console backend logs at WARNING level, so mails that were not sent show up in production logs too. Quiet hours (§7.4) are not built yet.
+
 ## 2026-10-11 — M0 implementation (Wegito/Community#1)
 
 1. **One PR for M0, one commit per task.** The roadmap asks for one PR per task. M0 was delivered in the PR that added the roadmap. Each commit starts with its task ID, so the history still maps to the plan.

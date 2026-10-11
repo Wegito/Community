@@ -5,6 +5,7 @@ from sqlalchemy import select
 from community.core.authz import can, require_perm
 from community.core.identity.models import Member
 from community.core.platform import audit
+from community.core.platform.notify import notify
 from community.core.time import today_local
 from community.extensions import db
 
@@ -98,6 +99,7 @@ def change_rank(public_id):
             db.session.rollback()
             flash(str(error), 'danger')
         else:
+            notify(member, 'rank_changed', f'Du bist ab {form.valid_from.data:%d.%m.%Y} {rank.label}.')
             db.session.commit()
             flash(f'{member.full_name} ist ab {form.valid_from.data:%d.%m.%Y} {rank.label}.', 'success')
             return redirect(url_for('org.change_rank', public_id=member.public_id))
@@ -185,7 +187,7 @@ def assign_office(key):
         member = db.get_or_404(Member, form.member_id.data)
         semester = db.session.get(Semester, form.semester_id.data) if form.semester_id.data else None
         try:
-            services.assign_office(
+            assignment = services.assign_office(
                 office,
                 member,
                 form.valid_from.data,
@@ -200,10 +202,24 @@ def assign_office(key):
             db.session.rollback()
             flash(str(error), 'danger')
         else:
+            _notify_office_holder(assignment)
             db.session.commit()
             flash(f'{member.full_name} ist ab {form.valid_from.data:%d.%m.%Y} {office.label}.', 'success')
             return redirect(url_for('org.office', key=key))
     return render_template('org/office_assign.html', office=office, form=form, holders=services.office_holders(office))
+
+
+def _notify_office_holder(assignment):
+    office = assignment.office
+    acting = ' (kommissarisch)' if assignment.is_acting else ''
+    notify(
+        assignment.member,
+        'office_assigned',
+        f'Du bist ab {assignment.valid_from:%d.%m.%Y} {office.label}{acting}.',
+        link=url_for('org.office', key=office.key),
+        mail_template='office_assigned',
+        mail_context={'office_label': office.label, 'description': office.description_md},
+    )
 
 
 @bp.route('/offices/assignments/<int:assignment_id>/end', methods=['POST'])
