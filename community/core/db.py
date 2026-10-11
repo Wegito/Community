@@ -2,9 +2,11 @@
 
 from datetime import UTC
 
-from sqlalchemy import DateTime, event
+from sqlalchemy import Column, DateTime, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.types import TypeDecorator
+
+from community.core.time import utcnow
 
 
 class UTCDateTime(TypeDecorator):
@@ -27,6 +29,12 @@ class UTCDateTime(TypeDecorator):
         if value is None:
             return None
         return value.replace(tzinfo=UTC)
+
+
+class TimestampMixin:
+    """Adds `created_at`, set to the current UTC time on insert."""
+
+    created_at = Column(UTCDateTime, default=utcnow)
 
 
 @event.listens_for(Engine, 'connect')

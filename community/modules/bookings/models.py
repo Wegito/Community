@@ -1,5 +1,4 @@
-from community.core.db import UTCDateTime
-from community.core.time import utcnow
+from community.core.db import TimestampMixin, UTCDateTime
 from community.extensions import db
 
 
@@ -14,7 +13,7 @@ class BookingStatus:
     CANCELLED = 'cancelled'
 
 
-class Booking(db.Model):
+class Booking(TimestampMixin, db.Model):
     __table_args__ = (db.CheckConstraint('"end" > start', name='end_after_start'),)
 
     id = db.Column(db.Integer, primary_key=True)
@@ -23,7 +22,6 @@ class Booking(db.Model):
     start = db.Column(UTCDateTime, nullable=False)
     end = db.Column(UTCDateTime, nullable=False)
     status = db.Column(db.String(20), nullable=False, default=BookingStatus.ACTIVE, server_default=BookingStatus.ACTIVE)
-    created_at = db.Column(UTCDateTime, default=utcnow)
 
     resource = db.relationship('Resource', lazy='joined')
     user = db.relationship('User', lazy='joined')
