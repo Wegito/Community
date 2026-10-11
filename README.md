@@ -13,16 +13,25 @@ The repository is public, and an old `.env` with `SECRET_KEY`, `INVITE_CODE` and
 2. **Check the accounts** (if a database exists):
    `sqlite3 instance/community.db "SELECT id, email, role, created_at FROM user;"`
    Delete unknown accounts. Every `admin` must be someone you know.
-3. **Set new secrets** in the server's `.env` (start from `.env.example`):
+3. **Get the server's `.env` out of git's way.** The old version tracked `.env`. This version removes it from git, so a plain `git pull` would either refuse to run (if you edited `.env`) or delete it. Move it aside, pull, and put it back:
+   ```bash
+   cd ~/community
+   mv .env ~/community.env.keep
+   git pull
+   mv ~/community.env.keep .env && chmod 600 .env
+   ```
+   From then on `.env` is ignored by git. Do **not** use `git stash` or `git checkout .env`: both lose your edits.
+4. **Set new secrets** in the server's `.env` (compare with `.env.example`):
    - `SECRET_KEY`: new random value, at least 32 characters:
      `python -c "import secrets; print(secrets.token_hex(32))"`
    - `INVITE_CODE`: a new code, or leave it empty to close registration.
    - Remove `ADMIN_EMAIL` and any `cd …` / `cat > .env << 'ENV'` lines.
    Rotating the key logs everyone out once. That is intended.
-4. **GitHub settings** (repository → Settings):
+   The new version refuses to start in production with a `SECRET_KEY` shorter than 32 characters.
+5. **GitHub settings** (repository → Settings):
    - *Code security*: enable **Secret scanning** and **Push protection**.
    - *Branches*: protect `main` and require the CI checks to pass.
-5. Optional: purge the old `.env` from the history. This needs a force-push, and existing clones keep their copy, so rotating the secrets (step 3) is what actually protects you.
+6. Optional: purge the old `.env` from the history. This needs a force-push, and existing clones keep their copy, so rotating the secrets (step 4) is what actually protects you.
 
 ## Local development
 
@@ -32,7 +41,7 @@ Needs Python 3.12 or newer.
 python -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
-cp .env.example .env                 # then set APP_ENV=development in .env
+cp .env.example .env                 # then set APP_ENV=development in .env (the flask command reads it)
 flask db upgrade                     # creates instance/community.db
 flask create-admin                   # asks for email, name, password
 flask run --debug
@@ -61,14 +70,14 @@ All settings come from environment variables or `.env` (see [`.env.example`](.en
 | `BASE_URL` | Public URL, e.g. `https://community.example.org` |
 | `SQLALCHEMY_DATABASE_URI` | Default `sqlite:///community.db` (in `instance/`) |
 | `TRUSTED_PROXY_HOPS` | `1` behind one Nginx, `0` without a proxy (default) |
-| `SESSION_COOKIE_SECURE` | `true` (default in production) when served over HTTPS |
+| `SESSION_COOKIE_SECURE` | Empty = default: `true` in production, `false` in development. Set `false` only for production without HTTPS. |
 | `MAX_FAILED_LOGINS`, `LOGIN_LOCKOUT_MINUTES` | Login lock after failed attempts (default 5 attempts, 15 minutes) |
 
 ## Deploying or updating on the server
 
 ```bash
 cd ~/community
-git pull
+git pull                             # first time: move .env aside first (see "Do this first", step 3)
 source .venv/bin/activate
 pip install -r requirements.txt
 flask db upgrade                     # always before restarting

@@ -12,3 +12,13 @@ Deviations from [`ROADMAP.md`](ROADMAP.md) and other decisions worth remembering
 6. **The unused htmx script was removed (M0-12).** M1-11 brings it back as a local, pinned file.
 7. **A form macro (`templates/macros/forms.html`) was added in M0-9.** The roadmap plans macros in M1-11, but the new 10-character password rule needs visible error messages now.
 8. **Bookings are serialised with a no-op `UPDATE` on the resource row (M0-11)** before the overlap check. On SQLite this takes the write lock; on Postgres it locks the row. `tests/test_bookings.py` proves the lock is held during the check.
+
+## 2026-10-11 — Pre-push review of M0
+
+An independent review (four reviewers, each finding checked by a second agent trying to refute it) confirmed 14 distinct issues; all are fixed in the commits marked "fix" in Wegito/Community#1. The ones that change design:
+
+9. **SQLite migrations run with foreign keys off** (`migrations/env.py`), followed by `PRAGMA foreign_key_check`. Batch table rebuilds cannot drop a referenced table while foreign keys are enforced.
+10. **Login attempts are counted before the password check, in one atomic UPDATE** (`User.reserve_login_attempt`). The attempt that reaches the limit sets the lock and is still checked. A locked account does the same hashing work as a wrong password.
+11. **`.env` is loaded by the entry points, not by `community/config.py`.** `wsgi.py` loads it; the `flask` command loads it by itself. Tests no longer depend on a developer's `.env`.
+12. **Test-client requests run in their own app context** (`tests/conftest.py`), so login state comes from the session cookie and the user loader, as in production.
+13. **`parse_cents` rejects more than two decimal places** instead of rounding, because `1.234` is ambiguous between German and English notation.
