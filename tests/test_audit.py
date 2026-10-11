@@ -19,7 +19,7 @@ def test_login_success_and_failure_are_recorded(client):
     client.post('/login', data={'email': user.login_email, 'password': 'wrong password'})
     client.post('/login', data={'email': 'nobody@example.org', 'password': 'wrong password'})
     client.post('/login', data={'email': user.login_email, 'password': DEFAULT_PASSWORD})
-    entries = db.session.scalars(select(AuditLog).order_by(AuditLog.id)).all()
+    entries = db.session.scalars(select(AuditLog).where(AuditLog.action.like('auth.%')).order_by(AuditLog.id)).all()
     assert [e.action for e in entries] == ['auth.login_failed', 'auth.login_failed', 'auth.login']
     assert entries[0].diff == {'reason': 'wrong_password'}
     assert entries[1].diff == {'reason': 'unknown_email', 'email': 'nobody@example.org'}

@@ -1,0 +1,39 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% block title %}Rang · {{ member.full_name }}{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-1">Rang von {{ member.display_name }}</h1>
+<p class="mb-4">Aktuell: <strong>{{ current.label if current else 'kein Rang' }}</strong></p>
+{% if own %}
+<p class="p-3 rounded border border-yellow-300 bg-yellow-50 mb-4">Den eigenen Rang kann man nicht selbst ändern.</p>
+{% else %}
+<form method="post" class="space-y-3 max-w-md mb-6">
+{{ form.hidden_tag() }}
+{{ field(form.rank_id) }}
+{{ field(form.valid_from) }}
+{{ field(form.convent_ref, placeholder='z. B. CC 12.10.2026, TOP 4') }}
+{{ field(form.note) }}
+{% if office_conflicts %}
+<div class="p-3 rounded border border-yellow-300 bg-yellow-50">
+<p class="mb-2">Hat Ämter, die der neue Rang evtl. nicht halten darf:</p>
+<ul class="list-disc ml-5 mb-2">{% for a in office_conflicts %}<li>{{ a.office.label }} (seit {{ a.valid_from|d }})</li>{% endfor %}</ul>
+<label class="flex items-center gap-2"><input type="radio" name="offices" value="close" checked> zum Vortag beenden</label>
+<label class="flex items-center gap-2"><input type="radio" name="offices" value="keep_acting"> kommissarisch weiterführen</label>
+</div>
+{% endif %}
+{{ submit(form.submit) }}
+</form>
+{% endif %}
+<h2 class="text-lg font-semibold mb-2">Verlauf</h2>
+<ul class="space-y-1">
+{% for h in history %}
+<li class="p-2 bg-white rounded shadow text-sm">
+<strong>{{ h.rank.label }}</strong> {{ h.valid_from|d }} – {{ h.valid_to|d if h.valid_to else 'heute' }}
+{% if h.convent_ref %} · {{ h.convent_ref }}{% endif %}{% if h.note %} · {{ h.note }}{% endif %}
+{% if h.changed_by %} · eingetragen von {{ h.changed_by.display_name }}{% endif %}
+</li>
+{% else %}
+<li class="opacity-70">Noch kein Rang eingetragen.</li>
+{% endfor %}
+</ul>
+{% endblock %}

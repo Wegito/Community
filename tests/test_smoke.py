@@ -5,12 +5,13 @@ and test_every_route_declares_access fails for a route without a declaration.
 """
 
 import re
-from datetime import timedelta
+from datetime import date, timedelta
 
 import pytest
 
 from community import create_app
 from community.config import TestingConfig
+from community.core.org.services import create_semester
 from community.core.time import utcnow
 from community.extensions import db
 from community.modules.bookings.models import Resource
@@ -48,8 +49,16 @@ def data(app):
     db.session.commit()
     start = (utcnow() + timedelta(days=1)).replace(microsecond=0)
     booking = create_booking(resource.id, member.id, start, start + timedelta(hours=1))
+    semester = create_semester('WS26/27', 'WS', date(2026, 10, 1), date(2027, 3, 31))
+    db.session.commit()
     # URL parameters by name, filled in for rules like /chores/edit/<int:cid>.
-    return {'cid': chore.id, 'booking_id': booking.id, 'resource_id': resource.id}
+    return {
+        'cid': chore.id,
+        'booking_id': booking.id,
+        'resource_id': resource.id,
+        'public_id': member.member.public_id,
+        'semester_id': semester.id,
+    }
 
 
 def url(rule, data):

@@ -39,7 +39,7 @@ def test_create_admin_command_promotes_existing_user(app):
     )
     from community.core.authz.models import MemberRole
 
-    assert len(db.session.scalars(select(MemberRole).where(MemberRole.member_id == user.member_id)).all()) == 2
+    assert len(db.session.scalars(select(MemberRole).where(MemberRole.member_id == user.member_id)).all()) == 1
 
 
 def test_non_admin_cannot_create_announcement(client, login):

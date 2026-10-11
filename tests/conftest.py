@@ -1,3 +1,5 @@
+import shutil
+
 import pytest
 from flask.testing import FlaskClient
 from flask_migrate import upgrade
@@ -22,18 +24,35 @@ class FreshContextClient(FlaskClient):
             return super().open(*args, **kwargs)
 
 
-@pytest.fixture
-def app(tmp_path):
+def _config_for(path):
     class Config(TestingConfig):
-        # A real file, so the schema is built exactly as in production: through the migrations.
-        SQLALCHEMY_DATABASE_URI = f'sqlite:///{tmp_path / "test.db"}'
+        SQLALCHEMY_DATABASE_URI = f'sqlite:///{path}'
 
-    app = create_app(Config)
-    app.test_client_class = FreshContextClient
+    return Config
+
+
+@pytest.fixture(scope='session')
+def template_db(tmp_path_factory):
+    """One database per test run, built exactly as in production (migrations, sync, seed)."""
+    path = tmp_path_factory.mktemp('template') / 'template.db'
+    app = create_app(_config_for(path))
     with app.app_context():
         upgrade()
         sync_permissions()
         seed_grants()
+        db.session.remove()
+        db.engine.dispose()
+    return path
+
+
+@pytest.fixture
+def app(tmp_path, template_db):
+    """A fresh copy of the template database for every test."""
+    path = tmp_path / 'test.db'
+    shutil.copy(template_db, path)
+    app = create_app(_config_for(path))
+    app.test_client_class = FreshContextClient
+    with app.app_context():
         yield app
         db.session.remove()
         db.engine.dispose()

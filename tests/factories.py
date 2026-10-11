@@ -43,22 +43,37 @@ def make_member(name='Max Mustermann', email=None, **fields):
     return member
 
 
-def make_user(email='max@example.org', name='Max Mustermann', password=DEFAULT_PASSWORD, perms=None):
-    """A user with a login. By default it has the permissions of a Bursch (from the seed)."""
+def set_rank(member, rank_key, valid_from=date(2000, 1, 1)):
+    from community.core.org.services import change_rank, rank_by_key
+
+    change_rank(member, rank_by_key(rank_key), valid_from)
+    db.session.commit()
+
+
+def make_user(email='max@example.org', name='Max Mustermann', password=DEFAULT_PASSWORD, perms=None, rank='bursch'):
+    """A user with a login and a rank (Bursch by default).
+
+    perms=[...] instead gives exactly those permissions (no rank) through a throwaway role.
+    """
     first, last = split_name(name)
     member = create_member(first, last, email=email)
     user = create_user(member, email, password=password)
     db.session.commit()
-    codes = seed_codes('rank.bursch') if perms is None else perms
-    if codes:
-        give_permissions(member, *codes)
+    if perms is not None:
+        if perms:
+            give_permissions(member, *perms)
+    elif rank:
+        set_rank(member, rank)
     return user
 
 
 def make_manager(email='chef@example.org', name='Chef Senior', **kwargs):
     """A Bursch who also manages announcements, tasks and bookings (like a Senior/Consenior)."""
-    extra = ['announcements.create', 'announcements.manage_any', 'tasks.manage', 'bookings.manage_any']
-    return make_user(email=email, name=name, perms=seed_codes('rank.bursch') + extra, **kwargs)
+    user = make_user(email=email, name=name, **kwargs)
+    give_permissions(
+        user.member, 'announcements.create', 'announcements.manage_any', 'tasks.manage', 'bookings.manage_any'
+    )
+    return user
 
 
 def make_admin(email='admin@example.org', name='Admin Istrator', password=DEFAULT_PASSWORD):

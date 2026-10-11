@@ -44,13 +44,18 @@ def create_app(config=None):
 
     import community.core.authz  # noqa: F401  (declares core permission codes)
     import community.core.identity  # noqa: F401  (registers the user loader)
+    import community.core.org.services  # noqa: F401  (adds rank, office and group roles to authz)
     from community.core.authz.cli import authz_cli
     from community.core.identity.cli import create_admin
+    from community.core.org.cli import org_cli
+    from community.core.org.routes import bp as org_bp
     from community.core.platform.audit import audit_cli, init_request_ids
 
     app.cli.add_command(create_admin)
     app.cli.add_command(audit_cli)
     app.cli.add_command(authz_cli)
+    app.cli.add_command(org_cli)
+    app.register_blueprint(org_bp)
     init_request_ids(app)
 
     for name in MODULES:
