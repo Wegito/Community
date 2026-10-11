@@ -1,0 +1,13 @@
+{#- The login email was changed (auth.services.confirm_email_change). Mandatory, sent to the OLD address. -#}
+{% extends 'mail/base.txt' %}
+{% block subject %}Login-E-Mail-Adresse geändert{% endblock %}
+{% block body -%}
+Die Login-E-Mail-Adresse deines Kontos bei {{ club_name }} wurde am {{ changed_at|dt }} geändert.
+
+Bisher: {{ old_email }}
+Neu:    {{ new_email }}
+
+Ab jetzt meldest du dich mit der neuen Adresse an, und Nachrichten gehen dorthin.
+
+Warst du das nicht? Dann wende dich bitte sofort an den Senior oder die technische Administration.
+{%- endblock %}

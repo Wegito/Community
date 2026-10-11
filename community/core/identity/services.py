@@ -61,6 +61,17 @@ def find_user_by_login_email(email):
     return db.session.scalar(select(User).where(User.login_email == normalize_email(email)))
 
 
+def login_email_taken(email, user):
+    """True if `email` is another account's login email or another member's contact email.
+
+    One address, one person: mails sent to it must never reach someone else (as on /join).
+    """
+    email = normalize_email(email)
+    other_login = select(User.id).where(User.login_email == email, User.id != user.id)
+    other_contact = select(Member.id).where(Member.email == email, Member.id != user.member_id)
+    return db.session.scalar(other_login.limit(1)) is not None or db.session.scalar(other_contact.limit(1)) is not None
+
+
 def end_all_sessions(user):
     """Log the account out on every device. Commits nothing.
 

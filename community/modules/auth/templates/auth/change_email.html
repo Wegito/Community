@@ -1,0 +1,16 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% block title %}Login-E-Mail ändern{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-2">Login-E-Mail-Adresse ändern</h1>
+<p class="mb-4 max-w-md">Bisher: <strong>{{ current_user.login_email }}</strong>. Wir schicken einen Bestätigungslink an die neue Adresse; erst wenn du sie dort bestätigst, gilt sie. Die bisherige Adresse bekommt danach eine Nachricht über die Änderung.</p>
+<form method="post" class="space-y-3 max-w-md" novalidate>
+{{ form.hidden_tag() }}
+{{ field(form.login_email, autocomplete='email') }}
+{{ field(form.password, autocomplete='current-password') }}
+<div class="flex gap-2 items-center">
+{{ submit(form.submit) }}
+<a class="underline" href="{{ url_for('members.profile') }}">Abbrechen</a>
+</div>
+</form>
+{% endblock %}

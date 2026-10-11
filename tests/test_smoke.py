@@ -17,6 +17,7 @@ from community.core.platform.jobs import enqueue
 from community.core.platform.notify import notify
 from community.core.time import utcnow
 from community.extensions import db
+from community.modules.auth.services import email_change_token, password_reset_token
 from community.modules.bookings.models import Resource
 from community.modules.bookings.services import create_booking
 from community.modules.tasks.models import Chore
@@ -96,6 +97,31 @@ def test_public_routes_render(client, rule, method, access):
         assert response.status_code in (404, 410)
     else:
         assert response.status_code == 200
+
+
+@pytest.fixture
+def valid_tokens(app):
+    """A usable token for each public rule with a <token>, so those pages are rendered for real once."""
+    owner = make_user(email='token@example.org', name='Token Owner')
+    _, invitation_token = create_invitation(make_member('Neu Ling'), 'link', created_by=owner)
+    db.session.commit()
+    return {
+        '/join/<token>': invitation_token,
+        '/password/reset/<token>': password_reset_token(owner),
+        '/settings/email/confirm/<token>': email_change_token(owner, 'new@example.org'),
+    }
+
+
+@pytest.mark.parametrize(
+    ('rule', 'method', 'access'), [r for r in RULES if r[2][0] == 'public' and '<' in r[0]], ids=ids
+)
+def test_public_token_routes_render_with_a_valid_token(client, valid_tokens, rule, method, access):
+    assert rule in valid_tokens, f'add a valid token for {rule} to the valid_tokens fixture'
+    response = client.get(url(rule, {'token': valid_tokens[rule]}))
+    assert response.status_code == 200
+    # The URL holds the token: keep it out of caches and Referer headers.
+    assert response.headers['Cache-Control'] == 'no-store'
+    assert response.headers['Referrer-Policy'] == 'no-referrer'
 
 
 @pytest.mark.parametrize(('rule', 'method', 'access'), [r for r in RULES if r[2][0] != 'public'], ids=ids)

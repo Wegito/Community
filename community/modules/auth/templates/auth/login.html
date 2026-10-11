@@ -10,5 +10,6 @@
 {{ checkbox(form.remember) }}
 {{ submit(form.submit) }}
 </form>
-<p class="mt-4 text-sm opacity-70">Kein Konto? Du bekommst einen Einladungslink vom Senior/Fuxmajor.</p>
+<p class="mt-4"><a class="underline" href="{{ url_for('auth.forgot_password') }}">Passwort vergessen?</a></p>
+<p class="mt-2 text-sm opacity-70">Kein Konto? Du bekommst einen Einladungslink vom Senior/Fuxmajor.</p>
 {% endblock %}

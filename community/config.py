@@ -66,6 +66,9 @@ class BaseConfig:
     INVITE_LINK_DAYS = env_int('INVITE_LINK_DAYS', 14)
     INVITE_QR_HOURS = env_int('INVITE_QR_HOURS', 24)
 
+    # "Passwort vergessen?": minutes a reset link stays valid (it also dies when used).
+    PASSWORD_RESET_MAX_AGE_MINUTES = env_int('PASSWORD_RESET_MAX_AGE_MINUTES', 60)
+
     # IP addresses in the audit log are removed after this many days (flask audit purge-ips).
     AUDIT_IP_RETENTION_DAYS = env_int('AUDIT_IP_RETENTION_DAYS', 90)
 
@@ -97,6 +100,8 @@ class BaseConfig:
             raise RuntimeError('JOB_MAX_ATTEMPTS must be at least 1')
         if cls.INVITE_LINK_DAYS < 1 or cls.INVITE_QR_HOURS < 1:
             raise RuntimeError('INVITE_LINK_DAYS and INVITE_QR_HOURS must be at least 1')
+        if cls.PASSWORD_RESET_MAX_AGE_MINUTES < 1:
+            raise RuntimeError('PASSWORD_RESET_MAX_AGE_MINUTES must be at least 1')
 
 
 class DevelopmentConfig(BaseConfig):
@@ -128,6 +133,7 @@ class TestingConfig(BaseConfig):
     JOB_MAX_ATTEMPTS = 5
     INVITE_LINK_DAYS = 14
     INVITE_QR_HOURS = 24
+    PASSWORD_RESET_MAX_AGE_MINUTES = 60
 
 
 class ProductionConfig(BaseConfig):
@@ -142,6 +148,13 @@ class ProductionConfig(BaseConfig):
                 'SECRET_KEY is missing or weak. Set a random value of at least '
                 f'{MIN_SECRET_KEY_LENGTH} characters, e.g. '
                 '`python -c "import secrets; print(secrets.token_hex(32))"`.'
+            )
+        # Without BASE_URL, links in mails are built from the request's Host header. Anyone can
+        # send "Passwort vergessen?" with a forged Host, and the victim would get a working reset
+        # link that points to the attacker's server.
+        if not cls.BASE_URL.startswith(('https://', 'http://')):
+            raise RuntimeError(
+                'BASE_URL is missing or lacks https://. Set the public URL, e.g. https://community.example.org.'
             )
 
 

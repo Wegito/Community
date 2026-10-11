@@ -32,10 +32,24 @@ def test_production_starts_with_strong_secret_key(tmp_path):
     class Config(ProductionConfig):
         SECRET_KEY = 'x' * 64
         SQLALCHEMY_DATABASE_URI = f'sqlite:///{tmp_path / "prod.db"}'
+        BASE_URL = 'https://community.example.org'
 
     app = create_app(Config)
     assert app.config['SESSION_COOKIE_SECURE'] is True
     assert app.config['SESSION_COOKIE_HTTPONLY'] is True
+
+
+@pytest.mark.parametrize('base_url', ['', 'community.example.org'])
+def test_production_needs_base_url(tmp_path, base_url):
+    """M1-8: reset links must not be built from a Host header an attacker can choose."""
+
+    class Config(ProductionConfig):
+        SECRET_KEY = 'x' * 64
+        SQLALCHEMY_DATABASE_URI = f'sqlite:///{tmp_path / "prod.db"}'
+        BASE_URL = base_url
+
+    with pytest.raises(RuntimeError, match='BASE_URL'):
+        create_app(Config)
 
 
 def test_unknown_app_env_is_rejected():
@@ -63,6 +77,7 @@ def test_config_has_safe_defaults_without_env(monkeypatch):
     monkeypatch.setenv('INVITE_CODE', 'invite')
     monkeypatch.delenv('INVITE_LINK_DAYS', raising=False)
     monkeypatch.delenv('INVITE_QR_HOURS', raising=False)
+    monkeypatch.delenv('PASSWORD_RESET_MAX_AGE_MINUTES', raising=False)
     monkeypatch.setenv('SESSION_COOKIE_SAMESITE', '')
     monkeypatch.setenv('SESSION_COOKIE_SECURE', '')
     try:
@@ -70,6 +85,7 @@ def test_config_has_safe_defaults_without_env(monkeypatch):
         assert not hasattr(fresh.ProductionConfig, 'INVITE_CODE')
         assert fresh.ProductionConfig.INVITE_LINK_DAYS == 14
         assert fresh.ProductionConfig.INVITE_QR_HOURS == 24
+        assert fresh.ProductionConfig.PASSWORD_RESET_MAX_AGE_MINUTES == 60
         assert fresh.ProductionConfig.SESSION_COOKIE_SAMESITE == 'Lax'
         assert fresh.ProductionConfig.SESSION_COOKIE_SECURE is True
         assert fresh.DevelopmentConfig.SESSION_COOKIE_SECURE is False
@@ -78,13 +94,13 @@ def test_config_has_safe_defaults_without_env(monkeypatch):
         importlib.reload(config)
 
 
-@pytest.mark.parametrize('setting', ['INVITE_LINK_DAYS', 'INVITE_QR_HOURS'])
-def test_invitation_lifetime_must_be_positive(setting):
+@pytest.mark.parametrize('setting', ['INVITE_LINK_DAYS', 'INVITE_QR_HOURS', 'PASSWORD_RESET_MAX_AGE_MINUTES'])
+def test_link_lifetimes_must_be_positive(setting):
     class Config(DevelopmentConfig):
         pass
 
     setattr(Config, setting, 0)
-    with pytest.raises(RuntimeError, match='INVITE_'):
+    with pytest.raises(RuntimeError, match=setting):
         create_app(Config)
 
 

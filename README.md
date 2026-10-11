@@ -27,6 +27,8 @@ The repository is public, and an old `.env` with `SECRET_KEY`, `INVITE_CODE` and
    - Remove `INVITE_CODE`: the shared registration code is gone. New members get personal
      invitation links (Mitglieder → Neues Mitglied).
    - Remove `ADMIN_EMAIL` and any `cd …` / `cat > .env << 'ENV'` lines.
+   - `BASE_URL`: the public address, e.g. `https://community.example.org`. Required in
+     production: links in emails (password reset, invitations) are built from it.
    Rotating the key logs everyone out once. That is intended.
    The new version refuses to start in production with a `SECRET_KEY` shorter than 32 characters.
 5. **GitHub settings** (repository → Settings):
@@ -55,6 +57,10 @@ There is no self-registration. To add someone, open *Mitglieder → Neues Mitgli
 link (copy it, show it as a QR code, or let the app email it) at `/join/<token>`, where they
 choose their login email and password.
 
+Forgotten passwords are reset by the members themselves (*Passwort vergessen?* on the login
+page; the link is mailed). In development the mail only appears in the log of `flask jobs tick`.
+Password and login email are changed on *Mein Profil*.
+
 ### Checks (the same ones CI runs)
 
 ```bash
@@ -72,7 +78,7 @@ All settings come from environment variables or `.env` (see [`.env.example`](.en
 | `APP_ENV` | `production` (default), `development` or `testing` |
 | `SECRET_KEY` | Required in production, at least 32 random characters. The app refuses to start otherwise. |
 | `CLUB_NAME` | Name shown in the UI |
-| `BASE_URL` | Public URL, e.g. `https://community.example.org`. Used for links in emails and invitation links; set it in production. |
+| `BASE_URL` | Public URL, e.g. `https://community.example.org`. Used for links in emails (password reset, invitations). **Required in production**: the app refuses to start without it, so links are never built from a forged `Host` header. |
 | `SQLALCHEMY_DATABASE_URI` | Default `sqlite:///community.db` (in `instance/`) |
 | `TRUSTED_PROXY_HOPS` | `1` behind one Nginx, `0` without a proxy (default) |
 | `SESSION_COOKIE_SECURE` | Empty = default: `true` in production, `false` in development. Set `false` only for production without HTTPS. |
@@ -85,6 +91,7 @@ All settings come from environment variables or `.env` (see [`.env.example`](.en
 | `MAIL_FROM` | Sender, default `Community <noreply@localhost>` |
 | `INVITE_LINK_DAYS` | Days an invitation link (copied or sent by email) stays valid (default 14) |
 | `INVITE_QR_HOURS` | Hours an invitation shown as a QR code stays valid (default 24) |
+| `PASSWORD_RESET_MAX_AGE_MINUTES` | Minutes a password reset link stays valid (default 60); it also stops working once used |
 | `JOB_MAX_ATTEMPTS` | Tries per background job before it is marked failed (default 5; waits 2, 4, 8, 16 minutes in between) |
 
 ## Background jobs and email

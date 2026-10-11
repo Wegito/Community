@@ -27,9 +27,9 @@ Namen und Kontakt-E-Mail kann nur die Mitgliederverwaltung ändern.</p>
 </form>
 
 <h2 class="text-lg font-semibold mb-2">Anmeldung</h2>
-{# M1-8 adds changing the password and the login email here. #}
 <div class="p-3 bg-white rounded shadow mb-6 space-y-2">
-<p>Login-E-Mail: <strong>{{ current_user.login_email }}</strong></p>
+<p>Login-E-Mail: <strong>{{ current_user.login_email }}</strong> · <a class="underline" href="{{ url_for('auth.change_email') }}">ändern</a></p>
+<p><a class="underline" href="{{ url_for('auth.change_password') }}">Passwort ändern</a></p>
 <form method="post" action="{{ url_for('members.logout_everywhere_own') }}">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
 <button type="submit" class="px-3 py-1 rounded border">Überall abmelden</button>

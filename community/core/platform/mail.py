@@ -115,10 +115,13 @@ def render_mail(template, **context):
     return subject, body
 
 
-def queue_mail(to, template, **context):
-    """Render a mail now and enqueue it for sending (commits nothing). Returns the job."""
+def queue_mail(to, template, *, dedupe_key=None, **context):
+    """Render a mail now and enqueue it for sending (commits nothing). Returns the job.
+
+    With a dedupe_key that was used before, no second mail is queued (see jobs.enqueue).
+    """
     subject, body = render_mail(template, **context)
-    return enqueue('mail.send', {'to': to, 'subject': subject, 'body': body})
+    return enqueue('mail.send', {'to': to, 'subject': subject, 'body': body}, dedupe_key=dedupe_key)
 
 
 def absolute_url(endpoint, **values):
