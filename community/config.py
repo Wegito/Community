@@ -73,7 +73,7 @@ class DevelopmentConfig(BaseConfig):
 class TestingConfig(BaseConfig):
     ENV_NAME = 'testing'
     TESTING = True
-    SECRET_KEY = 'testing-key'
+    SECRET_KEY = 'testing-key'  # noqa: S105 (tests only)
     SQLALCHEMY_DATABASE_URI = 'sqlite://'
     WTF_CSRF_ENABLED = False
     INVITE_CODE = 'test-invite'

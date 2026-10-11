@@ -1,5 +1,7 @@
 """Flask extension instances, initialised in create_app()."""
 
+from pathlib import Path
+
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -16,5 +18,7 @@ NAMING_CONVENTION = {
 }
 
 db = SQLAlchemy(metadata=MetaData(naming_convention=NAMING_CONVENTION))
-migrate = Migrate(render_as_batch=True, compare_type=True)
+MIGRATIONS_DIR = str(Path(__file__).resolve().parent.parent / 'migrations')
+
+migrate = Migrate(directory=MIGRATIONS_DIR, render_as_batch=True, compare_type=True)
 login_manager = LoginManager()
