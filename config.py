@@ -10,8 +10,7 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.getenv('SQLALCHEMY_DATABASE_URI', 'sqlite:///community.db')
     SQLALCHEMY_ECHO = False
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    INVITE_CODE = os.getenv('INVITE_CODE', 'invite')
-    ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', '')
+    INVITE_CODE = os.getenv('INVITE_CODE', '')
 
     # Optional: Cookies härten, wenn du über Nginx per HTTPS gehst
     SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'false').lower() == 'true'

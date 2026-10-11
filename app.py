@@ -1,14 +1,31 @@
 
-from flask import Flask, render_template, redirect, url_for, flash, request
+import hmac
+from functools import wraps
+
+import click
+from flask import Flask, render_template, redirect, url_for, flash, current_app
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from models import DB, User, Announcement, Chore, Booking, Resource, Role
 from forms import RegisterForm, LoginForm, AnnouncementForm, ChoreForm, BookingForm
 from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config
-from datetime import datetime
 from sqlalchemy import select
 
 login_manager = LoginManager()
+
+
+def admin_required(view):
+    """Allow only logged-in admins; others are redirected with a message."""
+    @wraps(view)
+    @login_required
+    def wrapped(*args, **kwargs):
+        if current_user.role != Role.ADMIN:
+            flash('Nur für Admins', 'warning')
+            return redirect(url_for('index'))
+        return view(*args, **kwargs)
+    return wrapped
+
+
 login_manager.login_view = 'login'
 @login_manager.user_loader
 def load_user(user_id):
@@ -22,6 +39,22 @@ def create_app():
     DB.init_app(app)
     login_manager.init_app(app)
 
+    @app.cli.command('create-admin')
+    @click.option('--email', prompt=True)
+    @click.option('--name', prompt=True)
+    @click.password_option()
+    def create_admin(email, name, password):
+        """Create an admin account, or promote an existing one."""
+        email = email.strip().lower()
+        user = DB.session.scalar(select(User).where(User.email == email))
+        if user is None:
+            user = User(email=email, name=name)
+            DB.session.add(user)
+        user.set_password(password)
+        user.role = Role.ADMIN
+        DB.session.commit()
+        click.echo(f'Admin ready: {email}')
+
     @app.route('/')
     def index():
         anns = Announcement.query.order_by(Announcement.created_at.desc()).limit(10).all()
@@ -29,10 +62,10 @@ def create_app():
 
     @app.route('/register', methods=['GET', 'POST'])
     def register():
-        from config import Config
         form = RegisterForm()
         if form.validate_on_submit():
-                if form.invite.data != Config.INVITE_CODE:
+                invite_code = current_app.config.get('INVITE_CODE')
+                if not invite_code or not hmac.compare_digest(form.invite.data.encode(), invite_code.encode()):
                     flash('Falscher Invite‑Code', 'danger')
                     return render_template('auth/register.html', form=form)
                 if DB.session.scalar(select(User).where(User.email == form.email.data)):
@@ -40,8 +73,6 @@ def create_app():
                     return render_template('auth/register.html', form=form)
                 u = User(email=form.email.data, name=form.name.data)
                 u.set_password(form.password.data)
-                if form.email.data == Config.ADMIN_EMAIL:
-                    u.role = Role.ADMIN
                 DB.session.add(u)
                 DB.session.commit()
                 flash('Registrierung erfolgreich. Bitte einloggen.', 'success')
@@ -65,11 +96,6 @@ def create_app():
         logout_user()
         return redirect(url_for('index'))
 
-    def admin_required():
-        if not current_user.is_authenticated or current_user.role != Role.ADMIN:
-            flash('Nur für Admins', 'warning')
-        return False
-    return True
 
 # Announcements
     @app.route('/announcements')
@@ -79,18 +105,16 @@ def create_app():
         return render_template('announcements/list.html', anns=anns)
 
     @app.route('/announcements/new', methods=['GET','POST'])
-    @login_required
+    @admin_required
     def announcement_new():
-        if not admin_required():
+        form = AnnouncementForm()
+        if form.validate_on_submit():
+            a = Announcement(title=form.title.data, body=form.body.data, author_id=current_user.id)
+            DB.session.add(a)
+            DB.session.commit()
+            flash('Ankündigung erstellt', 'success')
             return redirect(url_for('announcements'))
-    form = AnnouncementForm()
-    if form.validate_on_submit():
-        a = Announcement(title=form.title.data, body=form.body.data, author_id=current_user.id)
-        DB.session.add(a)
-        DB.session.commit()
-        flash('Ankündigung erstellt', 'success')
-        return redirect(url_for('announcements'))
-    return render_template('announcements/create.html', form=form)
+        return render_template('announcements/create.html', form=form)
 
     # Chores
     @app.route('/chores')
