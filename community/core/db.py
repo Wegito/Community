@@ -1,7 +1,32 @@
 """Database helpers shared by all modules."""
 
-from sqlalchemy import event
+from datetime import UTC
+
+from sqlalchemy import DateTime, event
 from sqlalchemy.engine import Engine
+from sqlalchemy.types import TypeDecorator
+
+
+class UTCDateTime(TypeDecorator):
+    """Stores aware datetimes as naive UTC and returns them as aware UTC.
+
+    Naive datetimes are rejected so local times cannot slip in unconverted.
+    """
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            raise ValueError('UTCDateTime needs a timezone-aware datetime')
+        return value.astimezone(UTC).replace(tzinfo=None)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return value.replace(tzinfo=UTC)
 
 
 @event.listens_for(Engine, 'connect')

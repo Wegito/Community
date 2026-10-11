@@ -1,0 +1,7 @@
+{% extends 'layout.html' %}
+{% block title %}Kein Zugriff{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Kein Zugriff</h1>
+<p class="mb-4">Dafür fehlen dir die Rechte.</p>
+<a class="underline" href="{{ url_for('announcements.index') }}">Zur Startseite</a>
+{% endblock %}

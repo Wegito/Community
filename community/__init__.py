@@ -46,4 +46,15 @@ def create_app(config=None):
     for name in MODULES:
         app.register_blueprint(import_module(name).bp)
 
+    from community.core.errors import register_error_handlers
+    from community.core.money import format_cents
+    from community.core.time import format_date, format_datetime
+
+    register_error_handlers(app)
+    app.jinja_env.filters.update(dt=format_datetime, d=format_date, cents=format_cents)
+
+    @app.context_processor
+    def inject_club_name():
+        return {'club_name': app.config['CLUB_NAME']}
+
     return app

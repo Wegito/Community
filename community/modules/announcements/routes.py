@@ -1,5 +1,6 @@
 from flask import flash, redirect, render_template, url_for
 from flask_login import current_user, login_required
+from sqlalchemy import select
 
 from community.core.security import admin_required
 from community.extensions import db
@@ -11,14 +12,14 @@ from .models import Announcement
 
 @bp.route('/')
 def index():
-    anns = Announcement.query.order_by(Announcement.created_at.desc()).limit(10).all()
+    anns = db.session.scalars(select(Announcement).order_by(Announcement.created_at.desc()).limit(10)).all()
     return render_template('announcements/index.html', anns=anns)
 
 
-@bp.route('/announcements')
+@bp.route('/announcements', endpoint='list')
 @login_required
-def list():
-    anns = Announcement.query.order_by(Announcement.created_at.desc()).all()
+def list_announcements():
+    anns = db.session.scalars(select(Announcement).order_by(Announcement.created_at.desc())).all()
     return render_template('announcements/list.html', anns=anns)
 
 

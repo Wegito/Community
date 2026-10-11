@@ -6,9 +6,9 @@
 <li class="p-3 bg-white rounded shadow flex items-center">
 <div class="flex-1">
 <div class="font-medium">{{ c.title }}</div>
-<div class="text-sm opacity-70">Fällig: {{ c.due_date or '—' }}</div>
+<div class="text-sm opacity-70">Fällig: {{ c.due_date|d or '—' }}</div>
 </div>
-<a class="text-slate-700 underline" href="/chores/edit/{{ c.id }}">Bearbeiten</a>
+<a class="text-slate-700 underline" href="{{ url_for('tasks.edit', cid=c.id) }}">Bearbeiten</a>
 </li>
 {% else %}
 <li class="opacity-70">Noch keine Aufgaben.</li>

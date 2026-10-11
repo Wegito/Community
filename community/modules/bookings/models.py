@@ -1,5 +1,5 @@
-from datetime import datetime
-
+from community.core.db import UTCDateTime
+from community.core.time import utcnow
 from community.extensions import db
 
 
@@ -12,6 +12,6 @@ class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     resource_id = db.Column(db.Integer, db.ForeignKey('resource.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    start = db.Column(db.DateTime, nullable=False)
-    end = db.Column(db.DateTime, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    start = db.Column(UTCDateTime, nullable=False)
+    end = db.Column(UTCDateTime, nullable=False)
+    created_at = db.Column(UTCDateTime, default=utcnow)

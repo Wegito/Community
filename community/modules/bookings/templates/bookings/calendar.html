@@ -24,7 +24,7 @@
 <ul class="space-y-2">
 {% for b, r, u in items %}
 <li class="p-3 bg-white rounded shadow">
-<div class="font-medium">{{ r.name }} – {{ b.start.strftime('%d.%m.%Y %H:%M') }} → {{ b.end.strftime('%d.%m.%Y %H:%M') }}</div>
+<div class="font-medium">{{ r.name }} – {{ b.start|dt }} → {{ b.end|dt }}</div>
 <div class="text-sm opacity-70">von {{ u.name }} ({{ u.email }})</div>
 </li>
 {% else %}

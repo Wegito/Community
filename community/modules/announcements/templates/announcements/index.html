@@ -5,7 +5,7 @@
 {% for a in anns %}
 <li class="p-4 bg-white shadow rounded">
 <div class="font-semibold">{{ a.title }}</div>
-<div class="text-sm opacity-70">{{ a.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+<div class="text-sm opacity-70">{{ a.created_at|dt }}</div>
 <p class="mt-2">{{ a.body }}</p>
 </li>
 {% else %}

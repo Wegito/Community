@@ -3,6 +3,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import select
 
 from community.core.identity.models import User
+from community.core.time import local_to_utc
 from community.extensions import db
 
 from . import bp
@@ -21,14 +22,15 @@ def calendar():
             r = Resource(name=form.resource.data)
             db.session.add(r)
             db.session.commit()
-        b = Booking(resource_id=r.id, user_id=current_user.id, start=form.start.data, end=form.end.data)
+        start, end = local_to_utc(form.start.data), local_to_utc(form.end.data)
+        b = Booking(resource_id=r.id, user_id=current_user.id, start=start, end=end)
         # basic rule: no overlap
         overlap = (
             db.session.execute(
                 select(Booking).where(
                     Booking.resource_id == r.id,
-                    Booking.end > form.start.data,
-                    Booking.start < form.end.data,
+                    Booking.end > start,
+                    Booking.start < end,
                 )
             )
             .scalars()

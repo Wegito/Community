@@ -1,5 +1,6 @@
 from flask import flash, redirect, render_template, url_for
 from flask_login import login_required
+from sqlalchemy import select
 
 from community.extensions import db
 
@@ -8,10 +9,10 @@ from .forms import ChoreForm
 from .models import Chore
 
 
-@bp.route('/chores')
+@bp.route('/chores', endpoint='list')
 @login_required
-def list():
-    items = Chore.query.order_by(Chore.due_date.asc().nulls_last()).all()
+def list_chores():
+    items = db.session.scalars(select(Chore).order_by(Chore.due_date.is_(None), Chore.due_date, Chore.id)).all()
     return render_template('tasks/list.html', items=items)
 
 

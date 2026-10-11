@@ -24,7 +24,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S105", "S106"]  # hard-coded test passwords
+"tests/**" = ["S105", "S106", "DTZ001"]  # test passwords; naive datetimes on purpose
 
 [tool.ruff.format]
 quote-style = "single"
