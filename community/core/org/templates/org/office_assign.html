@@ -1,0 +1,21 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, checkbox, submit %}
+{% block title %}{{ office.label }} besetzen{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">{{ office.label }} besetzen</h1>
+{% if holders %}
+<p class="mb-4">Aktuell: {% for a in holders %}{{ a.member.display_name }}{{ ', ' if not loop.last }}{% endfor %}</p>
+{% endif %}
+<form method="post" class="space-y-3 max-w-md">
+{{ form.hidden_tag() }}
+{{ field(form.member_id) }}
+{{ field(form.valid_from) }}
+{{ field(form.semester_id) }}
+{{ field(form.elected_on) }}
+{{ field(form.convent_ref, placeholder='z. B. CC 12.10.2026, TOP 4') }}
+{{ checkbox(form.is_acting) }}
+{{ checkbox(form.end_previous) }}
+{{ submit(form.submit) }}
+</form>
+<p class="mt-4"><a class="underline" href="{{ url_for('org.office', key=office.key) }}">Zurück</a></p>
+{% endblock %}

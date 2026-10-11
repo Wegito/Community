@@ -15,7 +15,7 @@
 {{ field(form.note) }}
 {% if office_conflicts %}
 <div class="p-3 rounded border border-yellow-300 bg-yellow-50">
-<p class="mb-2">Hat Ämter, die der neue Rang evtl. nicht halten darf:</p>
+<p class="mb-2">Hat Ämter. Falls der neue Rang ein Amt nicht halten darf:</p>
 <ul class="list-disc ml-5 mb-2">{% for a in office_conflicts %}<li>{{ a.office.label }} (seit {{ a.valid_from|d }})</li>{% endfor %}</ul>
 <label class="flex items-center gap-2"><input type="radio" name="offices" value="close" checked> zum Vortag beenden</label>
 <label class="flex items-center gap-2"><input type="radio" name="offices" value="keep_acting"> kommissarisch weiterführen</label>

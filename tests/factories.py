@@ -82,3 +82,13 @@ def make_admin(email='admin@example.org', name='Admin Istrator', password=DEFAUL
     grant_member_role(user.member, SYSADMIN)
     db.session.commit()
     return user
+
+
+def make_officer(office_key, email=None, name=None, valid_from=date(2020, 1, 1)):
+    """A Bursch holding an Amt (assigned by the server operator, i.e. without the self-assign check)."""
+    from community.core.org.services import assign_office, office_by_key
+
+    user = make_user(email=email or f'{office_key}@example.org', name=name or f'{office_key.title()} Person')
+    assign_office(office_by_key(office_key), user.member, valid_from)
+    db.session.commit()
+    return user

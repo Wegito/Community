@@ -2,15 +2,26 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import current_user
 from sqlalchemy import select
 
-from community.core.authz import require_perm
+from community.core.authz import can, require_perm
 from community.core.identity.models import Member
 from community.core.platform import audit
 from community.core.time import today_local
 from community.extensions import db
 
 from . import services
-from .forms import RankChangeForm, RankLabelForm, SemesterForm, SemesterStatusForm
-from .models import Rank, Semester, SemesterStatus
+from .forms import (
+    ButtonForm,
+    GroupAddForm,
+    GroupForm,
+    OfficeAssignForm,
+    OfficeDescriptionForm,
+    OfficeEndForm,
+    RankChangeForm,
+    RankLabelForm,
+    SemesterForm,
+    SemesterStatusForm,
+)
+from .models import GroupKind, GroupMembership, MemberGroup, OfficeAssignment, Rank, Semester, SemesterStatus
 
 bp = Blueprint('org', __name__, url_prefix='/org', template_folder='templates')
 
@@ -102,12 +113,173 @@ def change_rank(public_id):
 
 
 def _office_options():
-    """How to treat Ämter the new rank may not hold (filled in by the offices code, M1-5)."""
-    return {}
+    """How to treat Ämter the new rank may not hold: end them, or keep them as acting."""
+    choice = request.form.get('offices', 'close')
+    return {'offices': choice if choice in ('close', 'keep_acting') else 'close'}
 
 
 def _office_conflicts(member):
-    return []
+    return services.member_offices(member)
+
+
+def active_member_choices():
+    from community.core.identity.models import MemberStatus
+
+    members = db.session.scalars(
+        select(Member).where(Member.status == MemberStatus.ACTIVE).order_by(Member.first_name, Member.last_name)
+    ).all()
+    return [(m.id, m.display_name) for m in members]
+
+
+def office_or_404(key):
+    office = services.office_by_key(key)
+    if office is None:
+        abort(404)
+    return office
+
+
+@bp.route('/offices')
+@require_perm('members.directory.view')
+def offices():
+    rows = [(office, services.office_holders(office)) for office in services.offices()]
+    return render_template('org/offices.html', rows=rows)
+
+
+@bp.route('/offices/<key>', methods=['GET', 'POST'])
+@require_perm('members.directory.view')
+def office(key):
+    office = office_or_404(key)
+    form = OfficeDescriptionForm(obj=office)
+    if request.method == 'POST':
+        if not can('offices.assign'):
+            abort(403)
+        if form.validate_on_submit():
+            office.description_md = form.description_md.data
+            audit.record('org.office.describe', office)
+            db.session.commit()
+            flash('Gespeichert', 'success')
+            return redirect(url_for('org.office', key=key))
+    return render_template(
+        'org/office.html',
+        office=office,
+        holders=services.office_holders(office),
+        history=services.office_history(office),
+        form=form,
+        end_form=OfficeEndForm(),
+    )
+
+
+@bp.route('/offices/<key>/assign', methods=['GET', 'POST'])
+@require_perm('offices.assign')
+def assign_office(key):
+    office = office_or_404(key)
+    form = OfficeAssignForm()
+    form.member_id.choices = active_member_choices()
+    semesters = db.session.scalars(select(Semester).order_by(Semester.starts_on.desc())).all()
+    form.semester_id.choices = [(None, '—')] + [(s.id, s.code) for s in semesters]
+    if request.method == 'GET':
+        form.valid_from.data = today_local()
+        current = services.current_semester()
+        form.semester_id.data = current.id if current else None
+    if form.validate_on_submit():
+        member = db.get_or_404(Member, form.member_id.data)
+        semester = db.session.get(Semester, form.semester_id.data) if form.semester_id.data else None
+        try:
+            services.assign_office(
+                office,
+                member,
+                form.valid_from.data,
+                assigned_by=current_user,
+                is_acting=form.is_acting.data,
+                semester=semester,
+                elected_on=form.elected_on.data,
+                convent_ref=form.convent_ref.data,
+                end_previous=form.end_previous.data,
+            )
+        except services.OrgError as error:
+            db.session.rollback()
+            flash(str(error), 'danger')
+        else:
+            db.session.commit()
+            flash(f'{member.full_name} ist ab {form.valid_from.data:%d.%m.%Y} {office.label}.', 'success')
+            return redirect(url_for('org.office', key=key))
+    return render_template('org/office_assign.html', office=office, form=form, holders=services.office_holders(office))
+
+
+@bp.route('/offices/assignments/<int:assignment_id>/end', methods=['POST'])
+@require_perm('offices.assign')
+def end_office(assignment_id):
+    assignment = db.get_or_404(OfficeAssignment, assignment_id)
+    form = OfficeEndForm()
+    if form.validate_on_submit():
+        try:
+            services.end_assignment(assignment, form.valid_to.data, reason=form.reason.data, ended_by=current_user)
+        except services.OrgError as error:
+            db.session.rollback()
+            flash(str(error), 'danger')
+        else:
+            db.session.commit()
+            flash('Amtszeit beendet', 'success')
+    else:
+        flash('Bitte ein Datum angeben.', 'danger')
+    return redirect(url_for('org.office', key=assignment.office.key))
+
+
+@bp.route('/groups', methods=['GET', 'POST'])
+@require_perm('groups.manage')
+def groups():
+    form = GroupForm()
+    if form.validate_on_submit():
+        try:
+            group = services.create_group(form.name.data, form.kind.data, created_by=current_user)
+        except services.OrgError as error:
+            flash(str(error), 'danger')
+        else:
+            db.session.commit()
+            flash('Gruppe angelegt', 'success')
+            return redirect(url_for('org.group', group_id=group.id))
+    rows = [(g, len(services.group_members(g))) for g in services.groups()]
+    return render_template('org/groups.html', rows=rows, form=form, kind_labels=GroupKind.LABELS)
+
+
+@bp.route('/groups/<int:group_id>', methods=['GET', 'POST'])
+@require_perm('groups.manage')
+def group(group_id):
+    group = db.get_or_404(MemberGroup, group_id)
+    form = GroupAddForm()
+    form.member_id.choices = active_member_choices()
+    if request.method == 'GET':
+        form.valid_from.data = today_local()
+    if form.validate_on_submit():
+        member = db.get_or_404(Member, form.member_id.data)
+        try:
+            services.add_to_group(group, member, form.valid_from.data, is_lead=form.is_lead.data, added_by=current_user)
+        except services.OrgError as error:
+            db.session.rollback()
+            flash(str(error), 'danger')
+        else:
+            db.session.commit()
+            flash(f'{member.full_name} hinzugefügt', 'success')
+            return redirect(url_for('org.group', group_id=group.id))
+    return render_template(
+        'org/group.html',
+        group=group,
+        memberships=services.group_members(group),
+        form=form,
+        button_form=ButtonForm(),
+        kind_labels=GroupKind.LABELS,
+    )
+
+
+@bp.route('/groups/memberships/<int:membership_id>/end', methods=['POST'])
+@require_perm('groups.manage')
+def end_membership(membership_id):
+    membership = db.get_or_404(GroupMembership, membership_id)
+    if ButtonForm().validate_on_submit():
+        services.end_membership(membership, today_local(), ended_by=current_user)
+        db.session.commit()
+        flash(f'{membership.member.full_name} aus {membership.group.name} entfernt', 'success')
+    return redirect(url_for('org.group', group_id=membership.group_id))
 
 
 @bp.route('/ranks', methods=['GET', 'POST'])

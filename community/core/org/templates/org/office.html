@@ -1,0 +1,51 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% block title %}{{ office.label }}{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-1">{{ office.label }}</h1>
+<p class="text-sm opacity-70 mb-4">Können übernehmen: {{ office.eligible_ranks|map(attribute='label')|join(', ') or 'niemand' }}{% if office.max_holders > 1 %} · bis zu {{ office.max_holders }} Personen{% endif %}</p>
+
+<h2 class="text-lg font-semibold mb-2">Aufgaben</h2>
+{% if can('offices.assign') %}
+<form method="post" class="space-y-2 mb-6">
+{{ form.hidden_tag() }}
+{{ field(form.description_md, class='border p-2 rounded w-full h-40') }}
+{{ submit(form.submit) }}
+</form>
+{% else %}
+<div class="p-3 bg-white rounded shadow mb-6 whitespace-pre-line">{{ office.description_md or '—' }}</div>
+{% endif %}
+
+<div class="flex items-center mb-2">
+<h2 class="text-lg font-semibold">Aktuell</h2>
+<span class="flex-1"></span>
+{% if can('offices.assign') %}<a class="px-3 py-1 rounded border" href="{{ url_for('org.assign_office', key=office.key) }}">Besetzen</a>{% endif %}
+</div>
+<ul class="space-y-2 mb-6">
+{% for a in holders %}
+<li class="p-3 bg-white rounded shadow">
+<div class="font-medium">{{ a.member.display_name }}{% if a.is_acting %} (kommissarisch){% endif %}</div>
+<div class="text-sm opacity-70">seit {{ a.valid_from|d }}{% if a.valid_to %} bis {{ a.valid_to|d }}{% endif %}{% if a.semester %} · {{ a.semester.code }}{% endif %}{% if a.convent_ref %} · {{ a.convent_ref }}{% endif %}</div>
+{% if can('offices.assign') %}
+<form method="post" action="{{ url_for('org.end_office', assignment_id=a.id) }}" class="flex flex-wrap gap-2 mt-2 items-end">
+{{ end_form.hidden_tag() }}
+<label class="text-sm">Letzter Tag <input type="date" name="valid_to" class="border p-1 rounded" required></label>
+<input name="reason" placeholder="Grund" class="border p-1 rounded">
+<button class="px-3 py-1 rounded border">Beenden</button>
+</form>
+{% endif %}
+</li>
+{% else %}
+<li class="opacity-70">Unbesetzt.</li>
+{% endfor %}
+</ul>
+
+<h2 class="text-lg font-semibold mb-2">Bisherige Inhaber</h2>
+<ul class="space-y-1">
+{% for a in history %}
+<li class="text-sm">{{ a.member.display_name }}: {{ a.valid_from|d }} – {{ a.valid_to|d if a.valid_to else 'heute' }}{% if a.is_acting %} (kommissarisch){% endif %}{% if a.end_reason %} · {{ a.end_reason }}{% endif %}</li>
+{% else %}
+<li class="opacity-70 text-sm">Noch niemand.</li>
+{% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% block title %}Gruppen{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Gruppen</h1>
+<ul class="space-y-2 mb-6">
+{% for g, count in rows %}
+<li class="p-3 bg-white rounded shadow flex items-center gap-3">
+<a class="flex-1 font-medium underline" href="{{ url_for('org.group', group_id=g.id) }}">{{ g.name }}</a>
+<span class="text-sm opacity-70">{{ kind_labels[g.kind] }} · {{ count }} Mitglieder{% if g.role %} · gibt Rechte{% endif %}</span>
+</li>
+{% else %}
+<li class="opacity-70">Noch keine Gruppen.</li>
+{% endfor %}
+</ul>
+<h2 class="text-lg font-semibold mb-2">Neue Gruppe</h2>
+<form method="post" class="space-y-3 max-w-md">
+{{ form.hidden_tag() }}
+{{ field(form.name, placeholder='z. B. Küchendienst Gruppe A') }}
+{{ field(form.kind) }}
+{{ submit(form.submit) }}
+</form>
+{% endblock %}

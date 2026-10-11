@@ -2,14 +2,25 @@
 
 from datetime import date, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from community.core.authz.service import active_on, clear_cache, role_source
 from community.core.platform import audit
 from community.core.time import today_local
 from community.extensions import db
 
-from .models import Rank, RankHistory, Semester, SemesterKind
+from .models import (
+    GroupKind,
+    GroupMembership,
+    MemberGroup,
+    Office,
+    OfficeAssignment,
+    OfficeIncompatibility,
+    Rank,
+    RankHistory,
+    Semester,
+    SemesterKind,
+)
 
 
 class OrgError(Exception):
@@ -154,3 +165,287 @@ def change_rank(member, rank, valid_from, *, changed_by=None, convent_ref=None, 
         hook(member, rank, valid_from, changed_by, **hook_options)
     clear_cache()
     return entry
+
+
+# --- Ämter -----------------------------------------------------------------------
+
+
+def offices(include_archived=False):
+    query = select(Office).order_by(Office.sort_order)
+    if not include_archived:
+        query = query.where(Office.archived_at.is_(None))
+    return db.session.scalars(query).all()
+
+
+def office_by_key(key):
+    return db.session.scalar(select(Office).where(Office.key == key))
+
+
+def overlaps_from(model, day):
+    """SQL condition: the period is still running on or after `day`."""
+    return or_(model.valid_to.is_(None), model.valid_to >= day)
+
+
+def office_holders(office, day=None):
+    day = day or today_local()
+    return db.session.scalars(
+        select(OfficeAssignment)
+        .where(OfficeAssignment.office_id == office.id, active_on(OfficeAssignment, day))
+        .order_by(OfficeAssignment.valid_from)
+    ).all()
+
+
+def member_offices(member, day=None):
+    day = day or today_local()
+    return db.session.scalars(
+        select(OfficeAssignment)
+        .where(OfficeAssignment.member_id == member.id, active_on(OfficeAssignment, day))
+        .order_by(OfficeAssignment.valid_from)
+    ).all()
+
+
+def office_history(office):
+    return db.session.scalars(
+        select(OfficeAssignment)
+        .where(OfficeAssignment.office_id == office.id)
+        .order_by(OfficeAssignment.valid_from.desc(), OfficeAssignment.id.desc())
+    ).all()
+
+
+def incompatible_office_ids(office):
+    rows = db.session.execute(
+        select(OfficeIncompatibility.office_a_id, OfficeIncompatibility.office_b_id).where(
+            or_(OfficeIncompatibility.office_a_id == office.id, OfficeIncompatibility.office_b_id == office.id)
+        )
+    ).all()
+    return {a if b == office.id else b for a, b in rows}
+
+
+def is_eligible(office, member, day):
+    rank = current_rank(member, day)
+    return rank is not None and rank.id in {r.id for r in office.eligible_ranks}
+
+
+def assign_office(
+    office,
+    member,
+    valid_from,
+    *,
+    assigned_by=None,
+    is_acting=False,
+    semester=None,
+    elected_on=None,
+    convent_ref=None,
+    end_previous=True,
+):
+    """Give `member` the Amt from `valid_from` on (until the successor takes over). Commits nothing.
+
+    end_previous: if the Amt is full, the current holders' terms end the day before.
+    assigned_by=None means the server operator (CLI); otherwise nobody may assign themselves.
+    """
+    from community.core.identity.models import MemberStatus
+
+    if assigned_by is not None and assigned_by.member_id == member.id:
+        raise OrgError('Ein Amt kann man sich nicht selbst geben.')
+    if office.archived_at is not None:
+        raise OrgError('Dieses Amt wird nicht mehr verwendet.')
+    if member.status != MemberStatus.ACTIVE:
+        raise OrgError(f'{member.full_name} ist kein aktives Mitglied.')
+    if not is_acting and not is_eligible(office, member, valid_from):
+        labels = ', '.join(r.label for r in office.eligible_ranks) or 'niemand'
+        raise OrgError(f'{office.label} können nur {labels} übernehmen. Ausnahme: kommissarisch (wird protokolliert).')
+    running = db.session.scalars(
+        select(OfficeAssignment).where(
+            OfficeAssignment.member_id == member.id, overlaps_from(OfficeAssignment, valid_from)
+        )
+    ).all()
+    if any(a.office_id == office.id for a in running):
+        raise OrgError(f'{member.full_name} hat das Amt {office.label} in diesem Zeitraum bereits.')
+    conflicts = incompatible_office_ids(office)
+    clash = next((a for a in running if a.office_id in conflicts), None)
+    if clash is not None:
+        raise OrgError(f'{office.label} und {clash.office.label} darf niemand gleichzeitig haben.')
+
+    holders = db.session.scalars(
+        select(OfficeAssignment).where(
+            OfficeAssignment.office_id == office.id, overlaps_from(OfficeAssignment, valid_from)
+        )
+    ).all()
+    if len(holders) >= office.max_holders:
+        if not end_previous:
+            raise OrgError(f'{office.label} ist besetzt. Bisherige Inhaber zuerst beenden.')
+        later = [a for a in holders if a.valid_from >= valid_from]
+        if later:
+            raise OrgError(f'Es gibt schon eine Besetzung ab {later[0].valid_from:%d.%m.%Y}.')
+        excess = len(holders) - office.max_holders + 1
+        for previous in sorted(holders, key=lambda a: a.valid_from)[:excess]:
+            end_assignment(
+                previous, valid_from - timedelta(days=1), reason='Nachfolger übernimmt', ended_by=assigned_by
+            )
+
+    assignment = OfficeAssignment(
+        office_id=office.id,
+        member_id=member.id,
+        semester_id=getattr(semester, 'id', None),
+        valid_from=valid_from,
+        is_acting=is_acting,
+        elected_on=elected_on,
+        convent_ref=convent_ref or None,
+        assigned_by_user_id=getattr(assigned_by, 'id', None),
+    )
+    db.session.add(assignment)
+    db.session.flush()
+    audit.record(
+        'org.office.assign',
+        assignment,
+        actor=assigned_by,
+        diff={
+            'office': office.key,
+            'member_id': member.id,
+            'valid_from': valid_from,
+            'is_acting': is_acting,
+            'eligible': is_eligible(office, member, valid_from),
+        },
+    )
+    clear_cache()
+    return assignment
+
+
+def end_assignment(assignment, on, *, reason=None, ended_by=None):
+    """End an Amt on `on` (inclusive). Commits nothing."""
+    if on < assignment.valid_from:
+        raise OrgError(f'Das Ende darf nicht vor dem Beginn ({assignment.valid_from:%d.%m.%Y}) liegen.')
+    if assignment.valid_to is not None and assignment.valid_to <= on:
+        return assignment
+    assignment.valid_to = on
+    assignment.end_reason = reason or assignment.end_reason
+    audit.record(
+        'org.office.end',
+        assignment,
+        actor=ended_by,
+        diff={'office': assignment.office.key, 'member_id': assignment.member_id, 'valid_to': on, 'reason': reason},
+    )
+    clear_cache()
+    return assignment
+
+
+@role_source
+def _office_roles(member, day):
+    rows = db.session.scalars(
+        select(Office.role_id)
+        .join(OfficeAssignment, OfficeAssignment.office_id == Office.id)
+        .where(OfficeAssignment.member_id == member.id, active_on(OfficeAssignment, day))
+    )
+    return set(rows)
+
+
+def _offices_after_rank_change(member, rank, valid_from, changed_by, offices='close', **_):
+    """Ämter the new rank may not hold: end them the day before, or keep them as acting (audited)."""
+    for assignment in member_offices(member, valid_from):
+        if rank.id in {r.id for r in assignment.office.eligible_ranks}:
+            continue
+        if offices == 'keep_acting':
+            assignment.is_acting = True
+            audit.record(
+                'org.office.keep_acting',
+                assignment,
+                actor=changed_by,
+                diff={'office': assignment.office.key, 'new_rank': rank.key},
+            )
+        else:
+            end_assignment(
+                assignment,
+                max(valid_from - timedelta(days=1), assignment.valid_from),
+                reason=f'Rangwechsel zu {rank.label}',
+                ended_by=changed_by,
+            )
+
+
+RANK_CHANGE_HOOKS.append(_offices_after_rank_change)
+
+
+# --- Groups ----------------------------------------------------------------------
+
+
+def groups(include_archived=False):
+    query = select(MemberGroup).order_by(MemberGroup.kind, MemberGroup.name)
+    if not include_archived:
+        query = query.where(MemberGroup.archived_at.is_(None))
+    return db.session.scalars(query).all()
+
+
+def create_group(name, kind=GroupKind.TASK, *, semester=None, created_by=None):
+    name = name.strip()
+    exists = db.session.scalar(
+        select(MemberGroup.id).where(MemberGroup.name == name, MemberGroup.archived_at.is_(None))
+    )
+    if exists:
+        raise OrgError(f'Die Gruppe {name} gibt es schon.')
+    group = MemberGroup(name=name, kind=kind, semester_id=getattr(semester, 'id', None))
+    db.session.add(group)
+    db.session.flush()
+    audit.record('org.group.create', group, actor=created_by, diff={'name': name, 'kind': kind})
+    return group
+
+
+def group_members(group, day=None):
+    day = day or today_local()
+    return db.session.scalars(
+        select(GroupMembership)
+        .where(GroupMembership.group_id == group.id, active_on(GroupMembership, day))
+        .order_by(GroupMembership.valid_from)
+    ).all()
+
+
+def member_groups(member, day=None):
+    day = day or today_local()
+    return db.session.scalars(
+        select(GroupMembership).where(GroupMembership.member_id == member.id, active_on(GroupMembership, day))
+    ).all()
+
+
+def add_to_group(group, member, valid_from, *, is_lead=False, added_by=None):
+    running = db.session.scalar(
+        select(GroupMembership.id).where(
+            GroupMembership.group_id == group.id,
+            GroupMembership.member_id == member.id,
+            overlaps_from(GroupMembership, valid_from),
+        )
+    )
+    if running:
+        raise OrgError(f'{member.full_name} ist bereits in {group.name}.')
+    membership = GroupMembership(group_id=group.id, member_id=member.id, valid_from=valid_from, is_lead=is_lead)
+    db.session.add(membership)
+    db.session.flush()
+    audit.record('org.group.add', membership, actor=added_by, diff={'group': group.name, 'member_id': member.id})
+    clear_cache()
+    return membership
+
+
+def end_membership(membership, on, *, ended_by=None):
+    if on < membership.valid_from:
+        on = membership.valid_from
+    membership.valid_to = on
+    audit.record(
+        'org.group.remove',
+        membership,
+        actor=ended_by,
+        diff={'group': membership.group.name, 'member_id': membership.member_id, 'valid_to': on},
+    )
+    clear_cache()
+    return membership
+
+
+@role_source
+def _group_roles(member, day):
+    rows = db.session.scalars(
+        select(MemberGroup.role_id)
+        .join(GroupMembership, GroupMembership.group_id == MemberGroup.id)
+        .where(
+            GroupMembership.member_id == member.id,
+            MemberGroup.role_id.is_not(None),
+            MemberGroup.archived_at.is_(None),
+            active_on(GroupMembership, day),
+        )
+    )
+    return set(rows)

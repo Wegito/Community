@@ -13,6 +13,10 @@
 {% if can('announcements.view') %}<a href="{{ url_for('announcements.list') }}">Ankündigungen</a>{% endif %}
 {% if can('tasks.view_own') %}<a href="{{ url_for('tasks.list') }}">Putzplan</a>{% endif %}
 {% if can('bookings.create_own') %}<a href="{{ url_for('bookings.calendar') }}">Buchungen</a>{% endif %}
+{% if can('members.directory.view') %}<a href="{{ url_for('org.offices') }}">Ämter</a>{% endif %}
+{% if can('groups.manage') %}<a href="{{ url_for('org.groups') }}">Gruppen</a>{% endif %}
+{% if can('org.semesters.manage') %}<a href="{{ url_for('org.semesters') }}">Semester</a>{% endif %}
+{% if can('system.admin') %}<a href="{{ url_for('org.ranks') }}">Ränge</a>{% endif %}
 {% if can('audit.view') %}<a href="{{ url_for('admin.audit') }}">Protokoll</a>{% endif %}
 <span class="flex-1"></span>
 {% if current_user.is_authenticated %}

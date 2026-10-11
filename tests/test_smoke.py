@@ -11,7 +11,7 @@ import pytest
 
 from community import create_app
 from community.config import TestingConfig
-from community.core.org.services import create_semester
+from community.core.org.services import add_to_group, assign_office, create_group, create_semester, office_by_key
 from community.core.time import utcnow
 from community.extensions import db
 from community.modules.bookings.models import Resource
@@ -50,6 +50,9 @@ def data(app):
     start = (utcnow() + timedelta(days=1)).replace(microsecond=0)
     booking = create_booking(resource.id, member.id, start, start + timedelta(hours=1))
     semester = create_semester('WS26/27', 'WS', date(2026, 10, 1), date(2027, 3, 31))
+    assignment = assign_office(office_by_key('kassenwart'), member.member, date(2026, 10, 1))
+    group = create_group('Küche A')
+    membership = add_to_group(group, member.member, date(2026, 10, 1))
     db.session.commit()
     # URL parameters by name, filled in for rules like /chores/edit/<int:cid>.
     return {
@@ -58,6 +61,10 @@ def data(app):
         'resource_id': resource.id,
         'public_id': member.member.public_id,
         'semester_id': semester.id,
+        'key': 'kassenwart',
+        'assignment_id': assignment.id,
+        'group_id': group.id,
+        'membership_id': membership.id,
     }
 
 
