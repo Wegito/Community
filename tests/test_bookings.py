@@ -167,3 +167,30 @@ def test_overlap_check_runs_under_the_write_lock(app):
     finally:
         event.remove(db.engine, 'before_cursor_execute', probe)
     assert outcomes == ['database is locked']
+
+
+@pytest.mark.parametrize(
+    ('start', 'end'),
+    [('2027-03-28T02:30', '2027-03-28T03:15'), ('2027-03-28T02:00', '2027-03-28T03:00')],
+)
+def test_times_skipped_by_the_clock_change_are_rejected(client, login, start, end):
+    """2027-03-28 02:00-03:00 does not exist in Berlin; this used to give a 500 error."""
+    make_user()
+    saal = make_resource()
+    login('max@example.org')
+    response = client.post('/bookings', data={'resource_id': saal.id, 'start': start, 'end': end})
+    assert response.status_code == 200
+    assert 'Zeitumstellung' in response.get_data(as_text=True)
+    assert db.session.scalar(select(Booking)) is None
+
+
+def test_booking_across_the_clock_change_works(client, login):
+    make_user()
+    saal = make_resource()
+    login('max@example.org')
+    response = client.post(
+        '/bookings', data={'resource_id': saal.id, 'start': '2027-03-28T01:00', 'end': '2027-03-28T04:00'}
+    )
+    assert response.status_code == 302
+    booking = db.session.scalar(select(Booking))
+    assert booking.end - booking.start == timedelta(hours=2)

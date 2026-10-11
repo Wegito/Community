@@ -25,6 +25,11 @@ def local_to_utc(value: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
+def exists_locally(value: datetime) -> bool:
+    """False for a naive Berlin wall-clock time that is skipped when the clocks go forward."""
+    return to_local(local_to_utc(value)).replace(tzinfo=None) == value
+
+
 def format_datetime(value, fmt='%d.%m.%Y %H:%M'):
     """Jinja filter `dt`: Berlin time, German format. Empty for None."""
     if value is None:

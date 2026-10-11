@@ -32,7 +32,7 @@ def test_parse_cents(text, cents):
     assert parse_cents(text) == cents
 
 
-@pytest.mark.parametrize('text', ['abc', '', 'NaN', 'inf'])
+@pytest.mark.parametrize('text', ['abc', '', 'NaN', 'inf', '1.234', '1.234 €', '1,234.56', '12.345', '0,001'])
 def test_parse_cents_rejects_garbage(text):
     with pytest.raises(ValueError):
         parse_cents(text)

@@ -28,6 +28,8 @@ def calendar():
             )
         except BookingConflict:
             flash('Zeitraum überschneidet sich mit einer bestehenden Buchung', 'danger')
+        except ValueError:
+            flash('Das Ende muss nach dem Start liegen.', 'danger')
         else:
             flash('Gebucht', 'success')
             return redirect(url_for('bookings.calendar'))
