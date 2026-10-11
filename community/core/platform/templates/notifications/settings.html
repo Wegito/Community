@@ -1,37 +1,31 @@
 {% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, alert, table, cell, button %}
 {% block title %}Benachrichtigungen einstellen{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-1">Benachrichtigungen einstellen</h1>
-<p class="text-sm opacity-70 mb-4">Wichtige Nachrichten (z. B. Passwort zurücksetzen) kommen immer an.</p>
+{{ page_header('Benachrichtigungen einstellen', 'Wichtige Nachrichten (z. B. Passwort zurücksetzen) kommen immer an.') }}
 {% if not has_address %}
-<p class="p-3 rounded border border-yellow-300 bg-yellow-50 mb-4">Für dich ist keine E-Mail-Adresse hinterlegt, deshalb kommen keine E-Mails an.</p>
+{% call alert('warning', class='mb-4') %}Für dich ist keine E-Mail-Adresse hinterlegt, deshalb kommen keine E-Mails an.{% endcall %}
 {% endif %}
 <form method="post">
 {{ form.hidden_tag() }}
-<div class="overflow-x-auto mb-4">
-<table class="w-full text-sm bg-white shadow rounded">
-<thead><tr class="text-left border-b">
-<th class="p-2">Art</th>
-{% for channel in channels %}<th class="p-2">{{ channel_labels[channel] }}</th>{% endfor %}
-</tr></thead>
-<tbody>
+{% set headers = namespace(items=['Art']) %}
+{% for channel in channels %}{% set headers.items = headers.items + [channel_labels[channel]] %}{% endfor %}
+{% call table(headers.items, class='mb-4') %}
 {% for kind, state in rows %}
-<tr class="border-b">
-<td class="p-2">{{ kind.label }}{% if kind.mandatory %} <span class="opacity-70">(immer)</span>{% endif %}</td>
+<tr>
+<td class="{{ cell }}">{{ kind.label }}{% if kind.mandatory %} <span class="text-slate-500">(immer)</span>{% endif %}</td>
 {% for channel in channels %}
-<td class="p-2">
+<td class="{{ cell }}">
 {% if state[channel] is none %}
-<span class="opacity-50">—</span>
+<span class="text-slate-400">—</span>
 {% else %}
-<input type="checkbox" name="on" value="{{ kind.key }}:{{ channel }}" aria-label="{{ kind.label }}: {{ channel_labels[channel] }}"{% if state[channel] %} checked{% endif %}{% if kind.mandatory %} disabled{% endif %}>
+<input type="checkbox" name="on" value="{{ kind.key }}:{{ channel }}" class="size-4 accent-slate-900" aria-label="{{ kind.label }}: {{ channel_labels[channel] }}"{% if state[channel] %} checked{% endif %}{% if kind.mandatory %} disabled{% endif %}>
 {% endif %}
 </td>
 {% endfor %}
 </tr>
 {% endfor %}
-</tbody>
-</table>
-</div>
-<button type="submit" class="px-4 py-2 bg-slate-900 text-white rounded">Speichern</button>
+{% endcall %}
+{{ button('Speichern') }}
 </form>
 {% endblock %}

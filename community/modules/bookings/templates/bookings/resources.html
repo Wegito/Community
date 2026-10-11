@@ -1,25 +1,32 @@
 {% extends 'layout.html' %}
 {% from 'macros/forms.html' import field, submit %}
+{% from 'macros/ui.html' import page_header, section_header, button, badge, card, empty_state, stacked_list, row_class, back_link %}
 {% block title %}Ressourcen{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Ressourcen</h1>
-<form method="post" class="space-y-3 mb-6 max-w-md">
+{{ page_header('Ressourcen', 'Räume und Geräte, die Mitglieder buchen können.') }}
+{% if items %}
+{% call stacked_list() %}
+{% for r in items %}
+<li class="{{ row_class }}">
+<div class="min-w-48 flex-1{{ '' if r.is_active else ' text-slate-500' }}">{{ r.name }}{% if not r.is_active %} {{ badge('deaktiviert') }}{% endif %}</div>
+<form method="post" action="{{ url_for('bookings.toggle_resource', resource_id=r.id) }}">
+{{ button_form.hidden_tag() }}
+{{ button('Deaktivieren' if r.is_active else 'Aktivieren', 'secondary', 'sm') }}
+</form>
+</li>
+{% endfor %}
+{% endcall %}
+{% else %}
+{{ empty_state('Noch keine Ressourcen.') }}
+{% endif %}
+
+{{ section_header('Neue Ressource') }}
+{% call card(class='max-w-xl') %}
+<form method="post" class="space-y-4">
 {{ form.hidden_tag() }}
 {{ field(form.name, placeholder='z. B. Saal') }}
 {{ submit(form.submit) }}
 </form>
-<ul class="space-y-2">
-{% for r in items %}
-<li class="p-3 bg-white rounded shadow flex items-center gap-3">
-<div class="flex-1{{ '' if r.is_active else ' opacity-50' }}">{{ r.name }}{% if not r.is_active %} (deaktiviert){% endif %}</div>
-<form method="post" action="{{ url_for('bookings.toggle_resource', resource_id=r.id) }}">
-{{ button_form.hidden_tag() }}
-<button type="submit" class="px-3 py-1 rounded border">{{ 'Deaktivieren' if r.is_active else 'Aktivieren' }}</button>
-</form>
-</li>
-{% else %}
-<li class="opacity-70">Noch keine Ressourcen.</li>
-{% endfor %}
-</ul>
-<p class="mt-4"><a class="underline" href="{{ url_for('bookings.calendar') }}">Zurück zu den Buchungen</a></p>
+{% endcall %}
+{{ back_link('Zurück zu den Buchungen', url_for('bookings.calendar')) }}
 {% endblock %}

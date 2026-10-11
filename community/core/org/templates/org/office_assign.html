@@ -1,12 +1,13 @@
 {% extends 'layout.html' %}
-{% from 'macros/forms.html' import field, checkbox, submit %}
+{% from 'macros/forms.html' import field, checkbox, submit, actions %}
+{% from 'macros/ui.html' import page_header, card, link_button %}
 {% block title %}{{ office.label }} besetzen{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">{{ office.label }} besetzen</h1>
-{% if holders %}
-<p class="mb-4">Aktuell: {% for a in holders %}{{ a.member.display_name }}{{ ', ' if not loop.last }}{% endfor %}</p>
-{% endif %}
-<form method="post" class="space-y-3 max-w-md">
+<div class="max-w-xl">
+{% set subtitle %}{% if holders %}Aktuell: {% for a in holders %}{{ a.member.display_name }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}{% endset %}
+{{ page_header(office.label ~ ' besetzen', subtitle) }}
+{% call card() %}
+<form method="post" class="space-y-4">
 {{ form.hidden_tag() }}
 {{ field(form.member_id) }}
 {{ field(form.valid_from) }}
@@ -15,7 +16,11 @@
 {{ field(form.convent_ref, placeholder='z. B. CC 12.10.2026, TOP 4') }}
 {{ checkbox(form.is_acting) }}
 {{ checkbox(form.end_previous) }}
+{% call actions() %}
 {{ submit(form.submit) }}
+{{ link_button('Abbrechen', url_for('org.office', key=office.key), 'ghost') }}
+{% endcall %}
 </form>
-<p class="mt-4"><a class="underline" href="{{ url_for('org.office', key=office.key) }}">Zurück</a></p>
+{% endcall %}
+</div>
 {% endblock %}

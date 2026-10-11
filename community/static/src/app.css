@@ -1,0 +1,31 @@
+/*
+ * Source of community/static/app.css. Do not edit the built file: change this file or the
+ * templates, run tools/build-css.sh and commit both.
+ */
+
+/* source(none): no automatic scanning, only the paths below (the build is the same everywhere). */
+@import "tailwindcss" source(none);
+
+/* Class names are taken from every .html template below community/. Keep them there; shared
+   styles live in templates/macros/ui.html. Classes built in Python would need a line here. */
+@source "../../**/*.html";
+
+@layer base {
+  summary {
+    cursor: pointer;
+  }
+}
+
+/* htmx loading indicators. layout.html switches off the inline <style> htmx would add itself,
+   so a later Content-Security-Policy (roadmap backlog) does not need 'unsafe-inline' for it. */
+@layer components {
+  .htmx-indicator {
+    opacity: 0;
+    transition: opacity 200ms ease-in;
+  }
+
+  .htmx-request .htmx-indicator,
+  .htmx-request.htmx-indicator {
+    opacity: 1;
+  }
+}

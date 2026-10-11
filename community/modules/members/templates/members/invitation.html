@@ -1,26 +1,28 @@
 {% extends 'layout.html' %}
+{% from 'macros/forms.html' import input_class %}
+{% from 'macros/ui.html' import page_header, card, alert, button, link_button, btn_class, muted %}
 {% block title %}Einladung · {{ member.full_name }}{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Einladung für {{ member.full_name }}</h1>
 {% set state = invitation.state() %}
-<p class="mb-4">{{ invitation.channel_label }}{% if invitation.channel == 'email' %} an {{ invitation.email }}{% endif %} · {{ invitation.state_label }}{% if state == 'open' %}, gültig bis {{ invitation.expires_at|dt }}{% endif %}</p>
+{% set status %}{{ invitation.channel_label }}{% if invitation.channel == 'email' %} an {{ invitation.email }}{% endif %} · {{ invitation.state_label }}{% if state == 'open' %}, gültig bis {{ invitation.expires_at|dt }}{% endif %}{% endset %}
+{{ page_header('Einladung für ' ~ member.full_name, status) }}
 
 {% if qr %}
-<div class="p-4 bg-white rounded shadow mb-4 inline-block" data-qr>
-<div class="[&>svg]:w-72 [&>svg]:h-72 [&>svg]:max-w-full">{{ qr }}</div>
-<p class="text-sm opacity-70 mt-2 max-w-72">{{ member.first_name }} scannt den Code mit der Handykamera und legt das Konto an.</p>
+<div class="mb-4 inline-block rounded-lg border border-slate-200 bg-white p-4 shadow-sm" data-qr>
+<div class="[&>svg]:h-72 [&>svg]:w-72 [&>svg]:max-w-full">{{ qr }}</div>
+<p class="mt-2 max-w-72 {{ muted }}">{{ member.first_name }} scannt den Code mit der Handykamera und legt das Konto an.</p>
 </div>
 {% endif %}
 
 {% if link %}
-<div class="p-3 bg-white rounded shadow mb-4 space-y-2">
+{% call card(class='mb-4 space-y-2') %}
 <label for="invite-link" class="block text-sm font-medium">{% if qr %}Oder den Link schicken{% else %}Diesen Link an {{ member.first_name }} schicken (z. B. per Messenger){% endif %}</label>
 <div class="flex gap-2">
-<input id="invite-link" type="text" readonly value="{{ link }}" class="border p-2 rounded w-full font-mono text-sm" onfocus="this.select()">
-<button type="button" class="px-3 py-1 rounded border" data-copy="invite-link">Kopieren</button>
+<input id="invite-link" type="text" readonly value="{{ link }}" class="{{ input_class }} font-mono" onfocus="this.select()">
+<button type="button" class="{{ btn_class('secondary') }}" data-copy="invite-link">Kopieren</button>
 </div>
-<p class="text-sm opacity-70">Der Link gilt nur einmal. Er wird nur hier angezeigt, solange du angemeldet bist; danach eine neue Einladung erstellen.</p>
-</div>
+<p class="{{ muted }}">Der Link gilt nur einmal. Er wird nur hier angezeigt, solange du angemeldet bist; danach eine neue Einladung erstellen.</p>
+{% endcall %}
 <script>
 document.querySelectorAll('[data-copy]').forEach(function (button) {
   button.addEventListener('click', function () {
@@ -32,19 +34,19 @@ document.querySelectorAll('[data-copy]').forEach(function (button) {
 });
 </script>
 {% elif state == 'open' and invitation.channel != 'email' %}
-<p class="p-3 rounded border border-yellow-300 bg-yellow-50 mb-4">Der Link wird nur direkt nach dem Erstellen angezeigt. Wenn er verloren ging: neue Einladung erstellen (die alte wird dann ungültig).</p>
+{% call alert('warning', class='mb-4') %}Der Link wird nur direkt nach dem Erstellen angezeigt. Wenn er verloren ging: neue Einladung erstellen (die alte wird dann ungültig).{% endcall %}
 {% endif %}
 
-<div class="flex flex-wrap gap-2 items-center">
+<div class="flex flex-wrap items-center gap-3">
 {% if state == 'open' %}
 <form method="post" action="{{ url_for('members.revoke_invitation', invitation_id=invitation.id) }}">
 {{ button_form.hidden_tag() }}
-<button type="submit" class="px-3 py-1 rounded border border-red-300 text-red-700">Widerrufen</button>
+{{ button('Widerrufen', 'danger') }}
 </form>
 {% endif %}
 {% if state != 'accepted' and member.is_active_member and not member.user %}
-<a class="px-3 py-1 rounded border" href="{{ url_for('members.invite', public_id=member.public_id) }}">Neue Einladung</a>
+{{ link_button('Neue Einladung', url_for('members.invite', public_id=member.public_id)) }}
 {% endif %}
-<a class="underline" href="{{ url_for('members.detail', public_id=member.public_id) }}">Zu {{ member.full_name }}</a>
+{{ link_button('Zu ' ~ member.full_name, url_for('members.detail', public_id=member.public_id), 'ghost') }}
 </div>
 {% endblock %}

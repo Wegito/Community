@@ -1,25 +1,28 @@
 {% extends 'layout.html' %}
 {% from 'macros/forms.html' import field, radios, submit %}
+{% from 'macros/ui.html' import page_header, section_header, card, alert, back_link, muted %}
 {% block title %}Einladen · {{ member.full_name }}{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">{{ member.full_name }} einladen</h1>
+<div class="max-w-xl">
+{{ page_header(member.full_name ~ ' einladen') }}
 {% if not invitable %}
-<p class="p-3 rounded border border-yellow-300 bg-yellow-50 mb-4">
+{% call alert('warning') %}
 {% if member.user %}{{ member.full_name }} hat schon einen Login; eine Einladung ist nicht nötig.{% else %}{{ member.full_name }} ist kein aktives Mitglied.{% endif %}
-</p>
+{% endcall %}
 {% else %}
-<p class="mb-4 max-w-xl">Mit dem Link legt {{ member.first_name }} selbst E-Mail-Adresse und Passwort fest. Eine neue Einladung macht ältere Links ungültig.</p>
-<form method="post" class="space-y-3 max-w-md mb-6" novalidate>
+<p class="mb-4">Mit dem Link legt {{ member.first_name }} selbst E-Mail-Adresse und Passwort fest. Eine neue Einladung macht ältere Links ungültig.</p>
+{% call card() %}
+<form method="post" class="space-y-4" novalidate>
 {{ form.hidden_tag() }}
 {{ radios(form.delivery) }}
 {{ field(form.email, autocomplete='off') }}
-<p class="text-sm opacity-70">Nötig für die Einladung per E-Mail; sonst wird sie als Login-Adresse vorgeschlagen.</p>
+<p class="-mt-2 {{ muted }}">Nötig für die Einladung per E-Mail; sonst wird sie als Login-Adresse vorgeschlagen.</p>
 {{ submit(form.submit) }}
 </form>
-<h2 class="text-lg font-semibold mb-2">Offene Einladungen</h2>
-<div class="p-3 bg-white rounded shadow">
-{% include 'members/_invitations.html' %}
-</div>
+{% endcall %}
+{{ section_header('Offene Einladungen') }}
+{% call card() %}{% include 'members/_invitations.html' %}{% endcall %}
 {% endif %}
-<p class="mt-4"><a class="underline" href="{{ url_for('members.detail', public_id=member.public_id) }}">Zurück zu {{ member.full_name }}</a></p>
+{{ back_link('Zurück zu ' ~ member.full_name, url_for('members.detail', public_id=member.public_id)) }}
+</div>
 {% endblock %}

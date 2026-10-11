@@ -1,42 +1,51 @@
 {% extends 'layout.html' %}
 {% from 'macros/forms.html' import field, checkbox, submit %}
+{% from 'macros/ui.html' import page_header, section_header, card, link_button, post_button, badge, link_class, muted %}
 {% block title %}Mein Profil{% endblock %}
 {% block content %}
-<div class="flex flex-wrap items-start gap-2 mb-4">
-<div class="flex-1">
-<h1 class="text-2xl font-semibold">{{ member.full_name }}</h1>
-{% if member.biername %}<p class="text-lg opacity-80">{{ member.biername }}</p>{% endif %}
-{% if not member.is_active_member %}<p class="text-sm mt-1"><span class="px-2 rounded bg-slate-200">Ehemaliges Mitglied{% if member.ended_on %} seit {{ member.ended_on|d }}{% endif %}</span></p>{% endif %}
-</div>
-{% if can('members.edit_any') %}<a class="px-3 py-1 rounded border" href="{{ url_for('members.edit', public_id=member.public_id) }}">Alles bearbeiten</a>{% endif %}
-</div>
+{% call page_header(member.full_name, member.biername) %}
+{% if can('members.edit_any') %}{{ link_button('Alles bearbeiten', url_for('members.edit', public_id=member.public_id)) }}{% endif %}
+{% endcall %}
+{% if not member.is_active_member %}
+{% set former %}Ehemaliges Mitglied{% if member.ended_on %} seit {{ member.ended_on|d }}{% endif %}{% endset %}
+<p class="-mt-4 mb-6">{{ badge(former) }}</p>
+{% endif %}
 
 {% include 'members/_overview.html' %}
 
-<h2 class="text-lg font-semibold mb-2">Meine Angaben</h2>
-<form method="post" class="space-y-3 max-w-md mb-6">
+<div class="grid gap-x-8 lg:grid-cols-2">
+<section>
+{{ section_header('Meine Angaben') }}
+{% call card() %}
+<form method="post" class="space-y-4">
 {{ form.hidden_tag() }}
 {{ field(form.biername) }}
 {{ field(form.phone) }}
 {{ checkbox(form.show_phone) }}
-{{ field(form.address, class='border p-2 rounded w-full h-24') }}
+{{ field(form.address, rows=3) }}
 {{ checkbox(form.show_address) }}
-<p class="text-sm opacity-70">Mitglieder mit Kontaktrecht sehen deine E-Mail-Adresse{% if contact_email %} ({{ contact_email }}){% endif %}, Telefon und Adresse nur, wenn du sie freigibst.
+<p class="{{ muted }}">Mitglieder mit Kontaktrecht sehen deine E-Mail-Adresse{% if contact_email %} ({{ contact_email }}){% endif %}, Telefon und Adresse nur, wenn du sie freigibst.
 Namen und Kontakt-E-Mail kann nur die Mitgliederverwaltung ändern.</p>
 {{ submit(form.submit) }}
 </form>
+{% endcall %}
+</section>
 
-<h2 class="text-lg font-semibold mb-2">Anmeldung</h2>
-<div class="p-3 bg-white rounded shadow mb-6 space-y-2">
-<p>Login-E-Mail: <strong>{{ current_user.login_email }}</strong> · <a class="underline" href="{{ url_for('auth.change_email') }}">ändern</a></p>
-<p><a class="underline" href="{{ url_for('auth.change_password') }}">Passwort ändern</a></p>
-<form method="post" action="{{ url_for('members.logout_everywhere_own') }}">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-<button type="submit" class="px-3 py-1 rounded border">Überall abmelden</button>
-<span class="text-sm opacity-70">Beendet alle Anmeldungen auf allen Geräten, auch „Angemeldet bleiben“.</span>
-</form>
+<section>
+{{ section_header('Anmeldung') }}
+{% call card(class='space-y-3') %}
+<p>Login-E-Mail: <strong class="break-all">{{ current_user.login_email }}</strong> · <a class="{{ link_class }}" href="{{ url_for('auth.change_email') }}">ändern</a></p>
+<p><a class="{{ link_class }}" href="{{ url_for('auth.change_password') }}">Passwort ändern</a></p>
+<div class="space-y-1">
+{{ post_button('Überall abmelden', url_for('members.logout_everywhere_own')) }}
+<p class="{{ muted }}">Beendet alle Anmeldungen auf allen Geräten, auch „Angemeldet bleiben“.</p>
 </div>
+{% endcall %}
 
-<h2 class="text-lg font-semibold mb-2">Benachrichtigungen</h2>
-<p class="mb-6"><a class="underline" href="{{ url_for('notifications.settings') }}">Benachrichtigungen einstellen</a></p>
+{{ section_header('Benachrichtigungen') }}
+{% call card() %}
+<p><a class="{{ link_class }}" href="{{ url_for('notifications.settings') }}">Benachrichtigungen einstellen</a></p>
+{% endcall %}
+</section>
+</div>
 {% endblock %}

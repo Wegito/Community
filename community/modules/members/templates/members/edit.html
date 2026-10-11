@@ -1,23 +1,28 @@
 {% extends 'layout.html' %}
-{% from 'macros/forms.html' import field, checkbox, submit %}
+{% from 'macros/forms.html' import field, checkbox, submit, actions %}
+{% from 'macros/ui.html' import page_header, card, link_button, muted %}
 {% block title %}Bearbeiten · {{ member.full_name }}{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">{{ member.full_name }} bearbeiten</h1>
-<form method="post" class="space-y-3 max-w-md" novalidate>
+<div class="max-w-xl">
+{{ page_header(member.full_name ~ ' bearbeiten') }}
+{% call card() %}
+<form method="post" class="space-y-4" novalidate>
 {{ form.hidden_tag() }}
 {{ field(form.first_name) }}
 {{ field(form.last_name) }}
 {{ field(form.biername) }}
 {{ field(form.email) }}
-{% if member.user %}<p class="text-sm opacity-70">Login-E-Mail: {{ member.user.login_email }}</p>{% endif %}
+{% if member.user %}<p class="{{ muted }}">Login-E-Mail: {{ member.user.login_email }}</p>{% endif %}
 {{ field(form.phone) }}
 {{ checkbox(form.show_phone) }}
-{{ field(form.address, class='border p-2 rounded w-full h-24') }}
+{{ field(form.address, rows=3) }}
 {{ checkbox(form.show_address) }}
 {{ field(form.joined_on) }}
-<div class="flex gap-2 items-center">
+{% call actions() %}
 {{ submit(form.submit) }}
-<a class="underline" href="{{ url_for('members.detail', public_id=member.public_id) }}">Abbrechen</a>
-</div>
+{{ link_button('Abbrechen', url_for('members.detail', public_id=member.public_id), 'ghost') }}
+{% endcall %}
 </form>
+{% endcall %}
+</div>
 {% endblock %}

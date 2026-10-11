@@ -508,19 +508,20 @@ def test_member_page_lifecycle_buttons_follow_permissions(client, login):
     viewer = make_user(email='bursch@example.org', name='Bernd Bursch')
     login(viewer)
     page = client.get(url).get_data(as_text=True)
-    for text in ('Verwaltung', 'Login sperren', 'Überall abmelden', 'Austritt eintragen', 'Login: '):
+    # id="member-admin" is the page's "Verwaltung" section (the menu has a "Verwaltung" group too).
+    for text in ('id="member-admin"', 'Login sperren', 'Überall abmelden', 'Austritt eintragen', 'Login: '):
         assert text not in page
     client.post('/logout')
 
     senior = make_officer('senior')
     login(senior)
     page = client.get(url).get_data(as_text=True)
-    assert 'Login: target@example.org · aktiv' in page
+    assert 'id="member-admin"' in page and 'Login: target@example.org · aktiv' in page
     assert f'/m/{target.public_id}/login/disable' in page and f'/m/{target.public_id}/logout-everywhere' in page
     assert f'/m/{target.public_id}/exit' in page
     # The own page has none of these; the own logout is on /profile.
     page = client.get(f'/m/{senior.member.public_id}').get_data(as_text=True)
-    assert 'Verwaltung' not in page and 'Austritt eintragen' not in page
+    assert 'id="member-admin"' not in page and 'Austritt eintragen' not in page
 
     target.user.is_enabled = False
     db.session.commit()

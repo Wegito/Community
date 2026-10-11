@@ -1,11 +1,12 @@
 {# Rank, Ämter, groups and joined_on of `member`; `overview` comes from services.overview(). #}
-<dl class="p-3 bg-white rounded shadow grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 mb-6">
-<dt class="opacity-70">Rang</dt>
-<dd>{% if overview.rank_entry %}{{ overview.rank_entry.rank.label }} <span class="text-sm opacity-70">seit {{ overview.rank_entry.valid_from|d }}{% if overview.rank_entry.valid_to %} bis {{ overview.rank_entry.valid_to|d }}{% endif %}</span>{% else %}kein Rang{% endif %}</dd>
-<dt class="opacity-70">Ämter</dt>
-<dd>{% for a in overview.offices %}<a class="underline" href="{{ url_for('org.office', key=a.office.key) }}">{{ a.office.label }}</a>{% if a.is_acting %} (kommissarisch){% endif %} <span class="text-sm opacity-70">seit {{ a.valid_from|d }}</span>{{ ', ' if not loop.last }}{% else %}—{% endfor %}</dd>
-<dt class="opacity-70">Gruppen</dt>
+{% from 'macros/ui.html' import link_class, muted %}
+<dl class="mb-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+<dt class="text-slate-600">Rang</dt>
+<dd>{% if overview.rank_entry %}{{ overview.rank_entry.rank.label }} <span class="{{ muted }}">seit {{ overview.rank_entry.valid_from|d }}{% if overview.rank_entry.valid_to %} bis {{ overview.rank_entry.valid_to|d }}{% endif %}</span>{% else %}kein Rang{% endif %}</dd>
+<dt class="text-slate-600">Ämter</dt>
+<dd>{% for a in overview.offices %}<a class="{{ link_class }}" href="{{ url_for('org.office', key=a.office.key) }}">{{ a.office.label }}</a>{% if a.is_acting %} (kommissarisch){% endif %} <span class="{{ muted }}">seit {{ a.valid_from|d }}</span>{{ ', ' if not loop.last }}{% else %}—{% endfor %}</dd>
+<dt class="text-slate-600">Gruppen</dt>
 <dd>{% for m in overview.groups %}{{ m.group.name }}{% if m.is_lead %} (Leitung){% endif %}{{ ', ' if not loop.last }}{% else %}—{% endfor %}</dd>
-<dt class="opacity-70">Mitglied seit</dt>
+<dt class="text-slate-600">Mitglied seit</dt>
 <dd>{{ member.joined_on|d if member.joined_on else '—' }}</dd>
 </dl>

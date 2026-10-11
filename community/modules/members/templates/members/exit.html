@@ -1,31 +1,36 @@
 {% extends 'layout.html' %}
-{% from 'macros/forms.html' import field, submit %}
+{% from 'macros/forms.html' import field, submit, actions %}
+{% from 'macros/ui.html' import page_header, card, alert, link_button %}
 {% block title %}Austritt · {{ member.full_name }}{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Austritt: {{ member.full_name }}</h1>
+<div class="max-w-xl">
+{{ page_header('Austritt: ' ~ member.full_name) }}
 {% if is_self %}
-<p class="p-3 rounded border border-yellow-300 bg-yellow-50 mb-4">Den eigenen Austritt kann man nicht selbst eintragen.</p>
+{% call alert('warning') %}Den eigenen Austritt kann man nicht selbst eintragen.{% endcall %}
 {% else %}
-<div class="p-3 bg-white rounded shadow mb-4 space-y-1">
+{% call alert('warning', class='mb-6 space-y-2') %}
 <p>Danach hat {{ member.first_name }} nur noch die Rechte eines ehemaligen Mitglieds. Der Login bleibt bestehen (eigenes Profil, eigener Saldo).</p>
 <p>Zum Austrittsdatum enden:</p>
-<ul class="list-disc ml-6">
+<ul class="ml-6 list-disc">
 <li>Rang: {{ overview.rank_entry.rank.label if overview.rank_entry else '—' }}</li>
 <li>Ämter: {% for a in overview.offices %}{{ a.office.label }}{{ ', ' if not loop.last }}{% else %}—{% endfor %}</li>
 <li>Gruppen: {% for m in overview.groups %}{{ m.group.name }}{{ ', ' if not loop.last }}{% else %}—{% endfor %}</li>
 <li>direkt vergebene Rollen</li>
 </ul>
 <p>Der Kassenwart wird benachrichtigt, damit der Saldo abgerechnet wird.</p>
-</div>
-<form method="post" class="space-y-3 max-w-md" novalidate>
+{% endcall %}
+{% call card() %}
+<form method="post" class="space-y-4" novalidate>
 {{ form.hidden_tag() }}
 {{ field(form.ended_on) }}
 {{ field(form.reason) }}
-{{ field(form.note, class='border p-2 rounded w-full h-24') }}
-<div class="flex gap-2 items-center">
-{{ submit(form.submit) }}
-<a class="underline" href="{{ url_for('members.detail', public_id=member.public_id) }}">Abbrechen</a>
-</div>
+{{ field(form.note, rows=3) }}
+{% call actions() %}
+{{ submit(form.submit, 'danger') }}
+{{ link_button('Abbrechen', url_for('members.detail', public_id=member.public_id), 'ghost') }}
+{% endcall %}
 </form>
+{% endcall %}
 {% endif %}
+</div>
 {% endblock %}

@@ -1,34 +1,61 @@
 {# Form helpers: label, input and validation errors in one place. #}
-{% macro field(f, class='border p-2 rounded w-full') -%}
-<div>
-{{ f.label(class='block text-sm font-medium mb-1') }}
-{{ f(class=class ~ (' border-red-500' if f.errors else ''), **kwargs) }}
+{% from 'macros/ui.html' import btn_class %}
+
+{# Classes of text inputs, selects and textareas; a field with errors gets aria-invalid and a red border.
+   inline_input_class is for small controls next to a button (no full width). #}
+{% set inline_input_class = 'rounded-md border border-slate-300 bg-white px-3 py-2 text-base shadow-sm placeholder:text-slate-400 focus:border-slate-500 focus:outline-2 focus:outline-slate-300 aria-invalid:border-red-500 sm:text-sm' %}
+{% set input_class = 'block w-full ' ~ inline_input_class %}
+{% set _check_class = 'size-4 shrink-0 accent-slate-900' %}
+
+{% macro _errors(f) -%}
+{% if f.errors %}
+<div id="{{ f.id }}-error">
 {% for error in f.errors %}
-<p class="text-sm text-red-700 mt-1">{{ error }}</p>
+<p class="mt-1 text-sm text-red-700">{{ error }}</p>
 {% endfor %}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{# A labelled input. Further attributes as keywords, e.g. field(form.body, rows=8, placeholder='…'). #}
+{% macro field(f, class=input_class) -%}
+<div>
+{{ f.label(class='mb-1 block text-sm font-medium') }}
+{% if f.errors %}
+{{ f(class=class, aria_invalid='true', aria_describedby=f.id ~ '-error', **kwargs) }}
+{% else %}
+{{ f(class=class, **kwargs) }}
+{% endif %}
+{{ _errors(f) }}
 </div>
 {%- endmacro %}
 
 {% macro checkbox(f) -%}
+<div>
 <label class="flex items-center gap-2">
-{{ f(**kwargs) }}<span>{{ f.label.text }}</span>
+{{ f(class=_check_class, **kwargs) }}<span>{{ f.label.text }}</span>
 </label>
+{{ _errors(f) }}
+</div>
 {%- endmacro %}
 
 {% macro radios(f) -%}
 <fieldset>
-<legend class="block text-sm font-medium mb-1">{{ f.label.text }}</legend>
+<legend class="mb-1 block text-sm font-medium">{{ f.label.text }}</legend>
 <div class="space-y-1">
 {% for option in f %}
-<label class="flex items-center gap-2">{{ option() }}<span>{{ option.label.text }}</span></label>
+<label class="flex items-center gap-2">{{ option(class=_check_class) }}<span>{{ option.label.text }}</span></label>
 {% endfor %}
 </div>
-{% for error in f.errors %}
-<p class="text-sm text-red-700 mt-1">{{ error }}</p>
-{% endfor %}
+{{ _errors(f) }}
 </fieldset>
 {%- endmacro %}
 
-{% macro submit(f) -%}
-{{ f(class='px-4 py-2 bg-slate-900 text-white rounded') }}
+{% macro submit(f, variant='primary') -%}
+{{ f(class=btn_class(variant)) }}
+{%- endmacro %}
+
+{# Row below a form: the submit button and e.g. a "Abbrechen" link (call block). #}
+{% macro actions() -%}
+<div class="flex flex-wrap items-center gap-3 pt-2">{{ caller() }}</div>
 {%- endmacro %}

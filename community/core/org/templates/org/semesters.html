@@ -1,30 +1,34 @@
 {% extends 'layout.html' %}
-{% from 'macros/forms.html' import field, submit %}
+{% from 'macros/forms.html' import field, submit, inline_input_class %}
+{% from 'macros/ui.html' import page_header, section_header, card, button, empty_state, stacked_list, row_class, muted %}
 {% block title %}Semester{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Semester</h1>
-<p class="mb-4">Aktuell: <strong>{{ current.code if current else 'kein Semester für heute angelegt' }}</strong></p>
-<ul class="space-y-2 mb-6">
+{% set subtitle %}Aktuell: <strong class="text-slate-900">{{ current.code if current else 'kein Semester für heute angelegt' }}</strong>{% endset %}
+{{ page_header('Semester', subtitle) }}
+{% if items %}
+{% call stacked_list() %}
 {% for s in items %}
-<li class="p-3 bg-white rounded shadow flex flex-wrap items-center gap-3">
-<div class="flex-1">
+<li class="{{ row_class }}">
+<div class="min-w-48 flex-1">
 <div class="font-medium">{{ s.code }}</div>
-<div class="text-sm opacity-70">{{ s.starts_on|d }} – {{ s.ends_on|d }} · {{ status_labels[s.status] }}</div>
+<div class="{{ muted }}">{{ s.starts_on|d }} – {{ s.ends_on|d }} · {{ status_labels[s.status] }}</div>
 </div>
-<form method="post" action="{{ url_for('org.semester_status', semester_id=s.id) }}" class="flex gap-2">
+<form method="post" action="{{ url_for('org.semester_status', semester_id=s.id) }}" class="flex items-center gap-2">
 {{ status_form.hidden_tag() }}
-<select name="status" class="border p-1 rounded">
+<select name="status" class="{{ inline_input_class }}" aria-label="Status von {{ s.code }}">
 {% for value, label in status_labels.items() %}<option value="{{ value }}" {{ 'selected' if value == s.status }}>{{ label }}</option>{% endfor %}
 </select>
-<button class="px-3 py-1 rounded border">Ändern</button>
+{{ button('Ändern', 'secondary', 'sm') }}
 </form>
 </li>
-{% else %}
-<li class="opacity-70">Noch keine Semester.</li>
 {% endfor %}
-</ul>
-<h2 class="text-lg font-semibold mb-2">Neues Semester</h2>
-<form method="post" class="space-y-3 max-w-md">
+{% endcall %}
+{% else %}
+{{ empty_state('Noch keine Semester.') }}
+{% endif %}
+{{ section_header('Neues Semester') }}
+{% call card(class='max-w-xl') %}
+<form method="post" class="space-y-4">
 {{ form.hidden_tag() }}
 {{ field(form.code) }}
 {{ field(form.kind) }}
@@ -32,4 +36,5 @@
 {{ field(form.ends_on) }}
 {{ submit(form.submit) }}
 </form>
+{% endcall %}
 {% endblock %}

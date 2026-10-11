@@ -71,7 +71,35 @@ Password and login email are changed on *Mein Profil*.
 ruff check . && ruff format --check .
 python -m pytest --cov
 flask db check                       # models and migrations agree
+tools/build-css.sh && git diff --exit-code -- community/static/app.css   # committed CSS is up to date
 ```
+
+### CSS and htmx (frontend)
+
+The pages use [Tailwind CSS](https://tailwindcss.com) classes in the templates and
+[htmx](https://htmx.org) for partial page updates. Both are served from `community/static/`;
+nothing is loaded from a CDN, and the server needs no Node or build step.
+
+- **After changing classes in a template, rebuild the CSS and commit it with the change:**
+  ```bash
+  tools/build-css.sh            # writes community/static/app.css (minified)
+  tools/build-css.sh --watch    # rebuilds on every template change while you work
+  ```
+  The script downloads the Tailwind standalone CLI (pinned version, SHA-256 checked; Linux,
+  macOS or Windows with Git Bash) once into `tools/bin/`, which git ignores. It builds
+  `community/static/src/app.css` into `community/static/app.css`. CI rebuilds it and fails if the
+  committed file differs. Tailwind only sees class names written out in templates (`*.html`), not
+  ones built in Python.
+- Shared look: `templates/layout.html` (menus), `templates/macros/ui.html` (page headers, buttons,
+  badges, notices, cards, lists, tables) and `templates/macros/forms.html` (form fields).
+- **htmx 1.9.12** is vendored as `community/static/vendor/htmx.min.js`
+  (SHA-256 `449317ade7881e949510db614991e195c3a099c4c791c24dacec55f9f4a2a452`, also in
+  `static/vendor/SHA256SUMS`, which CI checks). htmx requests send the CSRF token in the
+  `X-CSRFToken` header automatically (`hx-headers` on `<body>`). To update it, download the new
+  `htmx.min.js` from the htmx GitHub release, update `SHA256SUMS` and the hash in
+  `tests/test_frontend.py`. htmx 2.x is a separate change (roadmap D25).
+- Updating Tailwind: change `TAILWIND_VERSION` and the hashes in `tools/build-css.sh` (from the
+  release's `sha256sums.txt`), rebuild and commit `app.css`.
 
 ## Configuration
 
@@ -140,6 +168,9 @@ gunicorn --workers 2 --bind 127.0.0.1:8000 wsgi:app
 Notes:
 - The entry point is now `wsgi:app` (the old `app.py` is gone). Update the gunicorn command or systemd unit.
 - Behind Nginx set `TRUSTED_PROXY_HOPS=1`, and make Nginx pass `Host`, `X-Forwarded-For` and `X-Forwarded-Proto`.
+- The app sets `X-Content-Type-Options`, `Referrer-Policy` and `X-Frame-Options` itself. Do not add them in
+  Nginx as well, or browsers get them twice.
+- `community/static/app.css` is built and committed; deploying needs no CSS build.
 - Uploads (member import) may be up to 2 MB. Set `client_max_body_size 3m;` in Nginx: its default of 1 MB would
   refuse larger lists with a bare error page before the app can show its own message.
 - Without HTTPS, login only works with `SESSION_COOKIE_SECURE=false`. Use HTTPS for anything real (roadmap M8-1).
@@ -158,12 +189,15 @@ community/
 │   ├── authz/         permissions: registry, roles, @require_perm, can()
 │   ├── org/           semesters, ranks, Ämter, groups
 │   ├── platform/      audit log, background jobs, mail, notifications (bell), QR codes
-│   ├── db.py time.py money.py security.py errors.py
+│   ├── nav.py         the main menu and the "Verwaltung" group (links follow the routes' permissions)
+│   ├── db.py time.py money.py security.py errors.py assets.py
 ├── modules/           one blueprint per feature: models, forms, routes, templates
 │   ├── auth/ members/ announcements/ tasks/ bookings/ admin/
-├── templates/         layout.html, macros/, errors/, mail/ (plain-text email templates)
+├── templates/         layout.html, macros/ (ui.html, forms.html), errors/, mail/ (plain-text email templates)
+├── static/            app.css (built, committed), src/app.css (Tailwind source), vendor/htmx.min.js
 migrations/            Alembic migrations (flask db …)
 tests/                 pytest
+tools/                 build-css.sh (Tailwind standalone CLI; downloads into tools/bin/)
 ```
 
 New features are added as modules; the recipe is in the roadmap, §4.4.

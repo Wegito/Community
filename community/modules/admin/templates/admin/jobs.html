@@ -1,45 +1,40 @@
 {% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, button, badge, table, cell, empty_row %}
 {% block title %}Jobs{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-1">Hintergrund-Jobs</h1>
-<p class="text-sm opacity-70 mb-4">E-Mails und Erinnerungen. Sie laufen, wenn der Server <code>flask jobs tick</code> ausführt (jede Minute).</p>
-<div class="flex flex-wrap gap-3 mb-4 text-sm">
-<a class="{{ 'font-semibold' if not status else 'underline' }}" href="{{ url_for('admin.jobs') }}">Alle</a>
+{% set subtitle %}E-Mails und Erinnerungen. Sie laufen, wenn der Server <code class="font-mono text-sm">flask jobs tick</code> ausführt (jede Minute).{% endset %}
+{{ page_header('Hintergrund-Jobs', subtitle) }}
+{% set filter_link = 'rounded-full px-3 py-1 text-sm font-medium ring-1 ring-inset ring-slate-300 hover:bg-slate-100 aria-[current=page]:bg-slate-900 aria-[current=page]:text-white aria-[current=page]:ring-slate-900' %}
+<nav aria-label="Nach Status filtern" class="mb-4 flex flex-wrap gap-2">
+<a class="{{ filter_link }}" href="{{ url_for('admin.jobs') }}"{% if not status %} aria-current="page"{% endif %}>Alle</a>
 {% for key, label in labels.items() %}
-<a class="{{ 'font-semibold' if status == key else 'underline' }}" href="{{ url_for('admin.jobs', status=key) }}">{{ label }}</a>
+<a class="{{ filter_link }}" href="{{ url_for('admin.jobs', status=key) }}"{% if status == key %} aria-current="page"{% endif %}>{{ label }}</a>
 {% endfor %}
-</div>
-<div class="overflow-x-auto">
-<table class="w-full text-sm bg-white shadow rounded">
-<thead><tr class="text-left border-b">
-<th class="p-2">#</th><th class="p-2">Art</th><th class="p-2">Status</th><th class="p-2">Versuche</th><th class="p-2">Fällig</th><th class="p-2">Fertig</th><th class="p-2">Details</th><th class="p-2"></th>
-</tr></thead>
-<tbody>
+</nav>
+{% call table(['#', 'Art', 'Status', 'Versuche', 'Fällig', 'Fertig', 'Details', none]) %}
 {% for job in items %}
-<tr class="border-b align-top">
-<td class="p-2">{{ job.id }}</td>
-<td class="p-2 font-mono">{{ job.kind }}</td>
-<td class="p-2 whitespace-nowrap {{ 'text-red-700 font-medium' if job.status == 'failed' else '' }}">{{ labels[job.status] }}</td>
-<td class="p-2">{{ job.attempts }}</td>
-<td class="p-2 whitespace-nowrap">{{ job.run_at|dt }}</td>
-<td class="p-2 whitespace-nowrap">{{ job.finished_at|dt }}</td>
-<td class="p-2 break-all">
+<tr>
+<td class="{{ cell }}">{{ job.id }}</td>
+<td class="{{ cell }} font-mono">{{ job.kind }}</td>
+<td class="{{ cell }} whitespace-nowrap">{{ badge(labels[job.status], 'danger' if job.status == 'failed' else ('success' if job.status == 'done' else 'neutral')) }}</td>
+<td class="{{ cell }}">{{ job.attempts }}</td>
+<td class="{{ cell }} whitespace-nowrap">{{ job.run_at|dt }}</td>
+<td class="{{ cell }} whitespace-nowrap">{{ job.finished_at|dt }}</td>
+<td class="{{ cell }} min-w-64 break-all">
 {{ job.summary }}
-{% if job.last_error and job.status != 'done' %}<div class="font-mono text-xs text-red-700">{{ job.last_error }}</div>{% endif %}
+{% if job.last_error and job.status != 'done' %}<div class="mt-1 font-mono text-xs text-red-700">{{ job.last_error }}</div>{% endif %}
 </td>
-<td class="p-2">
+<td class="{{ cell }}">
 {% if job.status == 'failed' %}
 <form method="post" action="{{ url_for('admin.retry_job', job_id=job.id) }}">
 {{ form.hidden_tag() }}
-<button type="submit" class="px-3 py-1 rounded border">Wiederholen</button>
+{{ button('Wiederholen', 'secondary', 'sm') }}
 </form>
 {% endif %}
 </td>
 </tr>
 {% else %}
-<tr><td class="p-2 opacity-70" colspan="8">Keine Jobs.</td></tr>
+{{ empty_row('Keine Jobs.', 8) }}
 {% endfor %}
-</tbody>
-</table>
-</div>
+{% endcall %}
 {% endblock %}

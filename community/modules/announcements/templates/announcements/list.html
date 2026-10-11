@@ -1,21 +1,9 @@
 {% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, link_button %}
+{% block title %}Ankündigungen{% endblock %}
 {% block content %}
-<div class="flex items-center mb-4">
-<h1 class="text-2xl font-semibold">Ankündigungen</h1>
-<span class="flex-1"></span>
-{% if can('announcements.create') %}
-<a class="px-3 py-2 bg-slate-900 text-white rounded" href="{{ url_for('announcements.create') }}">Neu</a>
-{% endif %}
-</div>
-<ul class="space-y-3">
-{% for a in anns %}
-<li class="p-4 bg-white shadow rounded">
-<div class="font-semibold">{{ a.title }}</div>
-<div class="text-sm opacity-70">{{ a.created_at|dt }}</div>
-<p class="mt-2">{{ a.body }}</p>
-</li>
-{% else %}
-<li class="opacity-70">Keine Ankündigungen.</li>
-{% endfor %}
-</ul>
+{% call page_header('Ankündigungen') %}
+{% if can('announcements.create') %}{{ link_button('Neue Ankündigung', url_for('announcements.create'), 'primary') }}{% endif %}
+{% endcall %}
+{% with empty = 'Keine Ankündigungen.' %}{% include 'announcements/_list.html' %}{% endwith %}
 {% endblock %}

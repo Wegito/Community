@@ -25,3 +25,6 @@ htmlcov/
 # IDEs
 .idea/
 .vscode/
+
+# Downloaded build tools (tools/build-css.sh)
+tools/bin/

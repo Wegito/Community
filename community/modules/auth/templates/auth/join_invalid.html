@@ -1,8 +1,11 @@
 {% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, alert, link_class %}
 {% block title %}Einladung{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Einladung</h1>
-<p class="p-3 rounded border border-yellow-300 bg-yellow-50 mb-4">{{ message }}</p>
+<div class="mx-auto max-w-xl">
+{{ page_header('Einladung') }}
+{% call alert('warning', class='mb-4') %}{{ message }}{% endcall %}
 <p class="mb-2">Ein Einladungslink gilt nur einmal und nur für kurze Zeit. Wende dich an die Person, die dich eingeladen hat (Senior oder Fuxmajor), und lass dir einen neuen schicken.</p>
-<p>Du hast schon ein Konto? Dann <a class="underline" href="{{ url_for('auth.login') }}">hier einloggen</a>.</p>
+<p>Du hast schon ein Konto? Dann <a class="{{ link_class }}" href="{{ url_for('auth.login') }}">hier einloggen</a>.</p>
+</div>
 {% endblock %}

@@ -1,23 +1,29 @@
 {% extends 'layout.html' %}
 {% from 'macros/forms.html' import field, submit %}
+{% from 'macros/ui.html' import page_header, section_header, card, badge, empty_state, stacked_list, row_class, link_class, muted %}
 {% block title %}Gruppen{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Gruppen</h1>
-<ul class="space-y-2 mb-6">
+{{ page_header('Gruppen') }}
+{% if rows %}
+{% call stacked_list() %}
 {% for g, count in rows %}
-<li class="p-3 bg-white rounded shadow flex items-center gap-3">
-<a class="flex-1 font-medium underline" href="{{ url_for('org.group', group_id=g.id) }}">{{ g.name }}</a>
-<span class="text-sm opacity-70">{{ kind_labels[g.kind] }} · {{ count }} Mitglieder{% if g.role %} · gibt Rechte{% endif %}</span>
+<li class="{{ row_class }}">
+<a class="min-w-48 flex-1 {{ link_class }}" href="{{ url_for('org.group', group_id=g.id) }}">{{ g.name }}</a>
+<span class="{{ muted }}">{{ kind_labels[g.kind] }} · {{ count }} Mitglieder</span>
+{% if g.role %}{{ badge('gibt Rechte', 'info') }}{% endif %}
 </li>
-{% else %}
-<li class="opacity-70">Noch keine Gruppen.</li>
 {% endfor %}
-</ul>
-<h2 class="text-lg font-semibold mb-2">Neue Gruppe</h2>
-<form method="post" class="space-y-3 max-w-md">
+{% endcall %}
+{% else %}
+{{ empty_state('Noch keine Gruppen.') }}
+{% endif %}
+{{ section_header('Neue Gruppe') }}
+{% call card(class='max-w-xl') %}
+<form method="post" class="space-y-4">
 {{ form.hidden_tag() }}
 {{ field(form.name, placeholder='z. B. Küchendienst Gruppe A') }}
 {{ field(form.kind) }}
 {{ submit(form.submit) }}
 </form>
+{% endcall %}
 {% endblock %}

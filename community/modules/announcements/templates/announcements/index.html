@@ -1,21 +1,10 @@
 {% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, alert %}
 {% block content %}
 {% if not can('announcements.view') %}
-<div class="p-4 bg-white shadow rounded mb-4">
-<p>Willkommen, {{ current_user.member.first_name }}! Dein Konto hat noch keine Rechte (kein Rang, kein Amt).
-Bitte wende dich an den Senior oder einen Admin.</p>
-</div>
+{% call alert('info', class='mb-6') %}Willkommen, {{ current_user.member.first_name }}! Dein Konto hat noch keine Rechte (kein Rang, kein Amt).
+Bitte wende dich an den Senior oder einen Admin.{% endcall %}
 {% endif %}
-<h1 class="text-2xl font-semibold mb-4">Neueste Ankündigungen</h1>
-<ul class="space-y-3">
-{% for a in anns %}
-<li class="p-4 bg-white shadow rounded">
-<div class="font-semibold">{{ a.title }}</div>
-<div class="text-sm opacity-70">{{ a.created_at|dt }}</div>
-<p class="mt-2">{{ a.body }}</p>
-</li>
-{% else %}
-<li class="opacity-70">Noch nichts hier.</li>
-{% endfor %}
-</ul>
+{{ page_header('Neueste Ankündigungen') }}
+{% with empty = 'Noch nichts hier.' %}{% include 'announcements/_list.html' %}{% endwith %}
 {% endblock %}

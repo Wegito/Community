@@ -1,7 +1,7 @@
 {% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, link_button %}
 {% block title %}Fehler{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Fehler</h1>
-<p class="mb-4">Da ist etwas schiefgelaufen. Bitte versuche es später noch einmal.</p>
-<a class="underline" href="{{ url_for('announcements.index') }}">Zur Startseite</a>
+{{ page_header('Fehler', 'Da ist etwas schiefgelaufen. Bitte versuche es später noch einmal.') }}
+{{ link_button('Zur Startseite', url_for('announcements.index')) }}
 {% endblock %}

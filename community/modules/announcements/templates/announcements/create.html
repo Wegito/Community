@@ -1,12 +1,20 @@
 {% extends 'layout.html' %}
-{% from 'macros/forms.html' import field, submit %}
+{% from 'macros/forms.html' import field, submit, actions %}
+{% from 'macros/ui.html' import page_header, card, link_button %}
 {% block title %}Ankündigung erstellen{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Ankündigung erstellen</h1>
-<form method="post" class="space-y-3">
+<div class="max-w-2xl">
+{{ page_header('Ankündigung erstellen') }}
+{% call card() %}
+<form method="post" class="space-y-4">
 {{ form.hidden_tag() }}
 {{ field(form.title) }}
-{{ field(form.body, class='border p-2 rounded w-full h-40') }}
+{{ field(form.body, rows=8) }}
+{% call actions() %}
 {{ submit(form.submit) }}
+{{ link_button('Abbrechen', url_for('announcements.list'), 'ghost') }}
+{% endcall %}
 </form>
+{% endcall %}
+</div>
 {% endblock %}

@@ -71,19 +71,25 @@ def create_app(config=None):
 
     from community.core.errors import register_error_handlers
     from community.core.money import format_cents
+    from community.core.security import init_security_headers
     from community.core.time import format_date, format_datetime
 
     register_error_handlers(app)
+    init_security_headers(app)
     app.jinja_env.filters.update(dt=format_datetime, d=format_date, cents=format_cents)
 
+    from community.core.assets import asset_url
     from community.core.authz import can, policies
+    from community.core.nav import nav_links
 
     @app.context_processor
     def inject_globals():
         return {
             'club_name': app.config['CLUB_NAME'],
+            'asset_url': asset_url,
             'can': can,
             'policies': policies,
+            'nav_links': nav_links,
             'unread_notifications': current_unread_count,
         }
 

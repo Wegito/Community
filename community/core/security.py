@@ -1,4 +1,4 @@
-"""Redirect safety. Access checks live in community.core.authz."""
+"""Redirect safety and security headers. Access checks live in community.core.authz."""
 
 from urllib.parse import urlsplit
 
@@ -17,3 +17,20 @@ def safe_next(target):
     if parts.scheme or parts.netloc:
         return None
     return target
+
+
+# Sent with every response, unless the view set its own value (token pages send
+# Referrer-Policy: no-referrer). A Content-Security-Policy is still on the backlog.
+SECURITY_HEADERS = {
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'same-origin',
+    'X-Frame-Options': 'DENY',
+}
+
+
+def init_security_headers(app):
+    @app.after_request
+    def add_security_headers(response):
+        for name, value in SECURITY_HEADERS.items():
+            response.headers.setdefault(name, value)
+        return response

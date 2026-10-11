@@ -68,6 +68,26 @@ jobs:
       - name: Downgrade to empty and upgrade again
         run: flask db downgrade base && flask db upgrade
 
+  css:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vendored files match their checksums
+        working-directory: community/static/vendor
+        run: sha256sum -c SHA256SUMS
+      - uses: actions/cache@v4
+        with:
+          path: tools/bin
+          key: tailwind-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/build-css.sh') }}
+      - name: Build the CSS with the pinned Tailwind CLI
+        run: tools/build-css.sh
+      - name: Committed app.css is up to date
+        run: |
+          if ! git diff --exit-code -- community/static/app.css; then
+            echo "::error::community/static/app.css is out of date. Run tools/build-css.sh and commit the result."
+            exit 1
+          fi
+
   audit:
     runs-on: ubuntu-latest
     steps:

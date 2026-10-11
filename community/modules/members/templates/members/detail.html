@@ -1,44 +1,45 @@
 {% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, section_header, link_button, post_button, badge, card, link_class, muted %}
 {% block title %}{{ member.full_name }}{% endblock %}
 {% block content %}
-<div class="flex flex-wrap items-start gap-2 mb-4">
-<div class="flex-1">
-<h1 class="text-2xl font-semibold">{{ member.full_name }}</h1>
-{% if member.biername %}<p class="text-lg opacity-80">{{ member.biername }}</p>{% endif %}
-{% if not member.is_active_member %}<p class="text-sm mt-1"><span class="px-2 rounded bg-slate-200">Ehemalig{% if member.ended_on %} seit {{ member.ended_on|d }}{% endif %}{% if member.ended_reason %} · {{ member.ended_reason_label }}{% endif %}</span></p>{% endif %}
-</div>
-{% if can('members.edit_any') %}<a class="px-3 py-1 rounded border" href="{{ url_for('members.edit', public_id=member.public_id) }}">Bearbeiten</a>{% endif %}
-{% if can('members.rank.change') and not is_self and member.is_active_member %}<a class="px-3 py-1 rounded border" href="{{ url_for('org.change_rank', public_id=member.public_id) }}">Rang ändern</a>{% endif %}
-{% if is_self %}<a class="px-3 py-1 rounded border" href="{{ url_for('members.profile') }}">Mein Profil</a>{% endif %}
-</div>
+{% call page_header(member.full_name, member.biername) %}
+{% if can('members.edit_any') %}{{ link_button('Bearbeiten', url_for('members.edit', public_id=member.public_id)) }}{% endif %}
+{% if can('members.rank.change') and not is_self and member.is_active_member %}{{ link_button('Rang ändern', url_for('org.change_rank', public_id=member.public_id)) }}{% endif %}
+{% if is_self %}{{ link_button('Mein Profil', url_for('members.profile')) }}{% endif %}
+{% endcall %}
+{% if not member.is_active_member %}
+{% set former %}Ehemalig{% if member.ended_on %} seit {{ member.ended_on|d }}{% endif %}{% if member.ended_reason %} · {{ member.ended_reason_label }}{% endif %}{% endset %}
+<p class="-mt-4 mb-6">{{ badge(former) }}</p>
+{% endif %}
 
 {% include 'members/_overview.html' %}
 
-<h2 class="text-lg font-semibold mb-2">Kontakt</h2>
+{{ section_header('Kontakt') }}
 {% set hidden_phone = member.phone and not member.show_phone %}
 {% set hidden_address = member.address and not member.show_address %}
 {% if contact.email or contact.phone or contact.address %}
-<dl class="p-3 bg-white rounded shadow grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-{% if contact.email %}<dt class="opacity-70">E-Mail</dt><dd><a class="underline" href="mailto:{{ contact.email }}">{{ contact.email }}</a></dd>{% endif %}
-{% if contact.phone %}<dt class="opacity-70">Telefon</dt><dd><a class="underline" href="tel:{{ contact.phone|replace(' ', '') }}">{{ contact.phone }}</a>{% if hidden_phone %} <span class="text-sm opacity-70">(für andere nicht sichtbar)</span>{% endif %}</dd>{% endif %}
-{% if contact.address %}<dt class="opacity-70">Adresse</dt><dd class="whitespace-pre-line">{{ contact.address }}{% if hidden_address %} <span class="text-sm opacity-70">(für andere nicht sichtbar)</span>{% endif %}</dd>{% endif %}
+<dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+{% if contact.email %}<dt class="text-slate-600">E-Mail</dt><dd class="break-all"><a class="{{ link_class }}" href="mailto:{{ contact.email }}">{{ contact.email }}</a></dd>{% endif %}
+{% if contact.phone %}<dt class="text-slate-600">Telefon</dt><dd><a class="{{ link_class }}" href="tel:{{ contact.phone|replace(' ', '') }}">{{ contact.phone }}</a>{% if hidden_phone %} <span class="{{ muted }}">(für andere nicht sichtbar)</span>{% endif %}</dd>{% endif %}
+{% if contact.address %}<dt class="text-slate-600">Adresse</dt><dd class="whitespace-pre-line">{{ contact.address }}{% if hidden_address %} <span class="{{ muted }}">(für andere nicht sichtbar)</span>{% endif %}</dd>{% endif %}
 </dl>
 {% else %}
-<p class="opacity-70">Keine Kontaktdaten sichtbar.</p>
+<p class="{{ muted }}">Keine Kontaktdaten sichtbar.</p>
 {% endif %}
 
 {% set manage_login = can('members.edit_any') and member.user and not is_self %}
 {% set manage_exit = can('members.exit.record') and not is_self %}
 {% if manage_login or manage_exit or can_invite %}
-<h2 class="text-lg font-semibold mt-6 mb-2">Verwaltung</h2>
-<div class="p-3 bg-white rounded shadow space-y-3">
+<section id="member-admin">
+{{ section_header('Verwaltung') }}
+{% call card(class='space-y-4') %}
 {% if can_invite %}
-<div class="flex flex-wrap items-center gap-2">
+<div class="flex flex-wrap items-center gap-3">
 <p>Kein Login.</p>
-<a class="px-3 py-1 rounded border" href="{{ url_for('members.invite', public_id=member.public_id) }}">Einladen</a>
+{{ link_button('Einladen', url_for('members.invite', public_id=member.public_id), 'secondary', 'sm') }}
 </div>
 <div>
-<p class="text-sm font-medium mb-1">Offene Einladungen</p>
+<p class="mb-2 text-sm font-medium">Offene Einladungen</p>
 {% include 'members/_invitations.html' %}
 </div>
 {% endif %}
@@ -46,36 +47,25 @@
 <p>Login: {{ member.user.login_email }} · {% if member.user.is_enabled %}aktiv{% else %}<strong>gesperrt</strong>{% endif %}</p>
 <div class="flex flex-wrap gap-2">
 {% if member.user.is_enabled %}
-<form method="post" action="{{ url_for('members.disable_login', public_id=member.public_id) }}">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-<button type="submit" class="px-3 py-1 rounded border border-red-300 text-red-700">Login sperren</button>
-</form>
-<form method="post" action="{{ url_for('members.logout_everywhere', public_id=member.public_id) }}">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-<button type="submit" class="px-3 py-1 rounded border">Überall abmelden</button>
-</form>
+{{ post_button('Login sperren', url_for('members.disable_login', public_id=member.public_id), 'danger') }}
+{{ post_button('Überall abmelden', url_for('members.logout_everywhere', public_id=member.public_id)) }}
 {% else %}
-<form method="post" action="{{ url_for('members.enable_login', public_id=member.public_id) }}">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-<button type="submit" class="px-3 py-1 rounded border">Login entsperren</button>
-</form>
+{{ post_button('Login entsperren', url_for('members.enable_login', public_id=member.public_id)) }}
 {% endif %}
 </div>
 {% elif can('members.edit_any') and not member.user and not can_invite %}
-<p class="opacity-70">Kein Login.</p>
+<p class="{{ muted }}">Kein Login.</p>
 {% endif %}
 {% if manage_exit %}
 <div class="flex flex-wrap gap-2">
 {% if member.is_active_member %}
-<a class="px-3 py-1 rounded border" href="{{ url_for('members.record_exit', public_id=member.public_id) }}">Austritt eintragen</a>
+{{ link_button('Austritt eintragen', url_for('members.record_exit', public_id=member.public_id), 'danger', 'sm') }}
 {% else %}
-<form method="post" action="{{ url_for('members.reactivate', public_id=member.public_id) }}">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-<button type="submit" class="px-3 py-1 rounded border">Wieder aufnehmen</button>
-</form>
+{{ post_button('Wieder aufnehmen', url_for('members.reactivate', public_id=member.public_id)) }}
 {% endif %}
 </div>
 {% endif %}
-</div>
+{% endcall %}
+</section>
 {% endif %}
 {% endblock %}

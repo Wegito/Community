@@ -1,7 +1,7 @@
 {% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, link_button %}
 {% block title %}Nicht gefunden{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Nicht gefunden</h1>
-<p class="mb-4">Diese Seite gibt es nicht (mehr).</p>
-<a class="underline" href="{{ url_for('announcements.index') }}">Zur Startseite</a>
+{{ page_header('Nicht gefunden', 'Diese Seite gibt es nicht (mehr).') }}
+{{ link_button('Zur Startseite', url_for('announcements.index')) }}
 {% endblock %}

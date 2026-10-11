@@ -1,13 +1,17 @@
 {% extends 'layout.html' %}
-{% block title %}{{ 'Passwort zurücksetzen' if kind == 'reset' else 'E-Mail-Adresse bestätigen' }}{% endblock %}
+{% from 'macros/ui.html' import page_header, alert, link_class %}
+{% set heading = 'Passwort zurücksetzen' if kind == 'reset' else 'E-Mail-Adresse bestätigen' %}
+{% block title %}{{ heading }}{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">{{ 'Passwort zurücksetzen' if kind == 'reset' else 'E-Mail-Adresse bestätigen' }}</h1>
-<p class="p-3 rounded border border-yellow-300 bg-yellow-50 mb-4 max-w-xl">{{ message }}</p>
+<div class="mx-auto max-w-xl">
+{{ page_header(heading) }}
+{% call alert('warning', class='mb-4') %}{{ message }}{% endcall %}
 {% if kind == 'reset' %}
-<p class="mb-2 max-w-xl">Ein Link zum Zurücksetzen gilt nur einmal und nur kurze Zeit. Er gilt auch nicht mehr, wenn das Passwort inzwischen geändert wurde.</p>
-<p><a class="underline" href="{{ url_for('auth.forgot_password') }}">Neuen Link anfordern</a> · <a class="underline" href="{{ url_for('auth.login') }}">Zum Login</a></p>
+<p class="mb-2">Ein Link zum Zurücksetzen gilt nur einmal und nur kurze Zeit. Er gilt auch nicht mehr, wenn das Passwort inzwischen geändert wurde.</p>
+<p><a class="{{ link_class }}" href="{{ url_for('auth.forgot_password') }}">Neuen Link anfordern</a> · <a class="{{ link_class }}" href="{{ url_for('auth.login') }}">Zum Login</a></p>
 {% else %}
-<p class="mb-2 max-w-xl">Ein Bestätigungslink gilt nur einmal und nur 24 Stunden. Er gilt auch nicht mehr, wenn das Passwort oder die Login-E-Mail-Adresse inzwischen geändert wurde.</p>
-<p>Ändere die Adresse in deinem <a class="underline" href="{{ url_for('auth.change_email') }}">Profil</a> einfach noch einmal.</p>
+<p class="mb-2">Ein Bestätigungslink gilt nur einmal und nur 24 Stunden. Er gilt auch nicht mehr, wenn das Passwort oder die Login-E-Mail-Adresse inzwischen geändert wurde.</p>
+<p>Ändere die Adresse in deinem <a class="{{ link_class }}" href="{{ url_for('auth.change_email') }}">Profil</a> einfach noch einmal.</p>
 {% endif %}
+</div>
 {% endblock %}

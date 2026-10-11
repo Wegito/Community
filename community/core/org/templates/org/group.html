@@ -1,29 +1,34 @@
 {% extends 'layout.html' %}
 {% from 'macros/forms.html' import field, checkbox, submit %}
+{% from 'macros/ui.html' import page_header, section_header, card, button, empty_state, stacked_list, row_class, back_link, muted %}
 {% block title %}{{ group.name }}{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-1">{{ group.name }}</h1>
-<p class="text-sm opacity-70 mb-4">{{ kind_labels[group.kind] }}{% if group.role %} · Mitglieder bekommen die Rechte der Rolle „{{ group.role.label }}“{% endif %}</p>
-<ul class="space-y-2 mb-6">
+{% set subtitle %}{{ kind_labels[group.kind] }}{% if group.role %} · Mitglieder bekommen die Rechte der Rolle „{{ group.role.label }}“{% endif %}{% endset %}
+{{ page_header(group.name, subtitle) }}
+{% if memberships %}
+{% call stacked_list() %}
 {% for m in memberships %}
-<li class="p-3 bg-white rounded shadow flex items-center gap-3">
-<div class="flex-1">{{ m.member.display_name }}{% if m.is_lead %} (Leitung){% endif %} <span class="text-sm opacity-70">seit {{ m.valid_from|d }}</span></div>
+<li class="{{ row_class }}">
+<div class="min-w-48 flex-1">{{ m.member.display_name }}{% if m.is_lead %} (Leitung){% endif %} <span class="{{ muted }}">seit {{ m.valid_from|d }}</span></div>
 <form method="post" action="{{ url_for('org.end_membership', membership_id=m.id) }}">
 {{ button_form.hidden_tag() }}
-<button class="px-3 py-1 rounded border">Entfernen</button>
+{{ button('Entfernen', 'danger', 'sm') }}
 </form>
 </li>
-{% else %}
-<li class="opacity-70">Noch niemand.</li>
 {% endfor %}
-</ul>
-<h2 class="text-lg font-semibold mb-2">Mitglied hinzufügen</h2>
-<form method="post" class="space-y-3 max-w-md">
+{% endcall %}
+{% else %}
+{{ empty_state('Noch niemand.') }}
+{% endif %}
+{{ section_header('Mitglied hinzufügen') }}
+{% call card(class='max-w-xl') %}
+<form method="post" class="space-y-4">
 {{ form.hidden_tag() }}
 {{ field(form.member_id) }}
 {{ field(form.valid_from) }}
 {{ checkbox(form.is_lead) }}
 {{ submit(form.submit) }}
 </form>
-<p class="mt-4"><a class="underline" href="{{ url_for('org.groups') }}">Alle Gruppen</a></p>
+{% endcall %}
+{{ back_link('Alle Gruppen', url_for('org.groups')) }}
 {% endblock %}
