@@ -98,10 +98,28 @@ def run_migrations_online():
     connectable = get_engine()
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=get_metadata(), **conf_args)
-
-        with context.begin_transaction():
-            context.run_migrations()
+        sqlite = connection.dialect.name == 'sqlite'
+        if sqlite:
+            # Batch mode rebuilds tables (copy, DROP old, rename). With foreign keys on
+            # (community/core/db.py enables them per connection) SQLite refuses to drop a
+            # table that other rows reference. The pragma is ignored inside a transaction,
+            # so commit right away; otherwise Alembic treats it as an outside transaction.
+            connection.exec_driver_sql('PRAGMA foreign_keys=OFF')
+            connection.commit()
+        try:
+            context.configure(connection=connection, target_metadata=get_metadata(), **conf_args)
+            with context.begin_transaction():
+                context.run_migrations()
+            if sqlite:
+                broken = connection.exec_driver_sql('PRAGMA foreign_key_check').fetchall()
+                if broken:
+                    raise RuntimeError(f'Foreign key violations after migrating: {broken}')
+        finally:
+            if sqlite:
+                # The connection returns to the pool; the app must get it back with foreign keys on.
+                connection.rollback()
+                connection.exec_driver_sql('PRAGMA foreign_keys=ON')
+                connection.commit()
 
 
 if context.is_offline_mode():
