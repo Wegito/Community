@@ -2,9 +2,7 @@ from flask_wtf import FlaskForm
 from wtforms import BooleanField, EmailField, PasswordField, StringField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length
 
-from community.core.identity.models import normalize_email
-
-MIN_PASSWORD_LENGTH = 10
+from community.core.identity.models import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, normalize_email
 
 
 def strip(value):
@@ -19,7 +17,11 @@ class RegisterForm(FlaskForm):
         'Passwort',
         validators=[
             DataRequired(),
-            Length(min=MIN_PASSWORD_LENGTH, max=256, message=f'Mindestens {MIN_PASSWORD_LENGTH} Zeichen.'),
+            Length(
+                min=MIN_PASSWORD_LENGTH,
+                max=MAX_PASSWORD_LENGTH,
+                message=f'Mindestens {MIN_PASSWORD_LENGTH} Zeichen.',
+            ),
         ],
     )
     confirm = PasswordField(
@@ -30,6 +32,6 @@ class RegisterForm(FlaskForm):
 
 class LoginForm(FlaskForm):
     email = EmailField('E-Mail', filters=[normalize_email], validators=[DataRequired(), Email()])
-    password = PasswordField('Passwort', validators=[DataRequired(), Length(max=256)])
+    password = PasswordField('Passwort', validators=[DataRequired(), Length(max=MAX_PASSWORD_LENGTH)])
     remember = BooleanField('Angemeldet bleiben')
     submit = SubmitField('Login')

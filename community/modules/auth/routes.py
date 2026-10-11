@@ -53,20 +53,19 @@ def login():
         user = db.session.scalar(select(User).where(User.email == form.email.data))
         if user is None:
             check_password_hash(_DUMMY_HASH, form.password.data)
-        elif user.is_locked(now):
-            pass  # same message as a wrong password; the lock expires on its own
+        elif not User.reserve_login_attempt(
+            user.id,
+            now,
+            max_attempts=current_app.config['MAX_FAILED_LOGINS'],
+            lockout=timedelta(minutes=current_app.config['LOGIN_LOCKOUT_MINUTES']),
+        ):
+            # Locked: same message and same cost as a wrong password, so the response
+            # does not reveal that the account exists. The lock expires on its own.
+            check_password_hash(_DUMMY_HASH, form.password.data)
         elif user.check_password(form.password.data):
-            user.register_successful_login()
-            db.session.commit()
+            User.reset_login_attempts(user.id)
             login_user(user, remember=form.remember.data)
             return redirect(next_url or url_for('announcements.index'))
-        else:
-            user.register_failed_login(
-                now,
-                max_attempts=current_app.config['MAX_FAILED_LOGINS'],
-                lockout=timedelta(minutes=current_app.config['LOGIN_LOCKOUT_MINUTES']),
-            )
-            db.session.commit()
         flash(LOGIN_FAILED, 'danger')
     return render_template('auth/login.html', form=form)
 

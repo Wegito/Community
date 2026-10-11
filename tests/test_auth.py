@@ -188,3 +188,54 @@ def test_migration_0002_stops_on_duplicates(tmp_path):
         db.session.remove()
         db.engine.dispose()
         ctx.pop()
+
+
+def test_parallel_wrong_passwords_cannot_exceed_the_limit(app, monkeypatch):
+    """Simultaneous attempts are counted atomically: at most MAX_FAILED_LOGINS password checks."""
+    import threading
+
+    user = make_user()
+    checks = []
+    original = User.check_password
+
+    def counting_check(self, pw):
+        checks.append(pw)
+        return original(self, pw)
+
+    monkeypatch.setattr(User, 'check_password', counting_check)
+    attempts = app.config['MAX_FAILED_LOGINS'] * 3
+    barrier = threading.Barrier(attempts)
+
+    def attempt():
+        client = app.test_client()
+        barrier.wait()
+        client.post('/login', data={'email': 'max@example.org', 'password': 'wrong password'})
+
+    threads = [threading.Thread(target=attempt) for _ in range(attempts)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert len(checks) <= app.config['MAX_FAILED_LOGINS']
+    db.session.refresh(user)
+    assert user.locked_until is not None
+
+
+def test_locked_account_costs_the_same_as_a_wrong_password(app, client, monkeypatch):
+    import community.modules.auth.routes as routes
+
+    user = make_user()
+    user.locked_until = utcnow() + timedelta(minutes=10)
+    db.session.commit()
+    calls = []
+    original = routes.check_password_hash
+
+    def counting(*args):
+        calls.append(args)
+        return original(*args)
+
+    monkeypatch.setattr(routes, 'check_password_hash', counting)
+    response = client.post('/login', data={'email': 'max@example.org', 'password': DEFAULT_PASSWORD})
+    assert response.status_code == 200
+    assert len(calls) == 1

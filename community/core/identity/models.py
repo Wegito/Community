@@ -1,11 +1,15 @@
 from datetime import datetime, timedelta
 
 from flask_login import UserMixin
+from sqlalchemy import case, literal, or_, update
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from community.core.db import UTCDateTime
 from community.core.time import utcnow
 from community.extensions import db
+
+MIN_PASSWORD_LENGTH = 10
+MAX_PASSWORD_LENGTH = 256
 
 
 class Role:
@@ -34,16 +38,33 @@ class User(UserMixin, db.Model):
     def check_password(self, pw: str) -> bool:
         return check_password_hash(self.password_hash, pw)
 
-    def is_locked(self, now: datetime) -> bool:
-        return self.locked_until is not None and self.locked_until > now
+    @classmethod
+    def reserve_login_attempt(cls, user_id, now: datetime, max_attempts: int, lockout: timedelta) -> bool:
+        """Count one login attempt before the password is checked. False = account is locked.
 
-    def register_failed_login(self, now: datetime, max_attempts: int, lockout: timedelta):
-        """Count a failed login; lock the account after max_attempts failures in a row."""
-        self.failed_logins = (self.failed_logins or 0) + 1
-        if self.failed_logins >= max_attempts:
-            self.locked_until = now + lockout
-            self.failed_logins = 0
+        A single UPDATE counts and locks at once, so parallel requests cannot get more than
+        max_attempts password checks per lockout window. The attempt that reaches the limit
+        sets the lock and is still checked.
+        """
+        reaches_limit = cls.failed_logins + 1 >= max_attempts
+        result = db.session.execute(
+            update(cls)
+            .where(cls.id == user_id, or_(cls.locked_until.is_(None), cls.locked_until <= now))
+            .values(
+                failed_logins=case((reaches_limit, 0), else_=cls.failed_logins + 1),
+                locked_until=case((reaches_limit, literal(now + lockout, UTCDateTime)), else_=None),
+            )
+            .execution_options(synchronize_session=False)
+        )
+        db.session.commit()
+        return result.rowcount == 1
 
-    def register_successful_login(self):
-        self.failed_logins = 0
-        self.locked_until = None
+    @classmethod
+    def reset_login_attempts(cls, user_id):
+        db.session.execute(
+            update(cls)
+            .where(cls.id == user_id)
+            .values(failed_logins=0, locked_until=None)
+            .execution_options(synchronize_session=False)
+        )
+        db.session.commit()

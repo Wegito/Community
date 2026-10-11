@@ -42,3 +42,14 @@ def test_admin_can_create_announcement(client, login):
     response = client.post('/announcements/new', data={'title': 'Kneipe', 'body': 'Freitag 20 Uhr'})
     assert response.status_code == 302
     assert 'Kneipe' in client.get('/announcements').get_data(as_text=True)
+
+
+def test_create_admin_rejects_short_password_and_bad_email(app):
+    runner = app.test_cli_runner()
+    short = runner.invoke(create_admin, ['--email', 'boss@example.org', '--name', 'Boss', '--password', 'short'])
+    assert short.exit_code != 0
+    bad_email = runner.invoke(
+        create_admin, ['--email', 'not-an-email', '--name', 'Boss', '--password', 'long enough pw']
+    )
+    assert bad_email.exit_code != 0
+    assert db.session.scalar(select(User)) is None

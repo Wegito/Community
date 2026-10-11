@@ -52,3 +52,31 @@ def test_proxy_fix_only_when_hops_configured(tmp_path):
 
     assert type(create_app(NoProxy).wsgi_app).__name__ != 'ProxyFix'
     assert type(create_app(OneProxy).wsgi_app).__name__ == 'ProxyFix'
+
+
+def test_config_has_safe_defaults_without_env(monkeypatch):
+    """K7: no default invite code; blank values fall back to the defaults."""
+    import importlib
+
+    import community.config as config
+
+    monkeypatch.delenv('INVITE_CODE', raising=False)
+    monkeypatch.setenv('SESSION_COOKIE_SAMESITE', '')
+    monkeypatch.setenv('SESSION_COOKIE_SECURE', '')
+    try:
+        fresh = importlib.reload(config)
+        assert fresh.ProductionConfig.INVITE_CODE == ''
+        assert fresh.ProductionConfig.SESSION_COOKIE_SAMESITE == 'Lax'
+        assert fresh.ProductionConfig.SESSION_COOKIE_SECURE is True
+        assert fresh.DevelopmentConfig.SESSION_COOKIE_SECURE is False
+    finally:
+        monkeypatch.undo()
+        importlib.reload(config)
+
+
+def test_invalid_samesite_is_rejected():
+    class Config(DevelopmentConfig):
+        SESSION_COOKIE_SAMESITE = 'sometimes'
+
+    with pytest.raises(RuntimeError, match='SAMESITE'):
+        create_app(Config)
