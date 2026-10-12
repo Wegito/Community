@@ -1,4 +1,5 @@
 import re
+from datetime import timedelta
 
 import pytest
 from sqlalchemy import select
@@ -160,7 +161,7 @@ def test_bell_and_list_newest_first(client, login):
     first = notify(user.member, 'rank_changed', 'Erste Nachricht')
     db.session.flush()
     second = notify(user.member, 'office_assigned', 'Zweite Nachricht', link='/org/offices')
-    second.created_at = first.created_at.replace(year=first.created_at.year + 1)
+    second.created_at = first.created_at + timedelta(days=365)
     db.session.commit()
     login(user)
     page = client.get('/notifications').get_data(as_text=True)

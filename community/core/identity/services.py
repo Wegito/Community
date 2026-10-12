@@ -156,9 +156,26 @@ def create_invitation(member, channel, *, created_by, email=None):
     return invitation, raw_token
 
 
+# Checks that run again each time an invitation is opened or redeemed, not only when it is made:
+# what was allowed then may not be any more. Each takes the invitation and returns True if it may
+# still be used. The members module adds the inviter-rights rule (members.services.email_only_reason).
+_invitation_checks = []
+
+
+def invitation_check(check):
+    """Register `check(invitation) -> bool` (decorator)."""
+    _invitation_checks.append(check)
+    return check
+
+
 def _usable(invitation, now=None):
     member = invitation.member
-    return invitation.is_open(now) and member.user is None and member.status == MemberStatus.ACTIVE
+    return (
+        invitation.is_open(now)
+        and member.user is None
+        and member.status == MemberStatus.ACTIVE
+        and all(check(invitation) for check in _invitation_checks)
+    )
 
 
 def find_valid_invitation(raw_token):

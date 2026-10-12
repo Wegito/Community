@@ -537,6 +537,87 @@ def test_fuxmajor_still_sends_links_to_members_without_amt(app, rank):
     assert invitation.channel == 'link'
 
 
+@pytest.mark.parametrize('starts_in', [0, 20])
+def test_a_link_dies_when_the_member_gets_rights_beyond_the_inviter(client, starts_in):
+    """The Fuxmajor's link to a plain Bursch must not work once he is elected Senior (now or later)."""
+    from community.core.org.services import assign_office, office_by_key
+
+    fm = make_officer('fuxmajor')
+    member = make_member('Bald Senior', email='bald@example.org')
+    set_rank(member, 'bursch')
+    _, token = members.invite(member, 'link', invited_by=fm, permissions=permissions_for(fm.member))
+    db.session.commit()
+    assert find_valid_invitation(token) is not None
+
+    assign_office(office_by_key('senior'), member, today_local() + timedelta(days=starts_in))
+    db.session.commit()
+    assert find_valid_invitation(token) is None
+    assert client.get(f'/join/{token}').status_code == 404
+    assert client.post(f'/join/{token}', data=join_form(login_email='fm-second@example.org')).status_code == 404
+    assert reload(member).user is None
+
+
+def test_an_email_to_the_stored_address_survives_new_rights(app):
+    from community.core.org.services import assign_office, office_by_key
+
+    fm = make_officer('fuxmajor')
+    member = make_member('Bald Senior', email='bald@example.org')
+    set_rank(member, 'bursch')
+    with app.test_request_context():
+        _, token = members.invite(
+            member, 'email', invited_by=fm, permissions=permissions_for(fm.member), email='bald@example.org'
+        )
+    assign_office(office_by_key('senior'), member, today_local())
+    db.session.commit()
+    assert find_valid_invitation(token) is not None
+
+
+def test_operator_links_are_not_limited_by_later_rights(app):
+    member = make_member('Bald Senior')
+    set_rank(member, 'bursch')
+    _, token = members.invite(member, 'link', invited_by=None, permissions=permissions_for(member))
+    from community.core.org.services import assign_office, office_by_key
+
+    assign_office(office_by_key('senior'), member, today_local())
+    db.session.commit()
+    assert find_valid_invitation(token) is not None
+
+
+def test_contact_email_of_a_member_with_more_rights_is_protected(client, login):
+    """Otherwise an admin could set it to their own alias and then use the 'stored address only' channel."""
+    kassenwart = login_less_officer('kassenwart', email='kw@example.org')
+    admin = make_admin()
+    login(admin)
+    form = {'first_name': 'Real', 'last_name': 'Officer', 'email': 'admin-alias@example.org'}
+    page = client.post(f'/m/{kassenwart.public_id}/edit', data=form)
+    assert page.status_code == 200
+    assert 'kann deshalb nur jemand mit diesen Rechten ändern' in page.get_data(as_text=True)
+    assert reload(kassenwart).email == 'kw@example.org'
+    with pytest.raises(members.MemberError, match=BEYOND_INVITER):
+        members.update_member(reload(kassenwart), {'email': 'admin-alias@example.org'}, actor=admin)
+    # Other fields stay editable; the server operator may change the address.
+    members.update_member(reload(kassenwart), {'biername': 'Moneten', 'email': 'KW@example.org'}, actor=admin)
+    members.update_member(reload(kassenwart), {'email': 'neu@example.org'})
+    db.session.commit()
+    assert reload(kassenwart).email == 'neu@example.org'
+
+
+def test_changing_the_contact_email_revokes_open_invitations(app):
+    fm = make_officer('fuxmajor')
+    member = make_member('Ohne Login', email='alt@example.org')
+    set_rank(member, 'fux')
+    with app.test_request_context():
+        _, token = members.invite(
+            member, 'email', invited_by=fm, permissions=permissions_for(fm.member), email='alt@example.org'
+        )
+    db.session.commit()
+    members.update_member(member, {'email': 'neu@example.org'}, actor=fm)
+    db.session.commit()
+    assert find_valid_invitation(token) is None
+    (entry,) = audit_entries('members.invitations.revoke')
+    assert entry.diff['reason'] == 'email'
+
+
 def test_admin_still_sends_links_to_new_spefuxe(app):
     """The technical admin has no rank, but may start new members as Spefux and invite them."""
     admin = make_admin()

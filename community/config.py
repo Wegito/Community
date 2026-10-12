@@ -144,6 +144,11 @@ class TestingConfig(BaseConfig):
     INVITE_LINK_DAYS = 14
     INVITE_QR_HOURS = 24
     PASSWORD_RESET_MAX_AGE_MINUTES = 60
+    # Pinned so a developer's shell settings cannot change what the tests see.
+    MAX_FAILED_LOGINS = 5
+    LOGIN_LOCKOUT_MINUTES = 15
+    AUDIT_IP_RETENTION_DAYS = 90
+    LAUNDRY_UNDO_MINUTES = 10
 
 
 class ProductionConfig(BaseConfig):

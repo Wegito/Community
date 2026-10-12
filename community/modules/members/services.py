@@ -216,8 +216,22 @@ def update_member(member, data, *, actor=None):
     """Change a member's data (members.edit_any). Returns {field: [old, new]}. Commits nothing.
 
     Raises EmailInUse when the contact email belongs to someone else.
+    The contact email of a member without login is where their invitation may go when only the
+    stored address may be used (email_only_reason). So only someone allowed to invite them by any
+    channel may change it, and a change revokes their open invitations. actor=None: server operator.
     """
-    return _update(member, data, ADMIN_FIELDS, 'members.update', actor)
+    no_login = member.user is None
+    if no_login and 'email' in data and _clean('email', data['email']) != member.email:
+        if actor is not None and email_only_reason(member, permissions_for(actor.member)):
+            raise MemberError(CONTACT_EMAIL_PROTECTED.format(name=member.full_name))
+    diff = _update(member, data, ADMIN_FIELDS, 'members.update', actor)
+    if no_login and 'email' in diff:
+        revoked = identity.revoke_open_invitations(member)
+        if revoked:
+            audit.record(
+                'members.invitations.revoke', member, actor=actor, diff={'revoked_ids': revoked, 'reason': 'email'}
+            )
+    return diff
 
 
 def update_own_profile(member, data, *, actor=None):
@@ -372,6 +386,10 @@ BEYOND_INVITER = (
 )
 ONLY_STORED_EMAIL = ' Die Einladung geht deshalb nur per E-Mail an die hinterlegte Adresse.'
 NO_STORED_EMAIL = ' Es ist keine E-Mail-Adresse hinterlegt, deshalb kann nur jemand mit diesen Rechten einladen.'
+CONTACT_EMAIL_PROTECTED = (
+    '{name} hat Rechte (durch Rang, Amt, Gruppe oder Rolle), die du weder selbst hast noch vergeben darfst. '
+    'Die E-Mail-Adresse, an die die Einladung geht, kann deshalb nur jemand mit diesen Rechten ändern.'
+)
 
 
 def starting_ranks(permissions):
@@ -502,6 +520,22 @@ def invite(member, channel, *, invited_by, permissions, email=None):
             expires_at=invitation.expires_at,
         )
     return invitation, raw_token
+
+
+@identity.invitation_check
+def _inviter_may_still_invite(invitation):
+    """The invite() rule again when the invitation is opened or redeemed.
+
+    A rank, Amt, group or role recorded after the link was made would otherwise reach whoever
+    holds the link. Only an email to the member's current stored address stays valid then.
+    Invitations from the server operator (CLI) are not limited.
+    """
+    if invitation.created_by is None:
+        return True
+    member = invitation.member
+    if invitation.channel == InvitationChannel.EMAIL and invitation.email == member.email:
+        return True
+    return email_only_reason(member, permissions_for(invitation.created_by.member)) is None
 
 
 def join_url(raw_token):

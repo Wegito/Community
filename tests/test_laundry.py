@@ -181,14 +181,13 @@ def test_settings_price_and_defect_machine(client, login):
         data={
             'price-tier': 'member',
             'price-kind': 'dry',
-            'price-price': '0,30',
+            'price-price': '0.30',
             'price-valid_from': '2026-11-01',
             'price-submit': 'y',
         },
     )
-    assert (
-        db.session.scalar(select(LaundryPrice).where(LaundryPrice.valid_from == date(2026, 11, 1))) is not None or True
-    )
+    price = db.session.scalar(select(LaundryPrice).where(LaundryPrice.valid_from == date(2026, 11, 1)))
+    assert (price.tier, price.kind, price.price_cents) == ('member', 'dry', 30)
     dryer = db.session.scalar(select(LaundryMachine).where(LaundryMachine.kind == 'dry'))
     client.post(f'/waesche/verwaltung/maschinen/{dryer.id}', data={'status': 'defect'})
     assert 'Trockner ist als defekt gemeldet' in client.get('/waesche/neu').get_data(as_text=True)
