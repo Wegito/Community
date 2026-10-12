@@ -49,7 +49,7 @@ MAIN = (
 ADMIN = (
     NavLink('Import', 'members.import_upload', also=('members.import_confirm',)),
     NavLink('Gruppen', 'org.groups', also=('org.group',)),
-    NavLink('Semester', 'org.semesters'),
+    NavLink('Semester', 'org.semesters', also=('org.edit_semester',)),
     NavLink('Ränge', 'org.ranks'),
     NavLink('Ohne Rang', 'org.first_ranks'),
     NavLink('Ressourcen', 'bookings.resources'),

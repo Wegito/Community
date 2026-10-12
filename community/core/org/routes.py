@@ -21,6 +21,7 @@ from .forms import (
     OfficeEndForm,
     RankChangeForm,
     RankLabelForm,
+    SemesterEditForm,
     SemesterForm,
     SemesterStatusForm,
 )
@@ -75,6 +76,43 @@ def semester_status(semester_id):
         semester.status = form.status.data
         audit.record('org.semester.status', semester, diff={'status': [old, semester.status]})
         db.session.commit()
+    return redirect(url_for('org.semesters'))
+
+
+@bp.route('/semesters/<int:semester_id>/edit', methods=['GET', 'POST'])
+@require_perm('org.semesters.manage')
+def edit_semester(semester_id):
+    semester = db.get_or_404(Semester, semester_id)
+    form = SemesterEditForm(obj=semester)
+    if form.validate_on_submit():
+        try:
+            services.update_semester(semester, form.code.data, form.kind.data, form.starts_on.data, form.ends_on.data)
+        except services.OrgError as error:
+            db.session.rollback()
+            flash(str(error), 'danger')
+        else:
+            db.session.commit()
+            flash(f'{semester.code} gespeichert', 'success')
+            return redirect(url_for('org.semesters'))
+    return render_template(
+        'org/semester_edit.html', semester=semester, form=form, in_use=services.semester_in_use(semester)
+    )
+
+
+@bp.route('/semesters/<int:semester_id>/delete', methods=['POST'])
+@require_perm('org.semesters.manage')
+def delete_semester(semester_id):
+    semester = db.get_or_404(Semester, semester_id)
+    code = semester.code
+    if ButtonForm().validate_on_submit():
+        try:
+            services.delete_semester(semester)
+        except services.OrgError as error:
+            db.session.rollback()
+            flash(str(error), 'danger')
+            return redirect(url_for('org.edit_semester', semester_id=semester_id))
+        db.session.commit()
+        flash(f'{code} gelöscht', 'success')
     return redirect(url_for('org.semesters'))
 
 

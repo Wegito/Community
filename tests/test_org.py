@@ -263,3 +263,94 @@ def test_replacing_a_wrong_rank_restores_the_previous_period(app):
     # A rank that began before today stays in the history.
     with pytest.raises(OrgError, match='nach dem Beginn'):
         change_rank(member, rank_by_key('alter_herr'), date(2000, 1, 1))
+
+
+# --- Fixing and deleting semesters ------------------------------------------------------------
+
+
+def _semester_audit(action):
+    from community.core.platform.audit import AuditLog
+
+    return db.session.scalars(select(AuditLog).where(AuditLog.action == action).order_by(AuditLog.id)).all()
+
+
+def test_update_semester_fixes_a_wrong_end_date(app):
+    from community.core.org.services import update_semester
+
+    ws = create_semester('WS26/27', 'WS', date(2026, 10, 1), date(2027, 9, 30))  # should end on 31.03.
+    with pytest.raises(OrgError, match='Überschneidet sich mit WS26/27'):
+        create_semester('SS27', 'SS', date(2027, 4, 1), date(2027, 9, 30))
+    update_semester(ws, 'WS26/27', 'WS', date(2026, 10, 1), date(2027, 3, 31))  # its own dates do not overlap
+    db.session.commit()
+    create_semester('SS27', 'SS', date(2027, 4, 1), date(2027, 9, 30))
+    assert current_semester(date(2027, 5, 1)).code == 'SS27'
+    (entry,) = _semester_audit('org.semester.update')
+    assert entry.entity_id == str(ws.id) and '"ends_on": ["2027-09-30", "2027-03-31"]' in entry.diff_json
+
+
+def test_update_semester_keeps_the_rules(app):
+    from community.core.org.services import update_semester
+
+    ws = create_semester('WS26/27', 'WS', date(2026, 10, 1), date(2027, 3, 31))
+    create_semester('SS27', 'SS', date(2027, 4, 1), date(2027, 9, 30))
+    with pytest.raises(OrgError, match='SS27 gibt es schon'):
+        update_semester(ws, 'SS27', 'WS', date(2026, 10, 1), date(2027, 3, 31))
+    with pytest.raises(OrgError, match='Überschneidet sich mit SS27'):
+        update_semester(ws, 'WS26/27', 'WS', date(2026, 10, 1), date(2027, 4, 1))
+    with pytest.raises(OrgError, match='vor seinem Ende beginnen'):
+        update_semester(ws, 'WS26/27', 'WS', date(2027, 3, 31), date(2027, 3, 31))
+    update_semester(ws, 'WS26/27', 'WS', date(2026, 10, 1), date(2027, 3, 31))  # nothing changed
+    assert _semester_audit('org.semester.update') == []
+
+
+def test_delete_semester_only_when_nothing_refers_to_it(app):
+    from community.core.org.services import assign_office, create_group, delete_semester, office_by_key
+
+    ws = create_semester('WS26/27', 'WS', date(2026, 10, 1), date(2027, 3, 31))
+    ss = create_semester('SS27', 'SS', date(2027, 4, 1), date(2027, 9, 30))
+    unused = create_semester('WS27/28', 'WS', date(2027, 10, 1), date(2028, 3, 31))
+    assign_office(office_by_key('kassenwart'), make_user().member, date(2026, 10, 1), semester=ws)
+    create_group('Küche', semester=ss)
+    db.session.commit()
+    for semester in (ws, ss):
+        with pytest.raises(OrgError, match='kann nicht gelöscht werden'):
+            delete_semester(semester)
+    semester_id = unused.id
+    delete_semester(unused)
+    db.session.commit()
+    assert db.session.get(Semester, semester_id) is None
+    (entry,) = _semester_audit('org.semester.delete')
+    assert entry.entity_id == str(semester_id) and 'WS27/28' in entry.diff_json
+
+
+def test_delete_semester_checks_every_reference(app):
+    # A new table pointing at semester must be added to SEMESTER_REFERENCES, or delete_semester would fail on it.
+    from community.core.org.services import SEMESTER_REFERENCES
+
+    pointing = {
+        (table.name, fk.parent.name)
+        for table in db.metadata.tables.values()
+        for fk in table.foreign_keys
+        if fk.column.table.name == 'semester'
+    }
+    assert pointing == {(column.class_.__table__.name, column.key) for column in SEMESTER_REFERENCES}
+
+
+def test_semester_edit_and_delete_pages(client, login):
+    login(make_user(perms=['org.semesters.manage']))
+    ws = create_semester('WS26/27', 'WS', date(2026, 10, 1), date(2027, 9, 30))
+    db.session.commit()
+    edit_url = f'/org/semesters/{ws.id}/edit'
+    assert f'href="{edit_url}"' in client.get('/org/semesters').get_data(as_text=True)
+    page = client.get(edit_url).get_data(as_text=True)
+    assert 'value="2027-09-30"' in page and f'/org/semesters/{ws.id}/delete' in page
+    data = {'code': 'WS26/27', 'kind': 'WS', 'starts_on': '2026-10-01', 'ends_on': '2027-03-31'}
+    response = client.post(edit_url, data=data)
+    assert response.status_code == 302 and response.location == '/org/semesters'
+    db.session.refresh(ws)
+    assert ws.ends_on == date(2027, 3, 31)
+    response = client.post(edit_url, data={**data, 'ends_on': '2026-09-30'})
+    assert 'Das Ende muss nach dem Beginn liegen.' in response.get_data(as_text=True)
+    response = client.post(f'/org/semesters/{ws.id}/delete', follow_redirects=True)
+    assert 'WS26/27 gelöscht' in response.get_data(as_text=True)
+    assert db.session.scalar(select(Semester)) is None

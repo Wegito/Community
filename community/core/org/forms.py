@@ -27,6 +27,10 @@ class SemesterForm(FlaskForm):
             raise ValidationError('Das Ende muss nach dem Beginn liegen.')
 
 
+class SemesterEditForm(SemesterForm):
+    submit = SubmitField('Speichern')
+
+
 class SemesterStatusForm(FlaskForm):
     status = SelectField('Status', choices=list(SemesterStatus.LABELS.items()))
     submit = SubmitField('Ändern')

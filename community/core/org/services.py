@@ -2,7 +2,7 @@
 
 from datetime import date, timedelta
 
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, true
 
 from community.core.authz.service import active_on, clear_cache, end_period, role_source, yesterday
 from community.core.platform import audit
@@ -59,16 +59,22 @@ def current_semester(day=None):
     return db.session.scalar(select(Semester).where(Semester.starts_on <= day, Semester.ends_on >= day))
 
 
-def create_semester(code, kind, starts_on, ends_on, *, status=None):
+def _check_semester(code, starts_on, ends_on, *, other_than=None):
+    """Codes are unique and semesters never overlap; `other_than` is the semester being changed."""
     if starts_on >= ends_on:
         raise OrgError('Das Semester muss vor seinem Ende beginnen.')
-    if db.session.scalar(select(Semester.id).where(Semester.code == code)):
+    others = Semester.id != other_than.id if other_than is not None else true()
+    if db.session.scalar(select(Semester.id).where(Semester.code == code, others)):
         raise OrgError(f'Das Semester {code} gibt es schon.')
     overlap = db.session.scalar(
-        select(Semester.code).where(Semester.starts_on <= ends_on, Semester.ends_on >= starts_on).limit(1)
+        select(Semester.code).where(Semester.starts_on <= ends_on, Semester.ends_on >= starts_on, others).limit(1)
     )
     if overlap:
         raise OrgError(f'Überschneidet sich mit {overlap}.')
+
+
+def create_semester(code, kind, starts_on, ends_on, *, status=None):
+    _check_semester(code, starts_on, ends_on)
     semester = Semester(code=code, kind=kind, starts_on=starts_on, ends_on=ends_on)
     if status:
         semester.status = status
@@ -76,6 +82,40 @@ def create_semester(code, kind, starts_on, ends_on, *, status=None):
     db.session.flush()
     audit.record('org.semester.create', semester, diff={'code': code, 'starts_on': starts_on, 'ends_on': ends_on})
     return semester
+
+
+SEMESTER_FIELDS = ('code', 'kind', 'starts_on', 'ends_on')
+
+
+def update_semester(semester, code, kind, starts_on, ends_on):
+    """Fix a semester's code, kind or dates (e.g. a mistyped end). Commits nothing."""
+    _check_semester(code, starts_on, ends_on, other_than=semester)
+    before = audit.snapshot(semester, SEMESTER_FIELDS)
+    semester.code, semester.kind, semester.starts_on, semester.ends_on = code, kind, starts_on, ends_on
+    diff = audit.changes(semester, SEMESTER_FIELDS, before)
+    if diff:
+        audit.record('org.semester.update', semester, diff=diff)
+    return diff
+
+
+# Columns that point at a semester (informational, D8). A semester one of them uses is kept.
+SEMESTER_REFERENCES = (OfficeAssignment.semester_id, MemberGroup.semester_id)
+
+
+def semester_in_use(semester):
+    return any(
+        db.session.scalar(select(column).where(column == semester.id).limit(1)) is not None
+        for column in SEMESTER_REFERENCES
+    )
+
+
+def delete_semester(semester):
+    """Delete a semester nothing refers to (e.g. one created by mistake). Commits nothing."""
+    if semester_in_use(semester):
+        raise OrgError(f'{semester.code} ist bei Ämtern oder Gruppen eingetragen und kann nicht gelöscht werden.')
+    audit.record('org.semester.delete', semester, diff=audit.snapshot(semester, SEMESTER_FIELDS))
+    db.session.delete(semester)
+    db.session.flush()
 
 
 # --- Ranks -----------------------------------------------------------------------
