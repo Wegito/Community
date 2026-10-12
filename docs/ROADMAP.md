@@ -518,6 +518,7 @@ members.rank.change   (v1 form)      -  -  -  -  │  Y   Y   .   .   ?   . │ 
 members.exit.record                  -  -  -  -  │  Y   .   Y   .   .   . │  .   -
 offices.assign                       -  -  -  -  │  Y   ?   Y   .   .   . │  .   Y
 groups.manage                        -  -  -  -  │  Y   Y   .   .   .   . │  .   .
+org.semesters.manage                 -  -  -  -  │  Y   .   .   .   .   . │  .   Y
 authz.matrix.edit                    -  -  -  -  │  .   .   .   .   .   . │  .   Y
 audit.view                           -  -  -  -  │  Y   .   .   ?   .   . │  .   Y
 announcements.view                   Y  Y  Y  Y  │  .   .   .   .   .   . │  .   .

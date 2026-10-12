@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from pathlib import Path
 
 import pytest
 from sqlalchemy import func, select
@@ -47,6 +48,15 @@ def test_seed_codes_are_declared_or_planned():
     for role_key, codes in load_seed().items():
         for code in codes:
             assert code in PERMISSIONS or code.split('.')[0] in planned, (role_key, code)
+
+
+def test_every_declared_code_is_in_the_roadmap_matrix(app):
+    """§8.1: a new permission code also goes into the default matrix (ROADMAP.md §6.5)."""
+    roadmap = (Path(__file__).resolve().parent.parent / 'docs' / 'ROADMAP.md').read_text(encoding='utf-8')
+    matrix = roadmap.split('### 6.5 Default permission matrix')[1].split('### 6.6')[0]
+    rows = [line.split('  ')[0] for line in matrix.splitlines() if '│' in line]  # "a.b, a.c (note)"
+    listed = {code.strip().split(' ')[0] for row in rows for code in row.split(',')}
+    assert sorted(set(PERMISSIONS) - listed) == []
 
 
 def test_seed_never_removes_grants(app):
