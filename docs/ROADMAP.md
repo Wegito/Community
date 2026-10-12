@@ -817,7 +817,14 @@ The contract is published early as `docs/api/openapi.yaml` (M6-2) so the user ca
 | M3-8 | Club payments & Auslagen | Manual journals: supplier invoices (EXPENSE/BANK), member Auslage credit and payout, cash book | M3-3 | S | M3-4 … M3-7 |
 | M3-9 | Finance go-live (ops) | **Gate: M8-3 restore drill passed.** Import, one month of parallel running, archive Excel read-only. | M3-3, M3-6, M8-3 | S | — |
 
-### 8.7 M4 — Laundry via QR → **R2 "Wäsche per QR"** (quick win, no money risk)
+### 8.7 M4 — Laundry via QR → **R2 "Wäsche per QR"** (next after M1)
+
+**Facts from the current Google Form "Waschliste" (analysed 2026-10-12; the file holds personal data and stays out of the repo):**
+- Questions: *Waschen* (required: "eine" or "beide" machines), *Trocknen* (yes), *Trocknen Modus* (8 dryer programs: Extra Trocken, Schranktrocken +, Bügeltrocken K, Sehr Trocken, Schranktrocken, Bügeltrocken P, Warm 20 min, Kalt 20 min), *Transport* (free text: which tub/box, e.g. "blaugraue Wanne"), plus email, a name ("Timer") and room. With a login, name, email and room are known and not asked again.
+- Billing sheet: one unit costs 0,25 € for members (aktiv/inaktiv) and 1,50 € for "Hausbewohner" (residents who are not members). The owner confirmed that **washing and drying both cost money**: one wash per machine ("beide" = 2) and one per dryer run. The old monthly counts only matched the dryer runs.
+- About 336 entries since January 2026; 84 have no email and cannot be assigned.
+- Only the laundry form moves away from Google; Google stays planned for the calendar (M5).
+
 | ID | Title | Scope | Depends on | Size | Parallel-safe with |
 |---|---|---|---|---|---|
 | M4-1 | QR core | `qr_token`; `/q/<token>` resolved through `QR_HANDLERS`; friendly 404 with manual choice; printable A4 sheet with label and printed domain (SVG; segno or qrcode **[verify]**); rotate button. **Print only after M8-1.** | M0-9, M1-3 | M | M2-*, M3-* |
@@ -932,7 +939,7 @@ M3-9 is gated by M8-3 and needs the Excel file from [Q18].
 | R6 Getränke + API | M6 | Bierwart tooling, counter-app API |
 | R7 Ämter-Workflows | M7 | Fux curriculum, rank workflow, handover, documents |
 
-Recommended order for a single maintainer: **R0 → R1 → (R2 ∥ R3) → R4 → R5 → R6 → R7**. Start R3 as soon as the Excel file arrives. M8 tasks run alongside.
+Recommended order for a single maintainer: **R0 → R1 → R2 → R3 → R4 → R5 → R6 → R7**. R2 (laundry) comes right after R1, by the owner's decision of 2026-10-12, because it replaces a Google Form in daily use. Start R3 as soon as the Excel file arrives. M8 tasks run alongside.
 
 ---
 
@@ -1008,7 +1015,7 @@ Each question names the tasks it blocks. Until a question is answered, the defau
 25. Who co-signs entries that benefit the Kassenwart personally (proposal: Senior or Consenior)? → §6.3
 
 ### Before M4 (laundry)
-26. What columns does the current laundry list have? Is laundry billed per wash, and at what price? How many washers and dryers? Residents only? Are reservations needed? → M4-2, M4-3, M4-5
+26. ~~Laundry list columns and billing~~ answered 2026-10-12 (see §8.7). Still open: how many washers and dryers exist; what the "Timer" column is for; whether residents without membership get their own login; whether the old entries should be imported. → M4-2, M4-3, M4-5
 
 ### Before M5 (events and Google)
 27. Who owns the club Google Calendar today: a normal Gmail account or Google Workspace? Does the club (not a person) own that account? → §7.1, M5-7
