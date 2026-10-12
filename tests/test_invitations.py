@@ -653,6 +653,8 @@ def test_new_member_with_email_queues_the_mail_and_hides_the_link(app, client, l
     mail = next(m for m in outbox(app) if m['to'] == 'neu@example.org')
     token = LINK_RE.search(mail['body']).group(1)
     assert find_valid_invitation(token) is not None
+    # Once sent, the link is nowhere in the database, only its hash (finding 9).
+    assert all(token not in job.payload_json for job in db.session.scalars(select(Job)))
 
 
 def test_new_member_email_delivery_without_address_shows_form_error(client, login):

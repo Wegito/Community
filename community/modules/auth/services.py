@@ -2,10 +2,11 @@
 
 Reset and email-change links are signed with SECRET_KEY (itsdangerous) instead of being stored.
 Each token carries what must not change before it is used, so it dies on its own:
-  password reset  {'uid', 'v': session_version, 'h': fingerprint of the password hash}
+  password reset  {'uid', 'v': session_version, 'h': fingerprint of the password hash,
+                   'e': fingerprint of the login email}
                   Dies when used (the reset raises session_version), after any other password
-                  change, "log out everywhere" or a locked login, and after
-                  PASSWORD_RESET_MAX_AGE_MINUTES.
+                  change, "log out everywhere" or a locked login, when the login email changes
+                  (the link went to the old mailbox), and after PASSWORD_RESET_MAX_AGE_MINUTES.
   email change    {'uid', 'email': new address, 'v', 'from': fingerprint of the login email}
                   Dies when used (the login email is no longer 'from'), after a password or
                   session change, and after EMAIL_CHANGE_MAX_AGE.
@@ -162,7 +163,12 @@ def reset_max_age():
 
 
 def password_reset_token(user):
-    payload = {'uid': user.id, 'v': user.session_version, 'h': fingerprint(user.password_hash)}
+    payload = {
+        'uid': user.id,
+        'v': user.session_version,
+        'h': fingerprint(user.password_hash),
+        'e': fingerprint(user.login_email),
+    }
     return _serializer(RESET_SALT).dumps(payload)
 
 
@@ -170,7 +176,11 @@ def user_from_reset_token(token):
     """The account a reset link is for, or None if the link is invalid, expired or used."""
     payload = _load(token, RESET_SALT, reset_max_age())
     user = _account(payload) if payload else None
-    if user is None or payload.get('h') != fingerprint(user.password_hash):
+    if (
+        user is None
+        or payload.get('h') != fingerprint(user.password_hash)
+        or payload.get('e') != fingerprint(user.login_email)
+    ):
         return None
     return user
 
@@ -245,8 +255,9 @@ def verify_current_password(user, password, purpose):
     """Check the current password before a change of password or login email.
 
     Counted like a login (failed_logins, locked_until), so a stolen session cannot be used to
-    guess the password. Commits the attempt counter and, on failure, its audit entry; raises
-    WrongPassword.
+    guess the password. Commits the attempt counter, and its reset when the password is right
+    (also if the change itself is then refused, e.g. for a taken address); on failure, commits
+    its audit entry and raises WrongPassword.
     """
     config = current_app.config
     allowed = User.reserve_login_attempt(
@@ -256,8 +267,7 @@ def verify_current_password(user, password, purpose):
         lockout=timedelta(minutes=config['LOGIN_LOCKOUT_MINUTES']),
     )
     if allowed and user.check_password(password):
-        user.failed_logins = 0
-        user.locked_until = None
+        User.clear_failed_logins(user.id)
         return
     reason = 'wrong_password' if allowed else 'locked'
     audit.record('auth.reauth_failed', user, actor=user, diff={'purpose': purpose, 'reason': reason})

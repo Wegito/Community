@@ -149,6 +149,17 @@ class User(UserMixin, TimestampMixin, db.Model):
         return result.rowcount == 1
 
     @classmethod
+    def clear_failed_logins(cls, user_id):
+        """The password was right (checked again before a change): count from zero and unlock. Commits."""
+        db.session.execute(
+            update(cls)
+            .where(cls.id == user_id)
+            .values(failed_logins=0, locked_until=None)
+            .execution_options(synchronize_session=False)
+        )
+        db.session.commit()
+
+    @classmethod
     def record_successful_login(cls, user_id, now: datetime):
         db.session.execute(
             update(cls)
@@ -181,7 +192,8 @@ class Invitation(db.Model):
     """A personal, single-use link (/join/<token>) with which a member without login creates one.
 
     Only the SHA-256 hash of the token is stored. The raw token exists once, when the
-    invitation is created, so a database leak does not reveal usable links.
+    invitation is created, so a database leak does not reveal usable links. An emailed link
+    waits in its mail job only until the mail is sent (jobs.job_handler `secret`).
     """
 
     id = db.Column(db.Integer, primary_key=True)

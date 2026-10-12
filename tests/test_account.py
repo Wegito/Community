@@ -124,10 +124,11 @@ def test_the_token_does_not_contain_the_password_hash(app):
     user = make_user()
     payload = URLSafeTimedSerializer(app.config['SECRET_KEY'], salt='password-reset').loads(password_reset_token(user))
     assert payload['h'] and payload['h'] not in user.password_hash
-    assert set(payload) == {'uid', 'v', 'h'}
+    assert payload['e'] and 'max' not in payload['e']
+    assert set(payload) == {'uid', 'v', 'h', 'e'}
 
 
-@pytest.mark.parametrize('change', ['password', 'sessions', 'disabled', 'no_password'])
+@pytest.mark.parametrize('change', ['password', 'sessions', 'disabled', 'no_password', 'login_email'])
 def test_reset_token_dies_after_password_or_session_changes(app, change):
     user = make_user()
     token = password_reset_token(user)
@@ -137,10 +138,26 @@ def test_reset_token_dies_after_password_or_session_changes(app, change):
         end_all_sessions(user)
     elif change == 'disabled':
         user.is_enabled = False
+    elif change == 'login_email':
+        user.login_email = 'neu@example.org'
     else:
         user.password_hash = None
     db.session.commit()
     assert user_from_reset_token(token) is None
+
+
+def test_reset_link_to_the_old_address_dies_with_the_email_change(app):
+    """Moving the login away from a mailbox also takes the reset links sent there (finding 7)."""
+    user = make_user()
+    token, version = password_reset_token(user), user.session_version
+    with app.test_request_context():
+        confirm_email_change(email_change_token(user, 'neu@example.org'))
+    db.session.commit()
+    assert reload(user).session_version == version  # nobody is logged out (decision 43)
+    with pytest.raises(InvalidLink):
+        reset_password(token, NEW_PASSWORD)
+    db.session.rollback()
+    assert reload(user).check_password(DEFAULT_PASSWORD)
 
 
 def test_reset_token_works_for_an_account_without_password(app):
@@ -340,6 +357,25 @@ def test_request_email_change_rules(app):
         assert mails() == []
         # The member's own contact email is fine.
         request_email_change(user, 'eigene@example.org', DEFAULT_PASSWORD)
+
+
+def test_a_refused_address_with_the_right_password_does_not_lock(app):
+    """Only wrong passwords count; the right one clears the counter, also when the address is refused (finding 8)."""
+    user = make_user()
+    make_member('Kontakt Person', email='kontakt@example.org')
+    with app.test_request_context():
+        with pytest.raises(WrongPassword, match=WRONG_PASSWORD):
+            request_email_change(user, 'neu@example.org', 'falsch geraten')
+        db.session.rollback()
+        for _ in range(app.config['MAX_FAILED_LOGINS']):
+            with pytest.raises(LoginEmailInUse):
+                request_email_change(user, 'kontakt@example.org', DEFAULT_PASSWORD)
+            db.session.rollback()  # as the route does
+            with pytest.raises(AccountError, match=SAME_EMAIL):
+                request_email_change(user, 'max@example.org', DEFAULT_PASSWORD)
+            db.session.rollback()
+    user = reload(user)
+    assert (user.failed_logins, user.locked_until) == (0, None)
 
 
 def test_confirm_email_change_switches_and_tells_the_old_address(app):
@@ -645,6 +681,17 @@ def test_change_email_errors(client):
     invalid = client.post('/settings/email', data=email_form(login_email='kein-email'))
     assert invalid.status_code == 200
     assert mails() == [] and reload(user).login_email == 'max@example.org'
+
+
+def test_refused_addresses_do_not_lock_the_login(app, client):
+    make_user()
+    make_user(email='taken@example.org', name='Taken Person')
+    sign_in(client, 'max@example.org')
+    for _ in range(app.config['MAX_FAILED_LOGINS']):
+        refused = client.post('/settings/email', data=email_form(login_email='taken@example.org'))
+        assert LOGIN_EMAIL_IN_USE in refused.get_data(as_text=True)
+    assert is_logged_in(sign_in(app.test_client(), 'max@example.org'))
+    assert mails() == []
 
 
 def test_confirm_with_an_address_taken_meanwhile(client):

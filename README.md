@@ -149,7 +149,9 @@ or with a systemd timer (`community-jobs.service` with `Type=oneshot`,
 `community-jobs.timer` with `OnCalendar=minutely`). Overlapping runs are safe: each job is
 claimed atomically. Failed jobs are retried with growing pauses and then marked failed.
 Once a day the tick also removes IP addresses older than `AUDIT_IP_RETENTION_DAYS` from the
-audit log (`flask audit purge-ips` does it at once).
+audit log (`flask audit purge-ips` does it at once). A sent mail's job keeps only recipient and
+subject, because the text can contain invitation or reset links; a failed mail keeps its text
+for 7 days, so it can be retried until then.
 
 ```bash
 flask jobs tick                      # run due jobs now

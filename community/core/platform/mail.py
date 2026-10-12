@@ -94,7 +94,8 @@ def send_mail(to, subject, body):
     _SENDERS[mail_backend(current_app.config)](message)
 
 
-@job_handler('mail.send', summary=lambda payload: f'{payload["to"]}: {payload["subject"]}')
+# The body may hold an invitation, reset or confirmation link: the job keeps only `to` and `subject`.
+@job_handler('mail.send', summary=lambda payload: f'{payload["to"]}: {payload["subject"]}', secret=('body',))
 def _send_job(to, subject, body):
     send_mail(to, subject, body)
 

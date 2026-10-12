@@ -25,7 +25,9 @@
 {% if job.last_error and job.status != 'done' %}<div class="mt-1 font-mono text-xs text-red-700">{{ job.last_error }}</div>{% endif %}
 </td>
 <td class="{{ cell }}">
-{% if job.status == 'failed' %}
+{% if job.status == 'failed' and job.secrets_removed %}
+<span class="text-xs text-slate-500">Inhalt gelöscht</span>
+{% elif job.status == 'failed' %}
 <form method="post" action="{{ url_for('admin.retry_job', job_id=job.id) }}">
 {{ form.hidden_tag() }}
 {{ button('Wiederholen', 'secondary', 'sm') }}

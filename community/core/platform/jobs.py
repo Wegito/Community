@@ -6,6 +6,8 @@ so overlapping ticks never run the same job twice, and runs each handler in its 
 transaction. Failed jobs are retried with exponential backoff (2, 4, 8, ... minutes).
 Delivery is at least once: a tick killed in the middle of a job runs it again later.
 Daily housekeeping (e.g. the audit log's IP retention) is queued by the tick itself, once per day.
+Payload keys a handler marks as secret (a mail's body with an invitation or reset link) are
+removed when the job is done, and from a failed job after FAILED_SECRETS_RETENTION.
 """
 
 import json
@@ -26,6 +28,8 @@ from community.extensions import db
 # A claimed job counts as abandoned (tick killed) when it is still running after this.
 LOCK_DURATION = timedelta(minutes=5)
 MAX_ERROR_LENGTH = 2000
+# A failed job keeps its secret payload keys this long, so it can still be retried.
+FAILED_SECRETS_RETENTION = timedelta(days=7)
 
 
 class JobStatus:
@@ -71,6 +75,32 @@ class Job(db.Model):
         except Exception:  # a broken payload must not break the admin page
             return ''
 
+    @property
+    def secrets_removed(self):
+        """True when the payload lost its secret keys (see job_handler), so the job cannot run again."""
+        handler = HANDLERS.get(self.kind)
+        if handler is None or not handler.secret:
+            return False
+        try:
+            return not set(handler.secret) <= self.payload.keys()
+        except ValueError:  # broken JSON: nothing to remove, and nothing to run either
+            return False
+
+    def remove_secrets(self):
+        """Drop the payload keys its handler marks as secret. True if there were any."""
+        handler = HANDLERS.get(self.kind)
+        if handler is None or not handler.secret:
+            return False
+        try:
+            payload = self.payload
+        except ValueError:  # broken JSON must not stop the purge of the other jobs
+            return False
+        kept = {key: value for key, value in payload.items() if key not in handler.secret}
+        if len(kept) == len(payload):
+            return False
+        self.payload_json = json.dumps(kept, ensure_ascii=False, sort_keys=True)
+        return True
+
     def __repr__(self):
         return f'<Job {self.id} {self.kind} {self.status}>'
 
@@ -80,22 +110,25 @@ class Handler:
     kind: str
     fn: object
     summary: object = None
+    secret: tuple = ()
 
 
 HANDLERS = {}
 
 
-def job_handler(kind, *, summary=None):
+def job_handler(kind, *, summary=None, secret=()):
     """Register the function that runs jobs of `kind`. It is called with the payload as keyword
     arguments and must not commit: the tick commits its changes together with the "done" mark,
     or rolls them back when it raises. `summary(payload)` optionally returns a short text for
-    the admin page."""
+    the admin page. `secret` names payload keys that may hold secrets, such as a mail body with
+    an invitation or reset link: they are removed when the job is done, and from a failed job
+    after FAILED_SECRETS_RETENTION (purge_secrets), so the job table keeps no usable links."""
 
     def decorator(fn):
         existing = HANDLERS.get(kind)
         if existing is not None and existing.fn is not fn:
             raise ValueError(f'Job kind {kind!r} has two handlers')
-        HANDLERS[kind] = Handler(kind, fn, summary)
+        HANDLERS[kind] = Handler(kind, fn, summary, tuple(secret))
         return fn
 
     return decorator
@@ -159,6 +192,34 @@ def queue_daily_jobs(day=None):
 def _purge_audit_ips():
     """Retention (M1-2): IP addresses older than AUDIT_IP_RETENTION_DAYS leave the audit log."""
     audit.purge_old_ips()
+
+
+def purge_secrets():
+    """Remove the secret payload keys of jobs that finished more than FAILED_SECRETS_RETENTION ago.
+
+    Done jobs lose them at once (_run_claimed); this catches failed ones, which keep them for a
+    retry until then, and any done job that still has them. Commits nothing. Returns the number
+    of jobs changed.
+    """
+    handlers = [handler for handler in HANDLERS.values() if handler.secret]
+    if not handlers:
+        return 0
+    keys = sorted({key for handler in handlers for key in handler.secret})
+    finished = db.session.scalars(
+        select(Job).where(
+            Job.kind.in_([handler.kind for handler in handlers]),
+            Job.status.in_((JobStatus.DONE, JobStatus.FAILED)),
+            Job.finished_at < utcnow() - FAILED_SECRETS_RETENTION,
+            or_(*(Job.payload_json.contains(f'"{key}"') for key in keys)),  # skips jobs purged before
+        )
+    ).all()
+    return sum(job.remove_secrets() for job in finished)
+
+
+@daily_job('jobs.purge_secrets')
+def _purge_job_secrets():
+    """Mail bodies with links stay in failed jobs for FAILED_SECRETS_RETENTION only."""
+    purge_secrets()
 
 
 def _due_job_ids(now, limit):
@@ -234,6 +295,7 @@ def _run_claimed(job_id):
         return 'failed'
     try:
         handler.fn(**job.payload)
+        job.remove_secrets()
         job.status = JobStatus.DONE
         job.locked_until = None
         job.finished_at = utcnow()
@@ -266,6 +328,8 @@ def retry_job(job, *, actor=None):
     """Put a failed job back in the queue with a fresh set of attempts. Commits nothing."""
     if job.status != JobStatus.FAILED:
         raise JobError('Nur fehlgeschlagene Jobs können wiederholt werden.')
+    if job.secrets_removed:
+        raise JobError('Der Inhalt dieses Jobs ist schon gelöscht, er kann nicht wiederholt werden.')
     job.status = JobStatus.PENDING
     job.attempts = 0
     job.run_at = utcnow()

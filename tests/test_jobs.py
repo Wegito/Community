@@ -42,6 +42,16 @@ def _writes_then_fails():
     raise RuntimeError('after writing')
 
 
+@job_handler('test.secret', summary=lambda payload: payload['to'], secret=('token',))
+def _secret(to, token):
+    CALLS.append(token)
+
+
+@job_handler('test.secret_fails', secret=('token',))
+def _secret_fails(**_):
+    raise RuntimeError('kaputt')
+
+
 @pytest.fixture(autouse=True)
 def _reset_calls():
     CALLS.clear()
@@ -202,6 +212,40 @@ def test_retry_job_only_for_failed_jobs(app):
     assert db.session.scalar(select(AuditLog).where(AuditLog.action == 'jobs.retry')).entity_id == str(job.id)
 
 
+def test_done_job_keeps_no_secrets(app):
+    """A sent mail's body holds invitation or reset links; once the job is done it is gone (finding 9)."""
+    job = enqueue('test.secret', {'to': 'x@example.org', 'token': 'GEHEIM'})
+    db.session.commit()
+    assert run_due_jobs()['done'] == 1
+    assert CALLS == ['GEHEIM']
+    db.session.refresh(job)
+    assert job.payload == {'to': 'x@example.org'} and 'GEHEIM' not in job.payload_json
+    assert job.summary == 'x@example.org'
+
+
+def test_failed_job_keeps_its_secrets_for_a_retry_only_for_a_while(app):
+    app.config['JOB_MAX_ATTEMPTS'] = 1
+    job = enqueue('test.secret_fails', {'to': 'x@example.org', 'token': 'GEHEIM'})
+    db.session.commit()
+    assert run_due_jobs()['failed'] == 1
+    assert jobs.purge_secrets() == 0  # fresh: still needed for a retry
+    db.session.commit()
+    db.session.refresh(job)
+    assert job.payload['token'] == 'GEHEIM'
+
+    job.finished_at = utcnow() - jobs.FAILED_SECRETS_RETENTION - timedelta(minutes=1)
+    pending = enqueue('test.secret', {'to': 'y@example.org', 'token': 'NOCH-NICHT-GESENDET'})
+    db.session.commit()
+    assert jobs.purge_secrets() == 1
+    db.session.commit()
+    db.session.refresh(job)
+    assert job.payload == {'to': 'x@example.org'}
+    assert db.session.get(Job, pending.id).payload['token'] == 'NOCH-NICHT-GESENDET'
+    with pytest.raises(jobs.JobError, match='gelöscht'):
+        retry_job(job)
+    assert jobs.purge_secrets() == 0
+
+
 def test_cli_tick_list_and_retry(app):
     runner = app.test_cli_runner()
     ok = enqueue('test.ok', {'value': 'cli'})
@@ -210,8 +254,8 @@ def test_cli_tick_list_and_retry(app):
 
     result = runner.invoke(jobs_cli, ['tick'])
     assert result.exit_code == 0, result.output
-    # test.ok and the daily audit.purge_ips are done.
-    assert '2 done' in result.output and '1 failed' in result.output
+    # test.ok and the daily audit.purge_ips and jobs.purge_secrets are done.
+    assert '3 done' in result.output and '1 failed' in result.output
 
     result = runner.invoke(jobs_cli, ['list', '--status', 'failed'])
     assert 'test.no_such_handler' in result.output
@@ -239,6 +283,7 @@ def test_admin_jobs_page_lists_jobs_and_retries(client, login):
     assert 'Wiederholen' in page
     # Mail bodies can contain password reset links: never shown.
     assert 'GEHEIM-TOKEN' not in page
+    assert 'Inhalt gelöscht' not in page
     assert 'x@example.org' not in client.get('/admin/jobs?status=done').get_data(as_text=True)
 
     response = client.post(f'/admin/jobs/{job.id}/retry')
@@ -248,6 +293,21 @@ def test_admin_jobs_page_lists_jobs_and_retries(client, login):
     # A second retry is refused with a message, not an error page.
     response = client.post(f'/admin/jobs/{job.id}/retry', follow_redirects=True)
     assert 'Nur fehlgeschlagene' in response.get_data(as_text=True)
+
+
+def test_admin_jobs_page_offers_no_retry_once_the_mail_text_is_gone(client, login):
+    job = enqueue('mail.send', {'to': 'x@example.org', 'subject': 'Passwort', 'body': 'Link: GEHEIM-TOKEN'})
+    job.status, job.attempts, job.finished_at = JobStatus.FAILED, 5, utcnow() - timedelta(days=30)
+    db.session.commit()
+    jobs.purge_secrets()
+    db.session.commit()
+    login(make_admin())
+    page = client.get('/admin/jobs').get_data(as_text=True)
+    assert 'x@example.org: Passwort' in page and 'Inhalt gelöscht' in page
+    assert 'Wiederholen' not in page
+    response = client.post(f'/admin/jobs/{job.id}/retry', follow_redirects=True)
+    assert 'gelöscht' in response.get_data(as_text=True)
+    assert db.session.get(Job, job.id).status == JobStatus.FAILED
 
 
 def test_jobs_page_needs_system_admin(client, login):

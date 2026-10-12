@@ -130,6 +130,28 @@ def test_smtp_backend_with_ssl_and_without_login(app, fake_smtp):
     assert [call if isinstance(call, str) else call[0] for call in smtp.calls] == ['send', 'quit']
 
 
+def test_a_sent_mail_keeps_only_recipient_and_subject(app):
+    """Mail bodies hold invitation, reset and confirmation links; the job forgets them once sent (finding 9)."""
+    job = queue_mail('max@example.org', 'notification', name='Max', title='Neue Aufgabe')
+    db.session.commit()
+    assert 'Hallo Max,' in job.payload['body']
+    assert run_due_jobs()['done'] == 1
+    assert 'Hallo Max,' in outbox(app)[0]['body']
+    job = db.session.get(Job, job.id)
+    assert job.payload == {'to': 'max@example.org', 'subject': 'Neue Aufgabe'}
+    assert job.summary == 'max@example.org: Neue Aufgabe'
+
+
+def test_a_failed_mail_keeps_its_body_for_a_retry(app, fake_smtp):
+    app.config['JOB_MAX_ATTEMPTS'] = 1
+    fake_smtp.fail_with = smtplib.SMTPServerDisconnected('gone')
+    job = queue_mail('max@example.org', 'notification', name='Max', title='Hallo')
+    db.session.commit()
+    assert run_due_jobs()['failed'] == 1
+    db.session.refresh(job)
+    assert 'Hallo Max,' in job.payload['body']
+
+
 def test_smtp_errors_make_the_job_retry(app, fake_smtp):
     fake_smtp.fail_with = smtplib.SMTPServerDisconnected('gone')
     job = queue_mail('max@example.org', 'notification', name='Max', title='Hallo')
