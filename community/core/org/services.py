@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 from sqlalchemy import or_, select
 
-from community.core.authz.service import active_on, clear_cache, role_source
+from community.core.authz.service import active_on, clear_cache, end_period, role_source, yesterday
 from community.core.platform import audit
 from community.core.time import today_local
 from community.extensions import db
@@ -127,52 +127,95 @@ def _rank_role(member, day):
 RANK_CHANGE_HOOKS = []
 
 
+def latest_rank_entry(member):
+    """The member's last rank period: the open one, or the one an Austritt closed."""
+    return db.session.scalar(
+        select(RankHistory).where(RankHistory.member_id == member.id).order_by(RankHistory.valid_from.desc()).limit(1)
+    )
+
+
+def first_free_rank_day(member, day=None):
+    """`day` (default today), or the day after the last rank ended if that is later (Wiederaufnahme)."""
+    day = day or today_local()
+    latest = latest_rank_entry(member)
+    if latest is not None and latest.valid_to is not None and latest.valid_to >= day:
+        return latest.valid_to + timedelta(days=1)
+    return day
+
+
 def change_rank(member, rank, valid_from, *, changed_by=None, convent_ref=None, note=None, **hook_options):
     """Put a member into `rank` from `valid_from` on. Commits nothing.
 
     changed_by=None means the server operator (CLI); otherwise nobody may change their own rank.
+    Rank periods never overlap: the new one starts after the current one began, or after the last one
+    ended (after a Wiederaufnahme). A rank that starts today or later can be replaced from the same day,
+    e.g. a wrong entry (decision 66).
     """
+    from community.core.identity.models import MemberStatus
+
     if changed_by is not None and changed_by.member_id == member.id:
         raise OrgError('Den eigenen Rang kann man nicht selbst ändern.')
+    if member.status != MemberStatus.ACTIVE:
+        raise OrgError(f'{member.full_name} ist kein aktives Mitglied.')
     if rank.archived_at is not None:
         raise OrgError('Dieser Rang wird nicht mehr verwendet.')
-    open_entry = db.session.scalar(
-        select(RankHistory).where(RankHistory.member_id == member.id, RankHistory.valid_to.is_(None))
-    )
+    latest = latest_rank_entry(member)
+    if latest is not None and latest.valid_to is not None and valid_from <= latest.valid_to:
+        raise OrgError(f'Das Datum muss nach dem Ende des letzten Rangs ({latest.valid_to:%d.%m.%Y}) liegen.')
+    open_entry = latest if latest is not None and latest.valid_to is None else None
+    previous, replaced = open_entry, None
     if open_entry is not None:
         if open_entry.rank_id == rank.id:
             raise OrgError(f'{member.full_name} ist bereits {rank.label}.')
-        if valid_from <= open_entry.valid_from:
+        if valid_from == open_entry.valid_from and valid_from >= today_local():
+            replaced = open_entry
+            previous = _replace_rank_entry(open_entry)
+        elif valid_from <= open_entry.valid_from:
             raise OrgError(
                 f'Das Datum muss nach dem Beginn des aktuellen Rangs ({open_entry.valid_from:%d.%m.%Y}) liegen.'
             )
-        open_entry.valid_to = valid_from - timedelta(days=1)
-        db.session.flush()
-    entry = RankHistory(
-        member_id=member.id,
-        rank_id=rank.id,
-        valid_from=valid_from,
-        convent_ref=convent_ref or None,
-        note=note or None,
-        changed_by_user_id=getattr(changed_by, 'id', None),
-    )
-    db.session.add(entry)
+        else:
+            open_entry.valid_to = valid_from - timedelta(days=1)
+            db.session.flush()
+    if previous is not None and previous.rank_id == rank.id:
+        previous.valid_to = None  # the wrong entry is gone; the previous period simply goes on
+        entry = previous
+    else:
+        entry = RankHistory(
+            member_id=member.id,
+            rank_id=rank.id,
+            valid_from=valid_from,
+            convent_ref=convent_ref or None,
+            note=note or None,
+            changed_by_user_id=getattr(changed_by, 'id', None),
+        )
+        db.session.add(entry)
     db.session.flush()
-    audit.record(
-        'org.rank.change',
-        member,
-        actor=changed_by,
-        diff={
-            'from': open_entry.rank.key if open_entry else None,
-            'to': rank.key,
-            'valid_from': valid_from,
-            'convent_ref': convent_ref,
-        },
-    )
+    diff = {
+        'from': previous.rank.key if previous is not None else None,
+        'to': rank.key,
+        'valid_from': valid_from,
+        'convent_ref': convent_ref,
+    }
+    if replaced is not None:
+        diff['replaces'] = replaced.rank.key
+    audit.record('org.rank.change', member, actor=changed_by, diff=diff)
     for hook in RANK_CHANGE_HOOKS:
         hook(member, rank, valid_from, changed_by, **hook_options)
     clear_cache()
     return entry
+
+
+def _replace_rank_entry(entry):
+    """Delete a rank entry that has not begun yet; returns the period before it, which ended the day before."""
+    previous = db.session.scalar(
+        select(RankHistory).where(
+            RankHistory.member_id == entry.member_id, RankHistory.valid_to == entry.valid_from - timedelta(days=1)
+        )
+    )
+    db.session.delete(entry)
+    db.session.flush()
+    return previous
 
 
 # --- Ämter -----------------------------------------------------------------------
@@ -203,11 +246,31 @@ def office_holders(office, day=None):
     ).all()
 
 
+def office_holders_from(office, day=None):
+    """Assignments of `office` running on `day` (default today) or starting later (for the office page)."""
+    day = day or today_local()
+    return db.session.scalars(
+        select(OfficeAssignment)
+        .where(OfficeAssignment.office_id == office.id, overlaps_from(OfficeAssignment, day))
+        .order_by(OfficeAssignment.valid_from)
+    ).all()
+
+
 def member_offices(member, day=None):
     day = day or today_local()
     return db.session.scalars(
         select(OfficeAssignment)
         .where(OfficeAssignment.member_id == member.id, active_on(OfficeAssignment, day))
+        .order_by(OfficeAssignment.valid_from)
+    ).all()
+
+
+def member_offices_from(member, day=None):
+    """Ämter of `member` running on `day` (default today) or starting later."""
+    day = day or today_local()
+    return db.session.scalars(
+        select(OfficeAssignment)
+        .where(OfficeAssignment.member_id == member.id, overlaps_from(OfficeAssignment, day))
         .order_by(OfficeAssignment.valid_from)
     ).all()
 
@@ -245,6 +308,17 @@ def is_eligible(office, member, day):
     return rank is not None and rank.id in {r.id for r in office.eligible_ranks}
 
 
+def later_ineligible_rank(office, member, day):
+    """The first rank entry recorded to start after `day` whose rank may not hold `office`, or None."""
+    eligible = {r.id for r in office.eligible_ranks}
+    entries = db.session.scalars(
+        select(RankHistory)
+        .where(RankHistory.member_id == member.id, RankHistory.valid_from > day)
+        .order_by(RankHistory.valid_from)
+    )
+    return next((entry for entry in entries if entry.rank_id not in eligible), None)
+
+
 def assign_office(
     office,
     member,
@@ -270,9 +344,14 @@ def assign_office(
         raise OrgError('Dieses Amt wird nicht mehr verwendet.')
     if member.status != MemberStatus.ACTIVE:
         raise OrgError(f'{member.full_name} ist kein aktives Mitglied.')
-    if not is_acting and not is_eligible(office, member, valid_from):
+    eligible = is_eligible(office, member, valid_from)
+    later_rank = later_ineligible_rank(office, member, valid_from)
+    if not is_acting and not (eligible and later_rank is None):
         labels = ', '.join(r.label for r in office.eligible_ranks) or 'niemand'
-        raise OrgError(f'{office.label} können nur {labels} übernehmen. Ausnahme: kommissarisch (wird protokolliert).')
+        rule = f'{office.label} können nur {labels} übernehmen. Ausnahme: kommissarisch (wird protokolliert).'
+        if eligible:
+            rule = f'{member.full_name} ist ab {later_rank.valid_from:%d.%m.%Y} {later_rank.rank.label}. {rule}'
+        raise OrgError(rule)
     running = db.session.scalars(
         select(OfficeAssignment).where(
             OfficeAssignment.member_id == member.id, overlaps_from(OfficeAssignment, valid_from)
@@ -323,7 +402,7 @@ def assign_office(
             'member_id': member.id,
             'valid_from': valid_from,
             'is_acting': is_acting,
-            'eligible': is_eligible(office, member, valid_from),
+            'eligible': eligible and later_rank is None,
         },
     )
     clear_cache()
@@ -348,6 +427,42 @@ def end_assignment(assignment, on, *, reason=None, ended_by=None):
     return assignment
 
 
+def cancel_assignment(assignment, *, cancelled_by=None):
+    """Austragen: delete an Amt that starts today or later, e.g. one given to the wrong member, so the
+    right one can start the same day (decision 66). Commits nothing.
+
+    A term that began before today stays in the history; it can only be ended.
+    """
+    if assignment.valid_from < today_local():
+        raise OrgError(f'Die Amtszeit läuft seit {assignment.valid_from:%d.%m.%Y}. Bitte beenden statt austragen.')
+    _delete_assignment(assignment, reason=None, actor=cancelled_by)
+
+
+def _delete_assignment(assignment, *, reason, actor):
+    audit.record(
+        'org.office.cancel',
+        assignment,
+        actor=actor,
+        diff={
+            'office': assignment.office.key,
+            'member_id': assignment.member_id,
+            'valid_from': assignment.valid_from,
+            'reason': reason,
+        },
+    )
+    db.session.delete(assignment)
+    db.session.flush()
+    clear_cache()
+
+
+def _close_assignment(assignment, last_day, *, reason, ended_by):
+    """End an Amt after `last_day`; one that starts later never takes effect and is deleted."""
+    if assignment.valid_from > last_day:
+        _delete_assignment(assignment, reason=reason, actor=ended_by)
+    else:
+        end_assignment(assignment, last_day, reason=reason, ended_by=ended_by)
+
+
 @role_source
 def _office_roles(member, day):
     rows = db.session.scalars(
@@ -359,8 +474,9 @@ def _office_roles(member, day):
 
 
 def _offices_after_rank_change(member, rank, valid_from, changed_by, offices='close', **_):
-    """Ämter the new rank may not hold: end them the day before, or keep them as acting (audited)."""
-    for assignment in member_offices(member, valid_from):
+    """Ämter the new rank may not hold, also those that start later: end them the day before (delete
+    those that start on or after `valid_from`), or keep them as acting (audited)."""
+    for assignment in member_offices_from(member, valid_from):
         if rank.id in {r.id for r in assignment.office.eligible_ranks}:
             continue
         if offices == 'keep_acting':
@@ -372,11 +488,8 @@ def _offices_after_rank_change(member, rank, valid_from, changed_by, offices='cl
                 diff={'office': assignment.office.key, 'new_rank': rank.key},
             )
         else:
-            end_assignment(
-                assignment,
-                max(valid_from - timedelta(days=1), assignment.valid_from),
-                reason=f'Rangwechsel zu {rank.label}',
-                ended_by=changed_by,
+            _close_assignment(
+                assignment, valid_from - timedelta(days=1), reason=f'Rangwechsel zu {rank.label}', ended_by=changed_by
             )
 
 
@@ -416,6 +529,16 @@ def group_members(group, day=None):
     ).all()
 
 
+def group_members_from(group, day=None):
+    """Memberships of `group` running on `day` (default today) or starting later (for the group page)."""
+    day = day or today_local()
+    return db.session.scalars(
+        select(GroupMembership)
+        .where(GroupMembership.group_id == group.id, overlaps_from(GroupMembership, day))
+        .order_by(GroupMembership.valid_from)
+    ).all()
+
+
 def member_groups(member, day=None):
     day = day or today_local()
     return db.session.scalars(
@@ -445,16 +568,18 @@ def add_to_group(group, member, valid_from, *, is_lead=False, added_by=None):
     return membership
 
 
-def end_membership(membership, on, *, ended_by=None):
-    if on < membership.valid_from:
-        on = membership.valid_from
-    membership.valid_to = on
-    audit.record(
-        'org.group.remove',
-        membership,
-        actor=ended_by,
-        diff={'group': membership.group.name, 'member_id': membership.member_id, 'valid_to': on},
-    )
+def end_membership(membership, on=None, *, ended_by=None):
+    """End a group membership after `on`, its last day (default: yesterday, so it ends at once).
+    One that starts later is deleted (decision 66). Commits nothing."""
+    on = on or yesterday()
+    if membership.valid_to is not None and membership.valid_to <= on:
+        return membership
+    diff = {'group': membership.group.name, 'member_id': membership.member_id}
+    if membership.valid_from > on:
+        audit.record('org.group.cancel', membership, actor=ended_by, diff={**diff, 'valid_from': membership.valid_from})
+    else:
+        audit.record('org.group.remove', membership, actor=ended_by, diff={**diff, 'valid_to': on})
+    end_period(membership, on)
     clear_cache()
     return membership
 
@@ -477,34 +602,30 @@ def _group_roles(member, day):
 # --- Austritt --------------------------------------------------------------------
 
 
-def _last_day(period, on):
-    """The day a period has to end when the member leaves on `on`: that day, or its own first
-    day if it starts later (valid_to >= valid_from)."""
-    return max(on, period.valid_from)
-
-
 def _running_after(model, member, on):
-    rows = db.session.scalars(
-        select(model).where(model.member_id == member.id, overlaps_from(model, on)).order_by(model.valid_from, model.id)
+    return db.session.scalars(
+        select(model)
+        .where(model.member_id == member.id, or_(model.valid_to.is_(None), model.valid_to > on))
+        .order_by(model.valid_from, model.id)
     ).all()
-    return [row for row in rows if row.valid_to is None or row.valid_to > _last_day(row, on)]
 
 
 def end_member_periods(member, on, *, reason=None, ended_by=None):
     """End the rank, Ämter and group memberships of `member` still running after `on` (Austritt,
     roadmap §6.4), so successors are not blocked by max_holders. Commits nothing.
 
-    Returns what was ended: {'rank': [rank keys], 'offices': [office keys], 'groups': [names]}.
+    Periods that start after `on` never take effect and are deleted (decision 66).
+    Returns what was ended or deleted: {'rank': [rank keys], 'offices': [office keys], 'groups': [names]}.
     """
     ended = {'rank': [], 'offices': [], 'groups': []}
     for entry in _running_after(RankHistory, member, on):
-        entry.valid_to = _last_day(entry, on)
         ended['rank'].append(entry.rank.key)
+        end_period(entry, on)
     for assignment in _running_after(OfficeAssignment, member, on):
-        end_assignment(assignment, _last_day(assignment, on), reason=reason, ended_by=ended_by)
         ended['offices'].append(assignment.office.key)
+        _close_assignment(assignment, on, reason=reason, ended_by=ended_by)
     for membership in _running_after(GroupMembership, member, on):
-        end_membership(membership, _last_day(membership, on), ended_by=ended_by)
         ended['groups'].append(membership.group.name)
+        end_membership(membership, on, ended_by=ended_by)
     clear_cache()
     return ended

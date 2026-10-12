@@ -163,3 +163,103 @@ def test_cli_set_rank(app):
     assert result.exit_code == 0, result.output
     assert current_rank(user.member).key == 'bursch'
     assert runner.invoke(org_cli, ['set-rank', '--email', user.login_email, '--rank', 'nope']).exit_code != 0
+
+
+# --- Rank history after an Austritt, wrong entries (review findings 4, 14, 27) ----
+
+
+def history(member):
+    rows = db.session.scalars(
+        select(RankHistory).where(RankHistory.member_id == member.id).order_by(RankHistory.valid_from)
+    ).all()
+    return [(r.rank.key, r.valid_from, r.valid_to) for r in rows]
+
+
+def test_new_rank_after_a_wiederaufnahme_starts_after_the_last_one(app):
+    from community.core.identity.models import ExitReason
+    from community.modules.members.services import exit_member, reactivate_member
+
+    member = make_member()
+    change_rank(member, rank_by_key('bursch'), date(2000, 1, 1))
+    exit_member(member, today_local(), ExitReason.AUSTRITT, recorded_by=None)
+    reactivate_member(member, actor=None)
+    db.session.commit()
+    for day in (today_local(), date(2010, 1, 1)):
+        with pytest.raises(OrgError, match=f'nach dem Ende des letzten Rangs \\({today_local():%d.%m.%Y}\\)'):
+            change_rank(member, rank_by_key('alter_herr'), day)
+    tomorrow = today_local() + timedelta(days=1)
+    change_rank(member, rank_by_key('alter_herr'), tomorrow)
+    db.session.commit()
+    assert history(member) == [('bursch', date(2000, 1, 1), today_local()), ('alter_herr', tomorrow, None)]
+
+
+def test_rank_page_suggests_the_day_after_the_last_rank(client, login):
+    from community.core.identity.models import ExitReason
+    from community.modules.members.services import exit_member, reactivate_member
+
+    senior = make_user(email='senior@example.org', name='Senior Person')
+    give_permissions(senior.member, 'members.rank.change')
+    member = make_member('Rudi Rückkehr')
+    change_rank(member, rank_by_key('bursch'), date(2000, 1, 1))
+    exit_member(member, today_local(), ExitReason.AUSTRITT, recorded_by=None)
+    reactivate_member(member, actor=None)
+    db.session.commit()
+    login(senior)
+    page = client.get(f'/org/members/{member.public_id}/rank').get_data(as_text=True)
+    assert f'value="{(today_local() + timedelta(days=1)).isoformat()}"' in page
+
+
+def test_former_members_get_no_rank(client, login):
+    from community.core.identity.models import ExitReason
+    from community.modules.members.services import exit_member
+
+    member = make_member('Ex Mitglied')
+    change_rank(member, rank_by_key('bursch'), date(2000, 1, 1))
+    exit_member(member, today_local() - timedelta(days=1), ExitReason.AUSTRITT, recorded_by=None)
+    db.session.commit()
+    with pytest.raises(OrgError, match='kein aktives Mitglied'):
+        change_rank(member, rank_by_key('alter_herr'), today_local())
+
+    # Someone who may change ranks but not see former members gets a 404, as on /m/<public_id>.
+    consenior = make_user(email='consenior@example.org', name='Con Senior', perms=['members.rank.change'])
+    login(consenior)
+    url = f'/org/members/{member.public_id}/rank'
+    assert client.get(url).status_code == 404
+    data = {'rank_id': rank_by_key('alter_herr').id, 'valid_from': today_local().isoformat()}
+    assert client.post(url, data=data).status_code == 404
+    client.post('/logout')
+
+    # Whoever records exits sees the history, but there is no form.
+    schriftwart = make_user(
+        email='sw@example.org', name='Sabine Schrift', perms=['members.rank.change', 'members.exit.record']
+    )
+    login(schriftwart)
+    page = client.get(url).get_data(as_text=True)
+    assert 'Bursch' in page and 'Rang ändern' not in page and 'Wiederaufnahme' in page
+    client.post(url, data=data)
+    assert history(member) == [('bursch', date(2000, 1, 1), today_local() - timedelta(days=1))]
+
+
+def test_rank_that_has_not_begun_can_be_replaced_the_same_day(client, login):
+    senior = make_user(email='senior@example.org', name='Senior Person')
+    give_permissions(senior.member, 'members.rank.change')
+    member = make_member('Neu Ling')
+    change_rank(member, rank_by_key('spefux'), today_local())  # e.g. created by the Fuxmajor
+    db.session.commit()
+    login(senior)
+    url = f'/org/members/{member.public_id}/rank'
+    response = client.post(url, data={'rank_id': rank_by_key('fux').id, 'valid_from': today_local().isoformat()})
+    assert response.status_code == 302
+    assert history(member) == [('fux', today_local(), None)]
+
+
+def test_replacing_a_wrong_rank_restores_the_previous_period(app):
+    member = make_member()
+    change_rank(member, rank_by_key('bursch'), date(2000, 1, 1))
+    change_rank(member, rank_by_key('alter_herr'), today_local())
+    change_rank(member, rank_by_key('bursch'), today_local())
+    db.session.commit()
+    assert history(member) == [('bursch', date(2000, 1, 1), None)]
+    # A rank that began before today stays in the history.
+    with pytest.raises(OrgError, match='nach dem Beginn'):
+        change_rank(member, rank_by_key('alter_herr'), date(2000, 1, 1))

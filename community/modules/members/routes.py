@@ -2,6 +2,7 @@ from flask import abort, flash, make_response, redirect, render_template, reques
 from flask_login import current_user, logout_user, user_logged_out
 
 from community.core.authz import can, current_permissions, require_login, require_perm
+from community.core.authz.policies import can_see_former_members
 from community.core.identity.models import Invitation, InvitationChannel
 from community.core.identity.services import open_invitations
 from community.core.org import services as org
@@ -40,11 +41,6 @@ def _drop_invitation_link_of_ended_login():
     stored = session.get(INVITATION_SESSION_KEY)
     if stored and not (current_user.is_authenticated and current_user.id == stored.get('user_id')):
         session.pop(INVITATION_SESSION_KEY, None)
-
-
-def can_see_former_members():
-    """Former members are listed and shown only to those who manage member data or exits."""
-    return can('members.edit_any') or can('members.exit.record')
 
 
 def member_or_404(public_id):

@@ -9,7 +9,7 @@
 {% call stacked_list() %}
 {% for m in memberships %}
 <li class="{{ row_class }}">
-<div class="min-w-48 flex-1">{{ m.member.display_name }}{% if m.is_lead %} (Leitung){% endif %} <span class="{{ muted }}">seit {{ m.valid_from|d }}</span></div>
+<div class="min-w-48 flex-1">{{ m.member.display_name }}{% if m.is_lead %} (Leitung){% endif %} <span class="{{ muted }}">{{ 'ab' if m.valid_from > today else 'seit' }} {{ m.valid_from|d }}</span></div>
 <form method="post" action="{{ url_for('org.end_membership', membership_id=m.id) }}">
 {{ button_form.hidden_tag() }}
 {{ button('Entfernen', 'danger', 'sm') }}

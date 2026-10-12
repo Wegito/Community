@@ -138,6 +138,27 @@ def test_authz_cli_grant_show_revoke(app):
     assert runner.invoke(authz_cli, ['revoke', '--email', 'max@example.org', '--role', SYSADMIN]).exit_code == 0
 
 
+def test_authz_cli_revoke_takes_effect_at_once(app):
+    """Review finding 12: valid_to is inclusive, so revoking must not end the role "today"."""
+    from community.core.authz.cli import authz_cli
+
+    member = make_user(perms=[]).member
+    grant_member_role(member, SYSADMIN, valid_from=date(2020, 1, 1))
+    grant_member_role(member, SYSADMIN, valid_from=today_local())
+    grant_member_role(member, SYSADMIN, valid_from=today_local() + timedelta(days=3))
+    db.session.commit()
+    result = app.test_cli_runner().invoke(authz_cli, ['revoke', '--email', 'max@example.org', '--role', SYSADMIN])
+    assert result.exit_code == 0 and '3 assignment(s)' in result.output
+    db.session.expire_all()
+    assert 'system.admin' not in permissions_for(member)
+    assert 'system.admin' not in permissions_for(member, today_local() + timedelta(days=5))
+    # The old grant ends yesterday; those that had not begun are gone.
+    rows = db.session.scalars(select(MemberRole).where(MemberRole.member_id == member.id)).all()
+    assert [(r.valid_from, r.valid_to) for r in rows] == [(date(2020, 1, 1), today_local() - timedelta(days=1))]
+    shown = app.test_cli_runner().invoke(authz_cli, ['show', '--email', 'max@example.org'])
+    assert SYSADMIN not in shown.output
+
+
 def test_role_table_has_unique_keys(app):
     db.session.add(Role(key=SYSADMIN, label='dup', kind='custom'))
     with pytest.raises(Exception):  # noqa: B017

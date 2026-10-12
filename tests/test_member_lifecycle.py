@@ -13,10 +13,12 @@ from community.core.org.services import (
     OrgError,
     add_to_group,
     assign_office,
+    change_rank,
     create_group,
     current_rank,
     office_by_key,
     office_holders,
+    rank_by_key,
 )
 from community.core.platform.audit import AuditLog
 from community.core.platform.jobs import Job, run_due_jobs
@@ -253,7 +255,7 @@ def club(app):
 def test_exit_ends_everything_and_notifies_the_kassenwart(app, club):
     member, senior = club['member'], club['senior']
     ended_on = today_local() - timedelta(days=30)
-    # Already over before the exit: stays as it is. Starts after the exit: ends on its first day.
+    # Already over before the exit: stays as it is. Starts after the exit: deleted (decision 66).
     old_group = create_group('Alte Gruppe')
     old = add_to_group(old_group, member, SINCE)
     old.valid_to = date(2021, 1, 1)
@@ -275,11 +277,7 @@ def test_exit_ends_everything_and_notifies_the_kassenwart(app, club):
         m.group.name: m.valid_to
         for m in db.session.scalars(select(GroupMembership).where(GroupMembership.member_id == member.id))
     }
-    assert groups == {
-        'Küche A': ended_on,
-        'Alte Gruppe': date(2021, 1, 1),
-        'Neue Gruppe': ended_on + timedelta(days=10),
-    }
+    assert groups == {'Küche A': ended_on, 'Alte Gruppe': date(2021, 1, 1)}
     roles = db.session.scalars(select(MemberRole).where(MemberRole.member_id == member.id)).all()
     assert [r.valid_to for r in roles if r.role.key == SYSADMIN] == [ended_on]
     ranks = db.session.scalars(select(RankHistory).where(RankHistory.member_id == member.id)).all()
@@ -329,6 +327,62 @@ def test_exit_frees_the_office_for_a_successor(app, club):
     )
     db.session.commit()
     assert assignment.id is not None
+
+
+def test_exit_cancels_periods_that_have_not_begun(app, club):
+    """Review findings 2 and 11: a future term must not block the successor or come back."""
+    member, senior = club['member'], club['senior']
+    start = today_local() + timedelta(days=60)
+    assign_office(office_by_key('senior'), member, start)  # elected for next semester
+    later_group = create_group('Neue Gruppe')
+    add_to_group(later_group, member, start)
+    grant_member_role(member, SYSADMIN, valid_from=start)  # a direct role that starts later
+    db.session.commit()
+
+    exit_member(member, today_local(), ExitReason.AUSTRITT, recorded_by=senior)
+    db.session.commit()
+
+    assert [
+        (a.office.key, a.valid_to)
+        for a in db.session.scalars(select(OfficeAssignment).where(OfficeAssignment.member_id == member.id))
+    ] == [('schriftwart', today_local())]
+    assert [
+        m.group.name for m in db.session.scalars(select(GroupMembership).where(GroupMembership.member_id == member.id))
+    ] == ['Küche A']
+    roles = db.session.scalars(select(MemberRole).where(MemberRole.member_id == member.id)).all()
+    assert [(r.role.key, r.valid_to) for r in roles] == [(SYSADMIN, today_local())]
+    (entry,) = audit_entries('members.exit')
+    assert entry.diff['ended']['offices'] == ['schriftwart', 'senior']
+    assert entry.diff['ended']['groups'] == ['Küche A', 'Neue Gruppe']
+    assert [e.diff['office'] for e in audit_entries('org.office.cancel')] == ['senior']
+    assert [e.diff['group'] for e in audit_entries('org.group.cancel')] == ['Neue Gruppe']
+
+    # The successor can start on the same day, and nobody else holds the office then.
+    successor = make_user(email='new@example.org', name='Nina Nachfolger').member
+    assignment = assign_office(office_by_key('senior'), successor, start)
+    db.session.commit()
+    assert office_holders(office_by_key('senior'), start) == [assignment]
+    assert [a.member_id for a in office_holders(office_by_key('senior'), start - timedelta(days=1))] == [
+        senior.member_id
+    ]
+
+    # After a Wiederaufnahme nothing comes back.
+    reactivate_member(member, actor=senior)
+    db.session.commit()
+    assert active_roles(member, start) == []
+    add_to_group(later_group, member, today_local())
+
+
+def test_exit_cancels_a_rank_change_that_has_not_begun(app, club):
+    member, senior = club['member'], club['senior']
+    later = today_local() + timedelta(days=10)
+    change_rank(member, rank_by_key('alter_herr'), later, offices='keep_acting')
+    db.session.commit()
+    exit_member(member, today_local(), ExitReason.AUSTRITT, recorded_by=senior)
+    db.session.commit()
+    ranks = db.session.scalars(select(RankHistory).where(RankHistory.member_id == member.id)).all()
+    assert [(r.rank.key, r.valid_to) for r in ranks] == [('bursch', today_local())]
+    assert audit_entries('members.exit')[0].diff['ended']['rank'] == ['bursch', 'alter_herr']
 
 
 def test_exit_of_the_kassenwart_does_not_notify_themselves(app, club):

@@ -6,6 +6,7 @@ former-member role. Permissions are the union of the roles' grants (no deny rule
 The result is computed once per request and cached in flask.g.
 """
 
+from datetime import timedelta
 from pathlib import Path
 
 import yaml
@@ -34,6 +35,27 @@ def role_source(fn):
 def active_on(model, day):
     """SQL condition: model.valid_from <= day <= model.valid_to (valid_to NULL = open-ended)."""
     return (model.valid_from <= day) & or_(model.valid_to.is_(None), model.valid_to >= day)
+
+
+def yesterday():
+    """The last day of something that ends now: valid_to is inclusive, so "today" would keep it until midnight."""
+    return today_local() - timedelta(days=1)
+
+
+def end_period(row, last_day):
+    """End a dated row (rank, Amt, group, direct role) after `last_day`. Commits nothing.
+
+    A row that starts after `last_day` never takes effect and is deleted instead of shrinking to one day
+    (decision 66). Returns 'ended', 'deleted', or None if it was over by then anyway.
+    """
+    if row.valid_from > last_day:
+        db.session.delete(row)
+        db.session.flush()
+        return 'deleted'
+    if row.valid_to is not None and row.valid_to <= last_day:
+        return None
+    row.valid_to = last_day
+    return 'ended'
 
 
 @role_source
@@ -123,17 +145,25 @@ def grant_member_role(member, role_key, *, valid_from=None, granted_by=None, rea
     return assignment
 
 
+def _member_roles_after(member, on, role=None):
+    query = select(MemberRole).where(
+        MemberRole.member_id == member.id, or_(MemberRole.valid_to.is_(None), MemberRole.valid_to > on)
+    )
+    if role is not None:
+        query = query.where(MemberRole.role_id == role.id)
+    return db.session.scalars(query.order_by(MemberRole.valid_from, MemberRole.id)).all()
+
+
 def end_member_role(member, role_key, *, on=None):
-    """End all open assignments of a direct role (valid_to inclusive). Commits nothing."""
+    """End a direct role after `on`, its last day (default: yesterday, so it ends at once). Commits nothing.
+
+    Assignments that start after `on` are deleted (end_period). Returns the assignments ended or deleted.
+    """
     role = role_by_key(role_key)
-    on = on or today_local()
-    rows = db.session.scalars(
-        select(MemberRole).where(
-            MemberRole.member_id == member.id, MemberRole.role_id == role.id, active_on(MemberRole, on)
-        )
-    ).all()
+    on = on or yesterday()
+    rows = _member_roles_after(member, on, role)
     for row in rows:
-        row.valid_to = on
+        end_period(row, on)
     clear_cache()
     return rows
 
@@ -141,20 +171,12 @@ def end_member_role(member, role_key, *, on=None):
 def end_all_member_roles(member, on):
     """End every direct role of `member` still running after `on` (Austritt). Commits nothing.
 
-    Each ends on `on`, or on its first day if it starts later. Returns the role keys ended.
+    Each ends on `on`; one that starts later is deleted (end_period). Returns the role keys.
     """
-    rows = db.session.scalars(
-        select(MemberRole).where(
-            MemberRole.member_id == member.id, or_(MemberRole.valid_to.is_(None), MemberRole.valid_to > on)
-        )
-    ).all()
     ended = []
-    for row in rows:
-        last_day = max(on, row.valid_from)
-        if row.valid_to is not None and row.valid_to <= last_day:
-            continue
-        row.valid_to = last_day
+    for row in _member_roles_after(member, on):
         ended.append(row.role.key)
+        end_period(row, on)
     clear_cache()
     return sorted(ended)
 

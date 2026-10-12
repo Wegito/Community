@@ -4,6 +4,11 @@
 from .service import can
 
 
+def can_see_former_members():
+    """Former members are listed and shown only to those who manage member data or exits (decisions 23, 32)."""
+    return can('members.edit_any') or can('members.exit.record')
+
+
 def can_manage_tasks():
     return can('tasks.manage')
 

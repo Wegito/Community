@@ -280,7 +280,7 @@ def exit_member(member, ended_on, reason, *, recorded_by, note=None):
 
     The member becomes ENDED and from then on only has the former-member role; the login stays
     usable (own profile, own Saldo). Rank, Ämter, groups and direct roles still running after
-    `ended_on` end that day, or on their first day if they start later; open invitations are
+    `ended_on` end that day; those that start later are deleted (decision 66). Open invitations are
     revoked. The current Kassenwart
     is notified (kind member_exit) to settle the Saldo. Returns the notified members.
 

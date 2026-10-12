@@ -3,6 +3,7 @@ from flask_login import current_user
 from sqlalchemy import select
 
 from community.core.authz import can, require_perm
+from community.core.authz.policies import can_see_former_members
 from community.core.identity.models import Member
 from community.core.platform import audit
 from community.core.platform.notify import notify
@@ -28,8 +29,9 @@ bp = Blueprint('org', __name__, url_prefix='/org', template_folder='templates')
 
 
 def member_or_404(public_id):
+    """The member behind the URL; former members only for can_see_former_members() (decisions 23, 32)."""
     member = db.session.scalar(select(Member).where(Member.public_id == public_id))
-    if member is None:
+    if member is None or not (member.is_active_member or can_see_former_members()):
         abort(404)
     return member
 
@@ -82,7 +84,7 @@ def change_rank(public_id):
     form = RankChangeForm()
     form.rank_id.choices = [(r.id, r.label) for r in services.ranks()]
     if request.method == 'GET':
-        form.valid_from.data = today_local()
+        form.valid_from.data = services.first_free_rank_day(member)
     if form.validate_on_submit():
         rank = db.get_or_404(Rank, form.rank_id.data)
         try:
@@ -111,6 +113,7 @@ def change_rank(public_id):
         history=services.rank_history(member),
         own=member.id == current_user.member_id,
         office_conflicts=_office_conflicts(member),
+        today=today_local(),
     )
 
 
@@ -121,7 +124,7 @@ def _office_options():
 
 
 def _office_conflicts(member):
-    return services.member_offices(member)
+    return services.member_offices_from(member)
 
 
 def active_member_choices():
@@ -164,10 +167,11 @@ def office(key):
     return render_template(
         'org/office.html',
         office=office,
-        holders=services.office_holders(office),
+        holders=services.office_holders_from(office),
         history=services.office_history(office),
         form=form,
         end_form=OfficeEndForm(),
+        today=today_local(),
     )
 
 
@@ -241,6 +245,23 @@ def end_office(assignment_id):
     return redirect(url_for('org.office', key=assignment.office.key))
 
 
+@bp.route('/offices/assignments/<int:assignment_id>/cancel', methods=['POST'])
+@require_perm('offices.assign')
+def cancel_office(assignment_id):
+    assignment = db.get_or_404(OfficeAssignment, assignment_id)
+    office_key, name = assignment.office.key, assignment.member.full_name
+    if ButtonForm().validate_on_submit():
+        try:
+            services.cancel_assignment(assignment, cancelled_by=current_user)
+        except services.OrgError as error:
+            db.session.rollback()
+            flash(str(error), 'danger')
+        else:
+            db.session.commit()
+            flash(f'{name} ausgetragen', 'success')
+    return redirect(url_for('org.office', key=office_key))
+
+
 @bp.route('/groups', methods=['GET', 'POST'])
 @require_perm('groups.manage')
 def groups():
@@ -280,7 +301,8 @@ def group(group_id):
     return render_template(
         'org/group.html',
         group=group,
-        memberships=services.group_members(group),
+        memberships=services.group_members_from(group),
+        today=today_local(),
         form=form,
         button_form=ButtonForm(),
         kind_labels=GroupKind.LABELS,
@@ -291,11 +313,12 @@ def group(group_id):
 @require_perm('groups.manage')
 def end_membership(membership_id):
     membership = db.get_or_404(GroupMembership, membership_id)
+    group_id, name, group_name = membership.group_id, membership.member.full_name, membership.group.name
     if ButtonForm().validate_on_submit():
-        services.end_membership(membership, today_local(), ended_by=current_user)
+        services.end_membership(membership, ended_by=current_user)
         db.session.commit()
-        flash(f'{membership.member.full_name} aus {membership.group.name} entfernt', 'success')
-    return redirect(url_for('org.group', group_id=membership.group_id))
+        flash(f'{name} aus {group_name} entfernt', 'success')
+    return redirect(url_for('org.group', group_id=group_id))
 
 
 @bp.route('/ranks', methods=['GET', 'POST'])

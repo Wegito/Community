@@ -65,7 +65,7 @@ def grant(email, role_key):
 @click.option('--role', 'role_key', required=True)
 @with_appcontext
 def revoke(email, role_key):
-    """End a member's custom or system role today."""
+    """End a member's custom or system role now (yesterday is its last day; later grants are deleted)."""
     member = _member_for(email)
     rows = service.end_member_role(member, role_key)
     audit.record('authz.member_role.revoke', member, diff={'role': role_key, 'via': 'cli'})

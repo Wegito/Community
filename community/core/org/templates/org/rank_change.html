@@ -7,6 +7,8 @@
 {{ page_header('Rang von ' ~ member.display_name, subtitle) }}
 {% if own %}
 {% call alert('warning') %}Den eigenen Rang kann man nicht selbst ändern.{% endcall %}
+{% elif not member.is_active_member %}
+{% call alert('warning') %}Ehemaliges Mitglied: einen neuen Rang gibt es erst nach der Wiederaufnahme.{% endcall %}
 {% else %}
 {% call card(class='max-w-xl') %}
 <form method="post" class="space-y-4">
@@ -18,7 +20,7 @@
 {% if office_conflicts %}
 {% call alert('warning') %}
 <p class="mb-2">Hat Ämter. Falls der neue Rang ein Amt nicht halten darf:</p>
-<ul class="mb-2 ml-5 list-disc">{% for a in office_conflicts %}<li>{{ a.office.label }} (seit {{ a.valid_from|d }})</li>{% endfor %}</ul>
+<ul class="mb-2 ml-5 list-disc">{% for a in office_conflicts %}<li>{{ a.office.label }} ({{ 'ab' if a.valid_from > today else 'seit' }} {{ a.valid_from|d }})</li>{% endfor %}</ul>
 <fieldset class="space-y-1">
 <legend class="sr-only">Ämter</legend>
 <label class="flex items-center gap-2"><input type="radio" name="offices" value="close" class="size-4 accent-slate-900" checked> zum Vortag beenden</label>
