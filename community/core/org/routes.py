@@ -13,6 +13,7 @@ from community.extensions import db
 from . import services
 from .forms import (
     ButtonForm,
+    FirstRankForm,
     GroupAddForm,
     GroupForm,
     OfficeAssignForm,
@@ -114,6 +115,39 @@ def change_rank(public_id):
         own=member.id == current_user.member_id,
         office_conflicts=_office_conflicts(member),
         today=today_local(),
+    )
+
+
+@bp.route('/ranks/first', methods=['GET', 'POST'])
+@require_perm('members.import')
+def first_ranks():
+    """Ohne Rang: members who never had a rank get their first one (after the update from M0, or an import)."""
+    members = services.members_without_rank()
+    ranks = {rank.id: rank for rank in services.ranks()}
+    form = FirstRankForm()
+    if request.method == 'GET':
+        form.valid_from.data = today_local()
+    if form.validate_on_submit():
+        chosen = []
+        for member in members:
+            rank = ranks.get(request.form.get(f'rank-{member.id}', type=int))
+            if rank is not None and member.id != current_user.member_id:  # the page offers no own rank
+                chosen.append((member, rank))
+        if not chosen:
+            flash('Bitte mindestens einen Rang auswählen.', 'warning')
+        else:
+            try:
+                for member, rank in chosen:
+                    services.set_first_rank(member, rank, form.valid_from.data, changed_by=current_user)
+            except services.OrgError as error:
+                db.session.rollback()
+                flash(f'{member.full_name}: {error}', 'danger')
+            else:
+                db.session.commit()
+                flash(f'Rang gesetzt für {", ".join(member.full_name for member, _ in chosen)}', 'success')
+                return redirect(url_for('org.first_ranks'))
+    return render_template(
+        'org/first_ranks.html', form=form, members=members, ranks=ranks.values(), chosen=request.form
     )
 
 

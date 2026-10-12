@@ -15,6 +15,7 @@ from flask_login import current_user
 from sqlalchemy import or_, select
 
 from community.core.identity.models import MemberStatus
+from community.core.platform import audit
 from community.core.time import today_local, utcnow
 from community.extensions import db
 
@@ -223,9 +224,11 @@ def load_seed(path=None):
     return data.get('grants', {})
 
 
-def seed_grants(path=None, *, granted_by=None):
-    """Add the default grants from seed/authz.yaml. Never removes grants.
+def seed_grants(path=None, *, granted_by=None, only_codes=None):
+    """Add the default grants from seed/authz.yaml (or `path`). Never removes grants. Commits.
 
+    only_codes: add only grants of these codes (flask setup: codes that are new in the database).
+    Each role that gets grants gets one audit entry naming the codes, the sensitive ones separately.
     Returns a dict with counts and the role keys / codes that were skipped because
     they do not exist (yet).
     """
@@ -240,7 +243,10 @@ def seed_grants(path=None, *, granted_by=None):
         if role is None:
             missing_roles.add(role_key)
             continue
+        new_codes = []
         for code in codes or []:
+            if only_codes is not None and code not in only_codes:
+                continue
             permission = permissions.get(code)
             if permission is None:
                 missing_codes.add(code)
@@ -254,6 +260,13 @@ def seed_grants(path=None, *, granted_by=None):
                     )
                 )
                 have.add((role.id, permission.id))
-                added += 1
+                new_codes.append(code)
+        if new_codes:
+            added += len(new_codes)
+            diff = {'role': role_key, 'codes': sorted(new_codes), 'source': Path(path or SEED_FILE).name}
+            sensitive = sorted(code for code in new_codes if permissions[code].is_sensitive)
+            if sensitive:
+                diff['sensitive'] = sensitive
+            audit.record('authz.role_permission.grant', role, actor=granted_by, diff=diff)
     db.session.commit()
     return {'added': added, 'missing_roles': sorted(missing_roles), 'missing_codes': sorted(missing_codes)}

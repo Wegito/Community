@@ -22,8 +22,10 @@ member_role_t = sa.table(
     sa.column('member_id', sa.Integer),
     sa.column('role_id', sa.Integer),
     sa.column('valid_from', sa.Date),
+    sa.column('valid_to', sa.Date),
     sa.column('reason', sa.String),
 )
+member_t = sa.table('member', sa.column('id', sa.Integer), sa.column('status', sa.String))
 user_t = sa.table('user', sa.column('id', sa.Integer), sa.column('member_id', sa.Integer), sa.column('role', sa.String))
 
 
@@ -106,11 +108,20 @@ def downgrade():
     with op.batch_alter_table('user', schema=None) as batch_op:
         batch_op.add_column(sa.Column('role', sa.String(length=20), server_default='resident', nullable=False))
 
+    # Only today's admins get role='admin' back: not a sysadmin role that ended or starts later,
+    # and not a member who has left (M0 code checks nothing but role == 'admin').
     conn = op.get_bind()
+    today = date.today()
     admins = conn.execute(
         sa.select(member_role_t.c.member_id)
         .join(role_t, role_t.c.id == member_role_t.c.role_id)
-        .where(role_t.c.key == 'custom.sysadmin')
+        .join(member_t, member_t.c.id == member_role_t.c.member_id)
+        .where(
+            role_t.c.key == 'custom.sysadmin',
+            member_role_t.c.valid_from <= today,
+            sa.or_(member_role_t.c.valid_to.is_(None), member_role_t.c.valid_to >= today),
+            member_t.c.status == 'active',
+        )
     ).scalars()
     for member_id in set(admins):
         conn.execute(user_t.update().where(user_t.c.member_id == member_id).values(role='admin'))

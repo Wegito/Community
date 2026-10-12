@@ -39,6 +39,13 @@ class RankChangeForm(FlaskForm):
     submit = SubmitField('Rang ändern')
 
 
+class FirstRankForm(FlaskForm):
+    """The date for "Ohne Rang"; the rank of each member is a select named rank-<member id>."""
+
+    valid_from = DateField('Ab', validators=[DataRequired()])
+    submit = SubmitField('Ränge setzen')
+
+
 class RankLabelForm(FlaskForm):
     label = StringField('Bezeichnung', validators=[DataRequired(), Length(max=80)])
     abbreviation = StringField('Kürzel', validators=[DataRequired(), Length(max=10)])

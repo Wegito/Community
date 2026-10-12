@@ -90,10 +90,11 @@ def audit_cli():
     """Audit log maintenance."""
 
 
-@audit_cli.command('purge-ips')
-@with_appcontext
-def purge_ips():
-    """Remove IP addresses older than AUDIT_IP_RETENTION_DAYS from the audit log."""
+def purge_old_ips():
+    """Remove the IP address from entries older than AUDIT_IP_RETENTION_DAYS. Commits nothing.
+
+    `flask jobs tick` runs this once a day (job audit.purge_ips). Returns the number of entries changed.
+    """
     from flask import current_app
 
     cutoff = utcnow() - timedelta(days=current_app.config['AUDIT_IP_RETENTION_DAYS'])
@@ -103,5 +104,13 @@ def purge_ips():
         .values(ip=None)
         .execution_options(synchronize_session=False)
     )
+    return result.rowcount
+
+
+@audit_cli.command('purge-ips')
+@with_appcontext
+def purge_ips():
+    """Remove IP addresses older than AUDIT_IP_RETENTION_DAYS now (`flask jobs tick` does it daily)."""
+    count = purge_old_ips()
     db.session.commit()
-    click.echo(f'Removed IP addresses from {result.rowcount} entries.')
+    click.echo(f'Removed IP addresses from {count} entries.')

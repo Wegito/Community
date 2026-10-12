@@ -5,6 +5,7 @@ with the change that caused it. Each tick claims due jobs one by one with an ato
 so overlapping ticks never run the same job twice, and runs each handler in its own
 transaction. Failed jobs are retried with exponential backoff (2, 4, 8, ... minutes).
 Delivery is at least once: a tick killed in the middle of a job runs it again later.
+Daily housekeeping (e.g. the audit log's IP retention) is queued by the tick itself, once per day.
 """
 
 import json
@@ -15,10 +16,11 @@ import click
 from flask import current_app
 from flask.cli import with_appcontext
 from sqlalchemy import or_, select, update
+from sqlalchemy.exc import IntegrityError
 
 from community.core.db import UTCDateTime
 from community.core.platform import audit
-from community.core.time import utcnow
+from community.core.time import today_local, utcnow
 from community.extensions import db
 
 # A claimed job counts as abandoned (tick killed) when it is still running after this.
@@ -121,6 +123,42 @@ def enqueue(kind, payload=None, *, run_at=None, dedupe_key=None):
     )
     db.session.add(job)
     return job
+
+
+# Kinds that `flask jobs tick` queues once per day (housekeeping), see daily_job().
+DAILY_KINDS = []
+
+
+def daily_job(kind, *, summary=None):
+    """Register a job handler (like job_handler) that every tick queues once per day."""
+
+    def decorator(fn):
+        job_handler(kind, summary=summary)(fn)
+        if kind not in DAILY_KINDS:
+            DAILY_KINDS.append(kind)
+        return fn
+
+    return decorator
+
+
+def queue_daily_jobs(day=None):
+    """Queue each daily job for `day` (default today, Europe/Berlin) unless that is done already. Commits.
+
+    The dedupe_key "<kind>:<date>" makes it once per day, however often the tick runs.
+    """
+    day = day or today_local()
+    for kind in DAILY_KINDS:
+        enqueue(kind, dedupe_key=f'{kind}:{day.isoformat()}')
+    try:
+        db.session.commit()
+    except IntegrityError:  # an overlapping tick queued them at the same moment
+        db.session.rollback()
+
+
+@daily_job('audit.purge_ips')
+def _purge_audit_ips():
+    """Retention (M1-2): IP addresses older than AUDIT_IP_RETENTION_DAYS leave the audit log."""
+    audit.purge_old_ips()
 
 
 def _due_job_ids(now, limit):
@@ -253,7 +291,8 @@ def jobs_cli():
 @click.option('--limit', default=50, show_default=True, help='Maximum number of jobs to run')
 @with_appcontext
 def tick(limit):
-    """Run due jobs (from cron or a systemd timer, every minute)."""
+    """Run due jobs (from cron or a systemd timer, every minute); once a day also the housekeeping."""
+    queue_daily_jobs()
     released = release_abandoned()
     counts = run_due_jobs(limit)
     click.echo(

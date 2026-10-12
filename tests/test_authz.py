@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from community.core.authz.decorators import require_perm
 from community.core.authz.models import FORMER_MEMBER, SYSADMIN, MemberRole, Permission, Role, RolePermission
@@ -164,3 +164,41 @@ def test_role_table_has_unique_keys(app):
     with pytest.raises(Exception):  # noqa: B017
         db.session.commit()
     db.session.rollback()
+
+
+def test_seed_writes_one_audit_entry_per_role(app):
+    """Grants added by the seed are audited, sensitive codes named separately (finding 21, §6.3 rule 5)."""
+    from community.core.authz.cli import authz_cli
+    from community.core.platform.audit import AuditLog
+
+    def drop(role_key, code):
+        permission = db.session.scalar(select(Permission).where(Permission.code == code))
+        db.session.delete(db.session.get(RolePermission, (role_by_key(role_key).id, permission.id)))
+
+    def seed_entries():
+        query = select(AuditLog).where(AuditLog.action == 'authz.role_permission.grant', AuditLog.id > before)
+        return db.session.scalars(query.order_by(AuditLog.id)).all()
+
+    drop(SYSADMIN, 'system.admin')
+    drop(SYSADMIN, 'members.invite')
+    drop('rank.fux', 'announcements.view')
+    db.session.commit()
+    before = db.session.scalar(select(func.max(AuditLog.id)))
+    result = app.test_cli_runner().invoke(authz_cli, ['seed'])
+    assert result.exit_code == 0, result.output
+    assert 'Grants added: 3.' in result.output
+    entries = seed_entries()
+    assert [(e.entity_type, e.entity_id) for e in entries] == [
+        ('role', str(role_by_key('rank.fux').id)),
+        ('role', str(role_by_key(SYSADMIN).id)),
+    ]
+    assert entries[0].diff == {'role': 'rank.fux', 'codes': ['announcements.view'], 'source': 'authz.yaml'}
+    assert entries[1].diff == {
+        'role': SYSADMIN,
+        'codes': ['members.invite', 'system.admin'],
+        'sensitive': ['system.admin'],
+        'source': 'authz.yaml',
+    }
+    # Nothing added, nothing recorded.
+    app.test_cli_runner().invoke(authz_cli, ['seed'])
+    assert len(seed_entries()) == 2

@@ -67,3 +67,43 @@ def test_create_admin_rejects_short_password_and_bad_email(app):
     )
     assert bad_email.exit_code != 0
     assert db.session.scalar(select(User)) is None
+
+
+def test_create_admin_gives_an_existing_member_a_login(app):
+    """A member without login (import, Neues Mitglied) gets the login instead of a duplicate (finding 32)."""
+    from community.core.identity.models import Member
+
+    from .factories import make_member
+
+    member = make_member('Max Kontakt', email='max@example.org')
+    result = app.test_cli_runner().invoke(
+        create_admin, ['--email', 'Max@Example.org', '--name', 'Anders Benannt', '--password', 'long enough pw']
+    )
+    assert result.exit_code == 0, result.output
+    assert 'Max Kontakt' in result.output
+    assert len(db.session.scalars(select(Member)).all()) == 1
+    user = db.session.scalar(select(User).where(User.login_email == 'max@example.org'))
+    assert user.member_id == member.id
+    assert member.first_name == 'Max'
+    assert role_keys(user) == {SYSADMIN}
+
+
+def test_create_admin_refuses_former_members_and_taken_contact_emails(app):
+    from community.core.identity.models import MemberStatus
+
+    from .factories import make_member
+
+    runner = app.test_cli_runner()
+    former = make_member('Ex Mitglied', email='ex@example.org', status=MemberStatus.ENDED)
+    result = runner.invoke(create_admin, ['--email', 'ex@example.org', '--name', 'Ex', '--password', 'long enough pw'])
+    assert result.exit_code != 0 and 'not an active member' in result.output
+    assert former.user is None
+    # The contact email of a member who logs in with another address.
+    other = make_user(email='login@example.org', name='Other Person')
+    other.member.email = 'kontakt@example.org'
+    db.session.commit()
+    result = runner.invoke(
+        create_admin, ['--email', 'kontakt@example.org', '--name', 'X', '--password', 'long enough pw']
+    )
+    assert result.exit_code != 0 and 'login@example.org' in result.output
+    assert db.session.scalar(select(User).where(User.login_email == 'kontakt@example.org')) is None

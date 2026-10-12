@@ -206,6 +206,31 @@ def change_rank(member, rank, valid_from, *, changed_by=None, convent_ref=None, 
     return entry
 
 
+def members_without_rank():
+    """Active members who never had a rank, e.g. accounts from before M1 or import rows without rank."""
+    from community.core.identity.models import Member, MemberStatus
+
+    return db.session.scalars(
+        select(Member)
+        .where(Member.status == MemberStatus.ACTIVE, Member.id.not_in(select(RankHistory.member_id)))
+        .order_by(Member.first_name, Member.last_name)
+    ).all()
+
+
+def set_first_rank(member, rank, valid_from, *, changed_by):
+    """Give a member who never had a rank their first one (bootstrap, decision 70). Commits nothing.
+
+    Holders of members.import may do this, as the import sets initial ranks (decision 53); any later
+    change, also after a Wiederaufnahme, is "Rang ändern" (members.rank.change). Audited by change_rank.
+    """
+    if latest_rank_entry(member) is not None:
+        raise OrgError(f'{member.full_name} hat schon einen Rang; geändert wird er über „Rang ändern“.')
+    if valid_from > today_local():
+        raise OrgError('Der erste Rang kann nicht in der Zukunft beginnen.')
+    # An Amt held before the rank was known is kommissarisch already and stays so.
+    return change_rank(member, rank, valid_from, changed_by=changed_by, offices='keep_acting')
+
+
 def _replace_rank_entry(entry):
     """Delete a rank entry that has not begun yet; returns the period before it, which ended the day before."""
     previous = db.session.scalar(

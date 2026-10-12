@@ -63,3 +63,29 @@ def test_purge_ips_removes_old_addresses(app):
     db.session.expire_all()
     assert db.session.get(AuditLog, old.id).ip is None
     assert db.session.get(AuditLog, new.id).ip == '5.6.7.8'
+
+
+def test_jobs_tick_purges_old_ips_once_a_day(app):
+    """The retention setting applies without a separate cron job: `flask jobs tick` purges daily (finding 20)."""
+    from community.core.platform.jobs import Job, JobStatus, jobs_cli
+
+    old = AuditLog(action='x', ip='1.2.3.4', occurred_at=utcnow() - timedelta(days=91))
+    new = AuditLog(action='y', ip='5.6.7.8', occurred_at=utcnow() - timedelta(days=89))
+    db.session.add_all([old, new])
+    db.session.commit()
+    runner = app.test_cli_runner()
+    assert runner.invoke(jobs_cli, ['tick']).exit_code == 0
+    db.session.expire_all()
+    assert db.session.get(AuditLog, old.id).ip is None
+    assert db.session.get(AuditLog, new.id).ip == '5.6.7.8'
+    purges = db.session.scalars(select(Job).where(Job.kind == 'audit.purge_ips')).all()
+    assert [job.status for job in purges] == [JobStatus.DONE]
+
+    # Later ticks on the same day queue no second purge.
+    late = AuditLog(action='z', ip='9.9.9.9', occurred_at=utcnow() - timedelta(days=100))
+    db.session.add(late)
+    db.session.commit()
+    assert runner.invoke(jobs_cli, ['tick']).exit_code == 0
+    db.session.expire_all()
+    assert len(db.session.scalars(select(Job).where(Job.kind == 'audit.purge_ips')).all()) == 1
+    assert db.session.get(AuditLog, late.id).ip == '9.9.9.9'

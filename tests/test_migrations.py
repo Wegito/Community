@@ -75,3 +75,61 @@ def test_upgrade_and_downgrade_with_data(tmp_path):
         finally:
             db.session.remove()
             db.engine.dispose()
+
+
+def test_downgrade_restores_only_current_admins(tmp_path):
+    """Back to M0, role='admin' goes only to members whose sysadmin role is active today (finding 15)."""
+    from datetime import date, timedelta
+
+    today = date.today()  # noqa: DTZ011 (the migration uses the server's local date too)
+
+    class Config(TestingConfig):
+        SQLALCHEMY_DATABASE_URI = f'sqlite:///{tmp_path / "admins.db"}'
+
+    def set_role_dates(conn, user_id, valid_from, valid_to=None):
+        conn.execute(
+            text(
+                'UPDATE member_role SET valid_from = :valid_from, valid_to = :valid_to '
+                'WHERE member_id = (SELECT member_id FROM "user" WHERE id = :user_id)'
+            ),
+            {'valid_from': valid_from, 'valid_to': valid_to, 'user_id': user_id},
+        )
+
+    app = create_app(Config)
+    with app.app_context():
+        try:
+            upgrade(revision='0003')
+            with db.engine.begin() as conn:
+                for user_id in (1, 2, 3, 4, 5):
+                    conn.execute(
+                        text(
+                            'INSERT INTO "user" (id, email, name, password_hash, role) '
+                            "VALUES (:id, :email, 'Name', 'x', 'admin')"
+                        ),
+                        {'id': user_id, 'email': f'u{user_id}@example.org'},
+                    )
+            upgrade()
+            with db.engine.begin() as conn:
+                # 1 stays admin; 2's role ended last year; 3's starts tomorrow; 4 left the club.
+                set_role_dates(conn, 2, date(2025, 1, 1), date(2025, 6, 30))
+                set_role_dates(conn, 3, today + timedelta(days=1))
+                conn.execute(
+                    text('UPDATE member SET status = \'ended\' WHERE id = (SELECT member_id FROM "user" WHERE id = 4)')
+                )
+                # 5's role was revoked (yesterday was its last day) and given again from today.
+                set_role_dates(conn, 5, date(2025, 1, 1), today - timedelta(days=1))
+                conn.execute(
+                    text(
+                        'INSERT INTO member_role (member_id, role_id, valid_from) '
+                        'SELECT member_id, role_id, :today FROM member_role '
+                        'WHERE member_id = (SELECT member_id FROM "user" WHERE id = 5)'
+                    ),
+                    {'today': today},
+                )
+            downgrade(revision='0005')
+            with db.engine.connect() as conn:
+                roles = dict(conn.execute(text('SELECT id, role FROM "user" ORDER BY id')).all())
+            assert roles == {1: 'admin', 2: 'resident', 3: 'resident', 4: 'resident', 5: 'admin'}
+        finally:
+            db.session.remove()
+            db.engine.dispose()

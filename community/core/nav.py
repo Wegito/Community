@@ -51,6 +51,7 @@ ADMIN = (
     NavLink('Gruppen', 'org.groups', also=('org.group',)),
     NavLink('Semester', 'org.semesters'),
     NavLink('Ränge', 'org.ranks'),
+    NavLink('Ohne Rang', 'org.first_ranks'),
     NavLink('Ressourcen', 'bookings.resources'),
     NavLink('Protokoll', 'admin.audit'),
     NavLink('Jobs', 'admin.jobs'),

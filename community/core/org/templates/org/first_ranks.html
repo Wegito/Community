@@ -1,0 +1,36 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit, inline_input_class %}
+{% from 'macros/ui.html' import page_header, table, cell, empty_state, muted %}
+{% block title %}Ohne Rang{% endblock %}
+{% block content %}
+{{ page_header('Mitglieder ohne Rang', 'Hier bekommen aktive Mitglieder ihren ersten Rang, z. B. Konten aus der Zeit vor der Umstellung oder Importzeilen ohne Rang. Ohne Rang haben sie fast keine Rechte. Danach ändert sich ein Rang nur über „Rang ändern“.') }}
+{% if not members %}
+{{ empty_state('Alle aktiven Mitglieder haben einen Rang.') }}
+{% else %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{% call table(['Mitglied', 'E-Mail', 'Erster Rang']) %}
+{% for m in members %}
+<tr>
+<td class="{{ cell }}">{{ m.full_name }}</td>
+<td class="{{ cell }} break-all">{{ m.user.login_email if m.user else (m.email or '–') }}</td>
+<td class="{{ cell }}">
+{% if m.id == current_user.member_id %}
+<span class="{{ muted }}">Den eigenen Rang setzt jemand anderes.</span>
+{% else %}
+<label class="sr-only" for="rank-{{ m.id }}">Erster Rang von {{ m.full_name }}</label>
+<select id="rank-{{ m.id }}" name="rank-{{ m.id }}" class="{{ inline_input_class }}">
+<option value="">offen lassen</option>
+{% for r in ranks %}<option value="{{ r.id }}"{% if chosen.get('rank-' ~ m.id) == r.id|string %} selected{% endif %}>{{ r.label }}</option>{% endfor %}
+</select>
+{% endif %}
+</td>
+</tr>
+{% endfor %}
+{% endcall %}
+<div class="max-w-md">{{ field(form.valid_from) }}</div>
+<p class="{{ muted }}">Die Mitglieder werden nicht benachrichtigt; jeder Rang steht im Protokoll.</p>
+{{ submit(form.submit) }}
+</form>
+{% endif %}
+{% endblock %}

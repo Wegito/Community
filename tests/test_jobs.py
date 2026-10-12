@@ -210,7 +210,8 @@ def test_cli_tick_list_and_retry(app):
 
     result = runner.invoke(jobs_cli, ['tick'])
     assert result.exit_code == 0, result.output
-    assert '1 done' in result.output and '1 failed' in result.output
+    # test.ok and the daily audit.purge_ips are done.
+    assert '2 done' in result.output and '1 failed' in result.output
 
     result = runner.invoke(jobs_cli, ['list', '--status', 'failed'])
     assert 'test.no_such_handler' in result.output

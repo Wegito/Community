@@ -47,6 +47,7 @@ def create_app(config=None):
     import community.core.identity  # noqa: F401  (registers the user loader)
     import community.core.org.services  # noqa: F401  (adds rank, office and group roles to authz)
     from community.core.authz.cli import authz_cli
+    from community.core.bootstrap import setup
     from community.core.identity.cli import create_admin
     from community.core.org.cli import org_cli
     from community.core.org.routes import bp as org_bp
@@ -56,6 +57,7 @@ def create_app(config=None):
     from community.core.platform.notify import current_unread_count
     from community.core.platform.routes import bp as notifications_bp
 
+    app.cli.add_command(setup)
     app.cli.add_command(create_admin)
     app.cli.add_command(audit_cli)
     app.cli.add_command(authz_cli)

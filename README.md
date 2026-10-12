@@ -46,11 +46,18 @@ source .venv/bin/activate            # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 cp .env.example .env                 # then set APP_ENV=development in .env (the flask command reads it)
 flask db upgrade                     # creates instance/community.db
+flask setup                          # permissions and their default grants; says what is missing
 flask create-admin                   # asks for email, name, password
 flask run --debug
 ```
 
-Open http://127.0.0.1:5000 and log in with the admin account.
+Open http://127.0.0.1:5000 and log in with the admin account. Run `flask setup` again after every
+`flask db upgrade`.
+
+The admin is the technical administrator (`custom.sysadmin`): members, invitations, import, Ämter
+and settings, but no rank and no finance rights. If the admin is also a member of the club, set
+their rank on the server (nobody sets their own rank in the app):
+`flask org set-rank --email admin@example.org --rank bursch` (`spefux`, `fux`, `bursch`, `alter_herr`).
 
 There is no self-registration. To add someone, open *Mitglieder → Neues Mitglied* (permission
 `members.invite`): the member is created without login, and they get a personal, single-use
@@ -125,6 +132,7 @@ All settings come from environment variables or `.env` (see [`.env.example`](.en
 | `INVITE_QR_HOURS` | Hours an invitation shown as a QR code stays valid (default 24) |
 | `PASSWORD_RESET_MAX_AGE_MINUTES` | Minutes a password reset link stays valid (default 60); it also stops working once used |
 | `JOB_MAX_ATTEMPTS` | Tries per background job before it is marked failed (default 5; waits 2, 4, 8, 16 minutes in between) |
+| `AUDIT_IP_RETENTION_DAYS` | Days the audit log keeps IP addresses (default 90). `flask jobs tick` removes older ones once a day. |
 
 ## Background jobs and email
 
@@ -140,6 +148,8 @@ or with a systemd timer (`community-jobs.service` with `Type=oneshot`,
 `WorkingDirectory=` the app folder and `ExecStart=<venv>/bin/flask jobs tick`, plus a
 `community-jobs.timer` with `OnCalendar=minutely`). Overlapping runs are safe: each job is
 claimed atomically. Failed jobs are retried with growing pauses and then marked failed.
+Once a day the tick also removes IP addresses older than `AUDIT_IP_RETENTION_DAYS` from the
+audit log (`flask audit purge-ips` does it at once).
 
 ```bash
 flask jobs tick                      # run due jobs now
@@ -154,16 +164,24 @@ password resets do not arrive. Use the club domain's mail host or a transactiona
 
 ## Deploying or updating on the server
 
+The server still runs the M0 version (accounts with `role` admin/resident)? Then follow
+[Updating a server that runs M0](#updating-a-server-that-runs-m0) once instead.
+
 ```bash
 cd ~/community
 git pull                             # first time: move .env aside first (see "Do this first", step 3)
 source .venv/bin/activate
 pip install -r requirements.txt
 flask db upgrade                     # always before restarting
+flask setup                          # always after db upgrade: permissions, default grants, what is missing
 # first time only: flask create-admin
-gunicorn --workers 2 --bind 127.0.0.1:8000 wsgi:app
+gunicorn --workers 2 --bind 127.0.0.1:8000 wsgi:app   # or restart its systemd service
 # first time only: add the cron job or timer for `flask jobs tick` (see "Background jobs and email")
 ```
+
+`flask setup` adds the default grants (`community/seed/authz.yaml`) on the first run and later only
+for permission codes that are new in that version, so a grant removed on purpose stays removed.
+`flask setup --seed` (or `flask authz seed`) adds every missing default grant again.
 
 Notes:
 - The entry point is now `wsgi:app` (the old `app.py` is gone). Update the gunicorn command or systemd unit.
@@ -176,6 +194,47 @@ Notes:
 - Without HTTPS, login only works with `SESSION_COOKIE_SECURE=false`. Use HTTPS for anything real (roadmap M8-1).
 - The database tables were never created by the old code. If you created them by hand, back up the file, compare it with `migrations/versions/0001_baseline.py`, then run `flask db stamp 0001` before `flask db upgrade`.
 - A full deploy kit (systemd units, Nginx example, backups) is roadmap task M8-2.
+
+### Updating a server that runs M0
+
+This version splits accounts into members and logins and replaces the admin flag with permissions.
+Nothing is lost, but until step 5 members see little more than their profile. Tell them, and plan
+an hour.
+
+1. Stop the app (its systemd service, or end gunicorn) and back up the database:
+   ```bash
+   cd ~/community
+   cp instance/community.db ~/community-before-m1.db
+   ```
+2. Do "Do this first" above. Its step 3 moves `.env` aside and runs `git pull`; step 4 sets the new
+   `SECRET_KEY` and `BASE_URL` and removes `INVITE_CODE`.
+3. Update the packages and the database:
+   ```bash
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   flask db upgrade
+   flask setup
+   ```
+   Every old account is now a member with a login (same email and password). `role=admin` became
+   the technical admin role (`custom.sysadmin`); `role=resident` is gone (it only marked accounts
+   as registered). Nobody has a rank yet, and the rank carries the everyday rights: until then a
+   member sees only Start (with "Dein Konto hat noch keine Rechte"), Benachrichtigungen and Profil,
+   and Ankündigungen, Putzplan and Buchungen answer "Kein Zugriff". `flask setup` lists these members.
+4. Start the app again and add the cron job or timer for `flask jobs tick` (see "Background jobs
+   and email"); without it no email is sent.
+5. Give everyone their first rank: log in as one of the old admins and open
+   *Verwaltung → Ohne Rang*. Choose a rank per member and *Ränge setzen*. Your own rank is set on
+   the server, since nobody sets their own rank in the app:
+   ```bash
+   flask org set-rank --email you@example.org --rank bursch
+   ```
+   On the command line for many members: write one `email rank` pair per line into `ranks.txt`, then
+   `while read -r email rank; do flask org set-rank --email "$email" --rank "$rank"; done < ranks.txt`
+6. Assign the first Ämter (*Ämter*, the Amt, *Besetzen*). From then on the Senior and the Consenior
+   change ranks (*Rang ändern* on a member's page). New members are invited (*Mitglieder → Neues
+   Mitglied*) or imported (*Verwaltung → Import*); there is no self-registration any more.
+
+Later updates follow "Deploying or updating" above.
 
 ## Project layout
 
@@ -190,6 +249,7 @@ community/
 │   ├── org/           semesters, ranks, Ämter, groups
 │   ├── platform/      audit log, background jobs, mail, notifications (bell), QR codes
 │   ├── nav.py         the main menu and the "Verwaltung" group (links follow the routes' permissions)
+│   ├── bootstrap.py   `flask setup`: permissions and default grants after every upgrade
 │   ├── db.py time.py money.py security.py errors.py assets.py
 ├── modules/           one blueprint per feature: models, forms, routes, templates
 │   ├── auth/ members/ announcements/ tasks/ bookings/ admin/

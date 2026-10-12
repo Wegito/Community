@@ -16,7 +16,7 @@ def authz_cli():
 @authz_cli.command('sync')
 @with_appcontext
 def sync():
-    """Copy the permission codes declared in code into the database. Run after every deploy."""
+    """Copy the permission codes declared in code into the database (`flask setup` does this too)."""
     added, updated, stale = service.sync_permissions()
     click.echo(f'Permissions: {added} added, {updated} updated.')
     if stale:
@@ -27,7 +27,7 @@ def sync():
 @click.option('--file', 'path', type=click.Path(exists=True, dir_okay=False), help='Default: community/seed/authz.yaml')
 @with_appcontext
 def seed(path):
-    """Add the default grants. Never removes grants. Run on first install, or on purpose."""
+    """Add every missing default grant (also removed ones). Never removes grants. Each grant is audited."""
     service.sync_permissions()
     result = service.seed_grants(path)
     click.echo(f'Grants added: {result["added"]}.')
