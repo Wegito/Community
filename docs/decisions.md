@@ -112,3 +112,9 @@ An independent review (four reviewers, each finding checked by a second agent tr
 - **No settlement to the Saldo yet**: the Kasse (M3) does not exist. Until then the monthly statement and its Excel export replace the "FINANZ" sheet. M4-5 (posting to the Saldo) follows with M3.
 - **Undo for 10 minutes** for the person who saved an entry; later only the Consenior (laundry.machines.manage) can cancel ("stornieren") an entry, with a reason. Cancelled entries stay visible, crossed out, and cost nothing.
 - **Import of the old list** matches by email only; rows without an email (84 in the current file) are not guessed. A dryer row without a program gets "Schranktrocken +", the most used program.
+
+## 2026-10-12 — Other clubs (M9)
+
+- **The owner wants to offer the app to other clubs.** New milestone M9 "Eigene Community" (roadmap §8.12) with a first-run wizard, presets, module switches, branding, an install kit and a licence. Decision D27: one install per club, and club-specific names and numbers are data, never code.
+- **M9-1 done now:** the club's name and a short name for the menu bar are saved in the database (table `club`, one row) and edited under Verwaltung → Verein (`system.admin`, audited). `CLUB_NAME` in `.env` stays as the fallback, so existing installs show the same name until someone saves one. The menu bar no longer cuts the name off: the short name helps, but the real cause was the width of the menu, so pages are now `max-w-6xl` wide and the full menu bar appears from 1280 px (`xl`), with the "Menü" button below that. Every new module adds a link, so M2-1 should group the top-level links.
+- **The setup wizard (M9-3) needs a one-time setup code** printed by `flask setup`: an open "create the first admin" page on a fresh server would let whoever finds it first take it over.

@@ -260,6 +260,7 @@ These resolve the contradictions between the earlier design drafts. If you devia
 | D24 | Language | German UI only, no Flask-Babel until English is needed [Q13]. Own filter formats `12,50 €`. | i18n from day one |
 | D25 | Frontend | Tailwind standalone CLI build (no Node); local, pinned htmx 1.9.x; htmx 2.x is a separate later PR | Tailwind Play CDN, unpkg |
 | D26 | Naming | `@require_perm`, `@public`; module names `auth, members, tasks, events, finance, drinks, laundry, fux, documents, api` | `require_permission`, `fuxen`, `program` |
+| D27 | Other clubs | One install per club; club-specific names, ranks, Ämter, prices and accounts are data (settings or a preset), never code | Multi-tenant hosting of several clubs in one database |
 
 ### 4.2 Project layout
 ```
@@ -889,7 +890,20 @@ The contract is published early as `docs/api/openapi.yaml` (M6-2) so the user ca
 | M8-6 | Club-owned accounts | Club Google account, Cloud project, service-account key; shared password manager with at least 2 holders; mail sender (club domain or EU provider, SPF/DKIM) with AVV | M8-1 | S | all |
 | M8-7 | GDPR pack | Datenschutzerklärung, Verarbeitungsverzeichnis, retention policy (audit IPs, drinks detail vs. bookkeeping retention), AVVs, own-data export (Art. 15/20). Get advice. **Gate before bulk onboarding (M1-9 invite batch) and before any Google feature.** | — | M | all |
 
-### 8.12 Dependency tree
+### 8.12 M9 — Eigene Community: other clubs run their own copy → **R8 "Eigene Community"**
+The owner wants to offer the app to other clubs (2026-10-12). One install per club (D27): each club has its own server, database and admins; nobody hosts several clubs in one database.
+
+| ID | Title | Scope | Depends on | Size | Parallel-safe with |
+|---|---|---|---|---|---|
+| M9-1 | Club settings ✅ | Name and short name (menu bar) editable under Verwaltung → Verein (`system.admin`), audited; used in the menu bar, browser tab and every mail; `CLUB_NAME` in `.env` is only the fallback until saved. Later fields: logo, accent colour, contact and legal links, IBAN (M3-7) | M1-3 | S | all |
+| M9-2 | Presets instead of seeds | The club's structure as one data file per kind of club (`community/presets/<key>.yaml`): ranks, Ämter (eligible ranks, descriptions, incompatibilities), groups, default grants, starting rank, the Amt told about new members, laundry and finance defaults (accounts, cost centres). Ship "Studentenverbindung" (today's seed) and "Verein, allgemein" (Mitglied, Ehrenmitglied, Vorstand). New installs get their data from the chosen preset, not from migrations; existing installs keep theirs. The last hard-coded keys (`STARTING_RANK`, `NEW_MEMBER_OFFICE`) become settings. | M9-1 | M | M2-*, M3-* |
+| M9-3 | First-run wizard | `/einrichtung`, open only while no login exists and only with the one-time setup code that `flask setup` prints (otherwise anyone who finds a fresh server first becomes its admin). Steps: club name → first admin (name, email, password) → choose a preset → review ranks and Ämter (rename, remove, add) → modules on or off → done, with links to "Mitglieder importieren" and "Einladen". Each step is audited; the wizard locks itself when finished. | M9-2, M9-4 | M | M9-5 |
+| M9-4 | Module switches | Per install: laundry, bookings, drinks, finance, calendar on or off. Menus, routes (404 when off), permissions and the wizard follow. | M9-1 | S | M9-2 |
+| M9-5 | Branding | Logo upload (PNG, size-limited, re-encoded), accent colour from an accessible palette, favicon. | M9-1 | S | M9-3, M9-4 |
+| M9-6 | Install kit | One documented way to install and update (container image or install script), an `.env` generator, versioned releases with a changelog, upgrade notes, a demo instance. | M8-2, M9-3 | M | — |
+| M9-7 | Licence and docs for others | Choose a licence [Q38]; README for other clubs (install, first run, backups, updates); keep this club's notes (`docs/decisions.md`, spikes) as history only. | — | S | all |
+
+### 8.13 Dependency tree
 ```
 M0 ───────────────────────────────────────────────────────────────────────────────────────
   M0-1 rotate/audit ··········· (deploy gate) ···························┐
@@ -931,7 +945,7 @@ OPS (any time)   M8-1 domain ─► M8-2 deploy ─► M8-3 backups ─► gate 
 M0-3 → M0-4 → M0-6 → M0-7 → M0-9 … M0-12 → M0-13 → M1-1 → M1-3 → M1-4 → M1-5 → M3-1 → M3-3 → M3-6 → **M3-9**.
 M3-9 is gated by M8-3 and needs the Excel file from [Q18].
 
-### 8.13 Releases and recommended order
+### 8.14 Releases and recommended order
 | Release | Contents | Value |
 |---|---|---|
 | R0 Läuft wieder | M0 | Safe, starting app with tests |
@@ -942,8 +956,9 @@ M3-9 is gated by M8-3 and needs the Excel file from [Q18].
 | R5 Semesterprogramm & Kalender | M5 | Senior tooling, ICS, Google, reminders |
 | R6 Getränke + API | M6 | Bierwart tooling, counter-app API |
 | R7 Ämter-Workflows | M7 | Fux curriculum, rank workflow, handover, documents |
+| R8 Eigene Community | M9 | Other clubs install their own copy: first-run wizard, presets, module switches, branding |
 
-Recommended order for a single maintainer: **R0 → R1 → R2 → R3 → R4 → R5 → R6 → R7**. R2 (laundry) comes right after R1, by the owner's decision of 2026-10-12, because it replaces a Google Form in daily use. Start R3 as soon as the Excel file arrives. M8 tasks run alongside.
+Recommended order for a single maintainer: **R0 → R1 → R2 → R3 → R4 → R5 → R6 → R7**. R2 (laundry) comes right after R1, by the owner's decision of 2026-10-12, because it replaces a Google Form in daily use. Start R3 as soon as the Excel file arrives. M8 tasks run alongside. Of R8, M9-1 is done; M9-2 (presets) fits best right after R3, before later modules add more club-specific seed data; the rest of M9 when another club actually wants to start. Until then every milestone follows D27: club-specific names and numbers are data, never code.
 
 ---
 
@@ -1039,6 +1054,11 @@ Each question names the tasks it blocks. Until a question is answered, the defau
 ### Legal (before M8-7, flags only, not legal advice)
 36. Is the Verbindung confessional? Membership data might then reveal religious belief (Art. 9 GDPR).
 37. Can a tax adviser or the Kassenprüfer confirm the record-retention duties (e.g. §147 AO, if applicable) for ledger and tally data, and whether per-drink detail may be deleted after settlement?
+
+### Before M9 (other clubs)
+38. Which licence? Open source (e.g. AGPL-3.0, so improvements by others stay open, or MIT) or source-available only? This decides whether and how other clubs may use and change the app. → M9-7
+39. Which clubs are "others": other VDSt chapters, other Studentenverbindungen, any Verein? This decides which presets ship first. → M9-2
+40. Does each club host its own copy, or would you run servers for them? Running servers for others brings duties (contracts, GDPR processing agreements, support). → M9-6
 
 ---
 

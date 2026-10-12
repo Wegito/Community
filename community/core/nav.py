@@ -57,6 +57,7 @@ ADMIN = (
     NavLink('Wäsche-Abrechnung', 'laundry.overview', also=('laundry.all_entries',)),
     NavLink('Wäsche verwalten', 'laundry.settings', also=('laundry.qr_sheet',)),
     NavLink('Protokoll', 'admin.audit'),
+    NavLink('Verein', 'admin.club'),
     NavLink('Jobs', 'admin.jobs'),
 )
 

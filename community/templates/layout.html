@@ -22,13 +22,13 @@
 <body class="min-h-screen bg-slate-50 text-slate-900 antialiased" hx-headers='{{ {"X-CSRFToken": csrf_token()}|tojson }}'>
 <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:shadow">Zum Inhalt springen</a>
 <header class="relative border-b border-slate-200 bg-white">
-<div class="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4">
-<a href="{{ url_for('announcements.index') }}" class="mr-2 min-w-0 truncate text-lg font-semibold">{{ club_name }}</a>
+<div class="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4">
+<a href="{{ url_for('announcements.index') }}" class="mr-2 min-w-0 truncate text-lg font-semibold">{{ club_short_name }}</a>
 {% if current_user.is_authenticated %}
 {% set nav = nav_links() %}
 {% set unread = unread_notifications() %}
 {# Wide screens: the links in the bar, "Verwaltung" as a drop-down. #}
-<nav aria-label="Hauptmenü" class="hidden items-center gap-1 lg:flex">
+<nav aria-label="Hauptmenü" class="hidden items-center gap-1 xl:flex">
 {% for link in nav.main %}{{ nav_link(link, top_link) }}{% endfor %}
 {% if nav.admin %}
 <details class="group relative">
@@ -47,20 +47,20 @@ Verwaltung
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-6" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/></svg>
 {% if unread %}<span class="absolute top-0.5 right-0.5 {{ count_badge }}" data-unread="{{ unread }}">{{ unread if unread < 100 else '99+' }}</span>{% endif %}
 </a>
-<a href="{{ url_for('members.profile') }}" class="hidden {{ top_link }} lg:inline-flex" title="Mein Profil"{% if request.endpoint == 'members.profile' %} aria-current="page"{% endif %}>{{ current_user.member.first_name }}</a>
-<form method="post" action="{{ url_for('auth.logout') }}" class="hidden lg:block">
+<a href="{{ url_for('members.profile') }}" class="hidden {{ top_link }} xl:inline-flex" title="Mein Profil"{% if request.endpoint == 'members.profile' %} aria-current="page"{% endif %}>{{ current_user.member.first_name }}</a>
+<form method="post" action="{{ url_for('auth.logout') }}" class="hidden xl:block">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
 <button type="submit" class="{{ top_link }}">Abmelden</button>
 </form>
 {# Small screens: everything in one menu that opens without JavaScript. #}
-<details class="group lg:hidden">
+<details class="group xl:hidden">
 <summary class="flex list-none items-center gap-1 rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 [&::-webkit-details-marker]:hidden">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="size-6 group-open:hidden" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="hidden size-6 group-open:block" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
 Menü
 </summary>
 <div class="absolute inset-x-0 top-full z-30 max-h-[calc(100vh-3.5rem)] overflow-y-auto border-b border-slate-200 bg-white shadow-lg">
-<nav aria-label="Hauptmenü" class="mx-auto max-w-5xl px-2 pt-1 pb-3">
+<nav aria-label="Hauptmenü" class="mx-auto max-w-6xl px-2 pt-1 pb-3">
 {% if nav.main %}
 <ul role="list">
 {% for link in nav.main %}<li>{{ nav_link(link, menu_link) }}</li>{% endfor %}
@@ -93,7 +93,7 @@ Menü
 </div>
 </header>
 
-<main id="main" class="mx-auto max-w-5xl px-4 py-6 sm:py-8">
+<main id="main" class="mx-auto max-w-6xl px-4 py-6 sm:py-8">
 {% with messages = get_flashed_messages(with_categories=true) %}
 {% if messages %}
 <div class="mb-6 space-y-2">

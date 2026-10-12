@@ -20,6 +20,7 @@ from itsdangerous import BadData, URLSafeTimedSerializer
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 
+from community.core.club import club_name
 from community.core.identity.models import User, normalize_email
 from community.core.identity.services import (
     accept_invitation,
@@ -83,7 +84,7 @@ def join(invitation, login_email, password):
     user = accept_invitation(invitation, login_email, password)
     user.last_login_at = utcnow()  # logged in right away
     member = user.member
-    club = current_app.config['CLUB_NAME']
+    club = club_name()
     notify(
         member,
         'welcome',

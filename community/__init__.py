@@ -45,6 +45,7 @@ def create_app(config=None):
     login_manager.login_message_category = 'warning'
 
     import community.core.authz  # noqa: F401  (declares core permission codes)
+    import community.core.club  # noqa: F401  (club settings model)
     import community.core.identity  # noqa: F401  (registers the user loader)
     import community.core.org.services  # noqa: F401  (adds rank, office and group roles to authz)
     from community.core.authz.cli import authz_cli
@@ -85,12 +86,14 @@ def create_app(config=None):
 
     from community.core.assets import asset_url
     from community.core.authz import can, policies
+    from community.core.club import club_name, club_short_name
     from community.core.nav import may_open, nav_links
 
     @app.context_processor
     def inject_globals():
         return {
-            'club_name': app.config['CLUB_NAME'],
+            'club_name': club_name(),
+            'club_short_name': club_short_name(),
             'asset_url': asset_url,
             'can': can,
             'policies': policies,

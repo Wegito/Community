@@ -177,7 +177,7 @@ def test_layout_for_a_member_without_admin_rights(client, login):
     assert 'Verwaltung' not in page
     assert '>Max</a>' in page and 'Mein Profil' in page
     assert page.count('action="/logout"') == 2  # logout is a POST form in both menus
-    assert '<details class="group lg:hidden">' in page and 'Menü' in page
+    assert '<details class="group xl:hidden">' in page and 'Menü' in page
 
 
 def test_member_without_any_permission_sees_only_the_account_menu(client, login):

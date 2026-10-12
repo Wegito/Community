@@ -116,7 +116,7 @@ All settings come from environment variables or `.env` (see [`.env.example`](.en
 |---|---|
 | `APP_ENV` | `production` (default), `development` or `testing` |
 | `SECRET_KEY` | Required in production, at least 32 random characters. The app refuses to start otherwise. |
-| `CLUB_NAME` | Name shown in the UI |
+| `CLUB_NAME` | Name shown in the UI and in mails until an admin saves one under Verwaltung → Verein |
 | `BASE_URL` | Public URL, e.g. `https://community.example.org`. Used for links in emails (password reset, invitations). **Required in production**: the app refuses to start without it, so links are never built from a forged `Host` header. |
 | `SQLALCHEMY_DATABASE_URI` | Default `sqlite:///community.db` (in `instance/`) |
 | `TRUSTED_PROXY_HOPS` | `1` behind one Nginx, `0` without a proxy (default) |

@@ -18,6 +18,8 @@ import click
 from flask import current_app, has_request_context, request, url_for
 from flask.cli import with_appcontext
 
+from community.core.club import club_name
+
 from .jobs import enqueue, job_handler
 
 BACKENDS = ('console', 'memory', 'smtp')
@@ -110,7 +112,7 @@ def render_mail(template, **context):
     tpl = current_app.jinja_env.get_template(f'mail/{template}.txt')
     if 'subject' not in tpl.blocks:
         raise ValueError(f'mail/{template}.txt has no subject block')
-    variables = {'club_name': current_app.config['CLUB_NAME'], **context}
+    variables = {'club_name': club_name(), **context}
     subject = _single_line(''.join(tpl.blocks['subject'](tpl.new_context(variables))))
     body = tpl.render(variables).strip() + '\n'
     return subject, body
@@ -154,7 +156,7 @@ def mail_cli():
 @with_appcontext
 def send_test(to):
     """Send a test mail right away (not through the job queue) to check the MAIL_* settings."""
-    club = current_app.config['CLUB_NAME']
+    club = club_name()
     backend = mail_backend(current_app.config)
     try:
         send_mail(to, f'Testmail von {club}', f'Diese Testmail zeigt, dass der Mailversand von {club} funktioniert.\n')
