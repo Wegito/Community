@@ -545,7 +545,8 @@ drinks.tally.record                  -  -  -  -  │  .   ?   .   .   .   Y │ 
 drinks.catalog.manage, drinks.stock  -  -  -  -  │  .   .   .   .   .   Y │  .   .
 drinks.view_all                      -  -  -  -  │  .   .   .   Y   .   Y │  .   .
 drinks.settlement.submit             -  -  -  -  │  .   .   .   .   .   Y │  .   .
-laundry.use.create_own, view_own     -  -  -  -  │  .   .   .   .   .   . │  Y   .
+laundry.use.create_own               -  -  -  -  │  .   .   .   .   .   . │  Y   .
+laundry.view_own                     -  -  -  -  │  .   .   .   .   .   . │  Y   .
 laundry.view_all                     -  -  -  -  │  .   Y   .   Y   .   . │  .   .
 laundry.machines.manage              -  -  -  -  │  .   Y   .   .   .   . │  .   Y
 laundry.settlement.submit            -  -  -  -  │  .   Y   .   .   .   . │  .   .
@@ -818,6 +819,8 @@ The contract is published early as `docs/api/openapi.yaml` (M6-2) so the user ca
 | M3-9 | Finance go-live (ops) | **Gate: M8-3 restore drill passed.** Import, one month of parallel running, archive Excel read-only. | M3-3, M3-6, M8-3 | S | — |
 
 ### 8.7 M4 — Laundry via QR → **R2 "Wäsche per QR"** (next after M1)
+
+**Status (2026-10-12):** M4-1 … M4-4 implemented (QR core, machines and prices, the form, lists, monthly statement with Excel export, import of the old list). M4-5 (posting to the Saldo) waits for M3; M4-6 (machine free / done reminder) is open. Details in `docs/decisions.md`.
 
 **Facts from the current Google Form "Waschliste" (analysed 2026-10-12; the file holds personal data and stays out of the repo):**
 - Questions: *Waschen* (required: "eine" or "beide" machines), *Trocknen* (yes), *Trocknen Modus* (8 dryer programs: Extra Trocken, Schranktrocken +, Bügeltrocken K, Sehr Trocken, Schranktrocken, Bügeltrocken P, Warm 20 min, Kalt 20 min), *Transport* (free text: which tub/box, e.g. "blaugraue Wanne"), plus email, a name ("Timer") and room. With a login, name, email and room are known and not asked again.

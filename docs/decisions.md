@@ -99,3 +99,14 @@ An independent review (four reviewers, each finding checked by a second agent tr
 11. **`.env` is loaded by the entry points, not by `community/config.py`.** `wsgi.py` loads it; the `flask` command loads it by itself. Tests no longer depend on a developer's `.env`.
 12. **Test-client requests run in their own app context** (`tests/conftest.py`), so login state comes from the session cookie and the user loader, as in production.
 13. **`parse_cents` rejects more than two decimal places** instead of rounding, because `1.234` is ambiguous between German and English notation.
+
+## 2026-10-12 — M4 Wäsche per QR (laundry)
+
+- **M4 comes right after M1** (owner's decision): it replaces a Google Form in daily use.
+- **The form keeps the old questions** (Waschen eine/beide, Trocknen, the 8 dryer programs, Transport → "Wanne/Box"); name, email, "Timer" and room come from the login.
+- **Washing and drying both cost money** (owner): one unit per washing machine ("beide" = 2) and one per dryer run. Default 0,25 € for members, 1,50 € for residents without membership, from 2026-01-01; prices are data with a valid-from date and every entry stores the prices it was saved with.
+- **Price group = rank:** a member with any current rank pays the member price; someone without rank (a resident who is not a member) the resident price. Who may enter laundry at all comes from the group *Hausbewohner*.
+- **One QR code for the laundry room** (not per machine), because the form asks for "eine/beide". The shared `qr_token` table (D10) is in core, so fridge or check-in codes can reuse it.
+- **No settlement to the Saldo yet**: the Kasse (M3) does not exist. Until then the monthly statement and its Excel export replace the "FINANZ" sheet. M4-5 (posting to the Saldo) follows with M3.
+- **Undo for 10 minutes** for the person who saved an entry; later only the Consenior (laundry.machines.manage) can cancel ("stornieren") an entry, with a reason. Cancelled entries stay visible, crossed out, and cost nothing.
+- **Import of the old list** matches by email only; rows without an email (84 in the current file) are not guessed. A dryer row without a program gets "Schranktrocken +", the most used program.

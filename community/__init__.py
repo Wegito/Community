@@ -12,6 +12,7 @@ MODULES = [
     'community.modules.announcements',
     'community.modules.tasks',
     'community.modules.bookings',
+    'community.modules.laundry',
     'community.modules.admin',
 ]
 
@@ -55,6 +56,7 @@ def create_app(config=None):
     from community.core.platform.jobs import jobs_cli
     from community.core.platform.mail import mail_cli
     from community.core.platform.notify import current_unread_count
+    from community.core.platform.qr import bp as qr_bp
     from community.core.platform.routes import bp as notifications_bp
 
     app.cli.add_command(setup)
@@ -66,6 +68,7 @@ def create_app(config=None):
     app.cli.add_command(mail_cli)
     app.register_blueprint(org_bp)
     app.register_blueprint(notifications_bp)
+    app.register_blueprint(qr_bp)
     init_request_ids(app)
 
     for name in MODULES:

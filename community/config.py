@@ -79,6 +79,9 @@ class BaseConfig:
     # IP addresses in the audit log are removed after this many days (flask audit purge-ips).
     AUDIT_IP_RETENTION_DAYS = env_int('AUDIT_IP_RETENTION_DAYS', 90)
 
+    # Laundry: minutes in which the person who saved an entry can take it back.
+    LAUNDRY_UNDO_MINUTES = env_int('LAUNDRY_UNDO_MINUTES', 10)
+
     # Background jobs (flask jobs tick): a failing job is retried with backoff, then marked failed.
     JOB_MAX_ATTEMPTS = env_int('JOB_MAX_ATTEMPTS', 5)
 

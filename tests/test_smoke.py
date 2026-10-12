@@ -9,6 +9,7 @@ import re
 from datetime import date, timedelta
 
 import pytest
+from sqlalchemy import select
 
 from community import create_app
 from community.config import TestingConfig
@@ -16,11 +17,14 @@ from community.core.identity.services import create_invitation
 from community.core.org.services import add_to_group, assign_office, create_group, create_semester, office_by_key
 from community.core.platform.jobs import enqueue
 from community.core.platform.notify import notify
+from community.core.platform.qr import tokens_for
 from community.core.time import utcnow
 from community.extensions import db
 from community.modules.auth.services import email_change_token, password_reset_token
 from community.modules.bookings.models import Resource
 from community.modules.bookings.services import create_booking
+from community.modules.laundry.models import LaundryMachine
+from community.modules.laundry.services import record_use
 from community.modules.tasks.models import Chore
 
 from .factories import give_permissions, make_admin, make_member, make_officer, make_user
@@ -61,6 +65,7 @@ def data(app):
     job = enqueue('test.smoke', {})
     notification = notify(member.member, 'rank_changed', 'Test')
     invitation, _ = create_invitation(make_member('Neu Ling'), 'link', created_by=member)
+    laundry_use, _ = record_use(member.member, washes=1, dried=False, submission_id='smoke', recorded_by=member)
     db.session.commit()
     # URL parameters by name, filled in for rules like /chores/edit/<int:cid>.
     return {
@@ -77,6 +82,9 @@ def data(app):
         'notification_id': notification.id,
         'invitation_id': invitation.id,
         'token': 'not-a-valid-token',
+        'use_id': laundry_use.id,
+        'machine_id': db.session.scalars(select(LaundryMachine)).first().id,
+        'qr_id': tokens_for('laundry')[0].id,
     }
 
 
@@ -110,6 +118,7 @@ def valid_tokens(app):
         '/join/<token>': invitation_token,
         '/password/reset/<token>': password_reset_token(owner),
         '/settings/email/confirm/<token>': email_change_token(owner, 'new@example.org'),
+        '/q/<token>': tokens_for('laundry')[0].token,
     }
 
 
@@ -119,7 +128,8 @@ def valid_tokens(app):
 def test_public_token_routes_render_with_a_valid_token(client, valid_tokens, rule, method, access):
     assert rule in valid_tokens, f'add a valid token for {rule} to the valid_tokens fixture'
     response = client.get(url(rule, {'token': valid_tokens[rule]}))
-    assert response.status_code == 200
+    # A printed QR code only forwards to the page it stands for.
+    assert response.status_code == (302 if rule == '/q/<token>' else 200)
     # The URL holds the token: keep it out of caches and Referer headers.
     assert response.headers['Cache-Control'] == 'no-store'
     assert response.headers['Referrer-Policy'] == 'no-referrer'

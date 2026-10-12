@@ -132,7 +132,31 @@ All settings come from environment variables or `.env` (see [`.env.example`](.en
 | `INVITE_QR_HOURS` | Hours an invitation shown as a QR code stays valid (default 24) |
 | `PASSWORD_RESET_MAX_AGE_MINUTES` | Minutes a password reset link stays valid (default 60); it also stops working once used |
 | `JOB_MAX_ATTEMPTS` | Tries per background job before it is marked failed (default 5; waits 2, 4, 8, 16 minutes in between) |
+| `LAUNDRY_UNDO_MINUTES` | Minutes in which someone can take back their own laundry entry (default 10) |
 | `AUDIT_IP_RETENTION_DAYS` | Days the audit log keeps IP addresses (default 90). `flask jobs tick` removes older ones once a day. |
+
+## Laundry (Wäsche per QR)
+
+Replaces the Google Form "Waschliste". Hausbewohner (members of the group *Hausbewohner*) scan the
+QR code in the laundry room, log in once (or stay logged in) and enter: one or both washing
+machines, the dryer and its program, and optionally their tub or box.
+
+- **Prices:** every wash and every dryer run costs money: 0,25 € for members (anyone with a rank),
+  1,50 € for residents without membership. Change them under *Verwaltung → Wäsche verwalten*; a new
+  price applies from its date, old entries keep their price.
+- **QR code:** *Wäsche verwalten → QR-Code → Anzeigen und drucken*. Print it only once the final
+  domain (`BASE_URL`) is set. "Neuen Code erzeugen" makes old stickers stop working.
+- **Monthly statement:** *Verwaltung → Wäsche-Abrechnung* (Kassenwart, Consenior), with Excel export.
+  Once the Kasse (M3) exists, the amounts go to each member's Saldo.
+- **Residents without membership** (e.g. the "Hausbewohner" of the old list) get an invitation like
+  everyone else, no rank, and membership in the group *Hausbewohner*.
+- **Import the old Google list** once (members must exist with the same email addresses first):
+  ```bash
+  flask laundry import-xlsx Waschliste.xlsx           # shows what would happen
+  flask laundry import-xlsx Waschliste.xlsx --apply   # imports; running it twice imports nothing twice
+  ```
+  Entries without an email address cannot be assigned and are skipped. Keep the file off the
+  server afterwards; it contains personal data. Never commit it to the repository.
 
 ## Background jobs and email
 

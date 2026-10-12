@@ -43,6 +43,7 @@ MAIN = (
         ),
     ),
     NavLink('Ämter', 'org.offices', also=('org.office', 'org.assign_office')),
+    NavLink('Wäsche', 'laundry.mine', also=('laundry.new',)),
 )
 
 # "Verwaltung": shown only to someone who may open at least one of these pages.
@@ -53,6 +54,8 @@ ADMIN = (
     NavLink('Ränge', 'org.ranks'),
     NavLink('Ohne Rang', 'org.first_ranks'),
     NavLink('Ressourcen', 'bookings.resources'),
+    NavLink('Wäsche-Abrechnung', 'laundry.overview', also=('laundry.all_entries',)),
+    NavLink('Wäsche verwalten', 'laundry.settings', also=('laundry.qr_sheet',)),
     NavLink('Protokoll', 'admin.audit'),
     NavLink('Jobs', 'admin.jobs'),
 )

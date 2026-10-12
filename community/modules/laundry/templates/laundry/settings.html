@@ -1,0 +1,55 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit, actions %}
+{% from 'macros/ui.html' import page_header, section_header, card, button, link_button, table, cell, empty_row, stacked_list, row_class, muted %}
+{% block title %}Wäsche verwalten{% endblock %}
+{% block content %}
+{{ page_header('Wäsche verwalten') }}
+
+{{ section_header('QR-Code zum Aushängen') }}
+{% call stacked_list() %}
+{% for qr in codes %}
+<li class="{{ row_class }}">
+<div class="flex-1">{{ qr.label }}</div>
+{{ link_button('Anzeigen und drucken', url_for('laundry.qr_sheet', qr_id=qr.id), size='sm') }}
+</li>
+{% endfor %}
+{% endcall %}
+
+{{ section_header('Maschinen') }}
+{% call stacked_list() %}
+{% for m in machines %}
+<li class="{{ row_class }}">
+<div class="flex-1">{{ m.name }} <span class="{{ muted }}">· {{ status_labels[m.status] }}</span></div>
+<form method="post" action="{{ url_for('laundry.machine_status', machine_id=m.id) }}" class="flex gap-2">
+{{ status_form.hidden_tag() }}
+<select name="status" class="rounded-md border border-slate-300 px-2 py-1 text-sm" aria-label="Status von {{ m.name }}">
+{% for value, label in status_labels.items() %}<option value="{{ value }}" {{ 'selected' if value == m.status }}>{{ label }}</option>{% endfor %}
+</select>
+{{ button('Ändern', 'secondary', 'sm') }}
+</form>
+</li>
+{% endfor %}
+{% endcall %}
+
+{{ section_header('Preise') }}
+<p class="mb-3 {{ muted }}">Aktuell:
+{% for tier, tier_label in tier_labels.items() %}{{ tier_label }}: Waschen {{ current.get((tier, 'wash'))|cents if current.get((tier, 'wash')) is not none else '—' }}, Trocknen {{ current.get((tier, 'dry'))|cents if current.get((tier, 'dry')) is not none else '—' }}{{ ' · ' if not loop.last }}{% endfor %}.
+Ein neuer Preis gilt ab seinem Datum; alte Einträge behalten ihren Preis.</p>
+{% call table(['Preisgruppe', 'Für', 'Preis', 'Gilt ab']) %}
+{% for p in prices %}
+<tr><td class="{{ cell }}">{{ tier_labels[p.tier] }}</td><td class="{{ cell }}">{{ kind_labels[p.kind] }}</td><td class="{{ cell }}">{{ p.price_cents|cents }}</td><td class="{{ cell }}">{{ p.valid_from|d }}</td></tr>
+{% else %}
+{{ empty_row('Noch keine Preise.', 4) }}
+{% endfor %}
+{% endcall %}
+{% call card(class='mt-4') %}
+<form method="post" class="grid grid-cols-1 gap-4 md:grid-cols-4">
+{{ price_form.hidden_tag() }}
+{{ field(price_form.tier) }}
+{{ field(price_form.kind) }}
+{{ field(price_form.price) }}
+{{ field(price_form.valid_from) }}
+<div class="md:col-span-4">{{ submit(price_form.submit) }}</div>
+</form>
+{% endcall %}
+{% endblock %}

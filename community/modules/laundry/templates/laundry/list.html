@@ -1,0 +1,33 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, link_button, button, table, cell, empty_row, badge %}
+{% block title %}Wäscheliste{% endblock %}
+{% block content %}
+{% call page_header('Wäscheliste') %}
+{{ link_button('Abrechnung', url_for('laundry.overview', monat=month_key)) }}
+{% endcall %}
+{% include 'laundry/_month_nav.html' %}
+{% call table(['Zeit', 'Name', 'Eintrag', 'Wanne/Box', 'Betrag', none]) %}
+{% for u in uses %}
+<tr class="{{ 'opacity-60' if u.is_void }}">
+<td class="{{ cell }} whitespace-nowrap">{{ u.used_at|dt }}</td>
+<td class="{{ cell }}">{{ u.member.full_name }}</td>
+<td class="{{ cell }}{{ ' line-through' if u.is_void }}">{{ describe(u) }}</td>
+<td class="{{ cell }}">{{ u.container or '' }}</td>
+<td class="{{ cell }}">{{ u.total_cents|cents }}</td>
+<td class="{{ cell }}">
+{% if u.is_void %}{{ badge('storniert') }}{% if u.void_reason %} <span class="text-xs">{{ u.void_reason }}</span>{% endif %}
+{% elif may_void %}
+<form method="post" action="{{ url_for('laundry.void', use_id=u.id) }}" class="flex gap-2">
+{{ void_form.hidden_tag() }}
+<input type="hidden" name="monat" value="{{ month_key }}">
+<input name="reason" placeholder="Grund" class="w-28 rounded-md border border-slate-300 px-2 py-1 text-sm" aria-label="Grund">
+{{ button('Stornieren', 'danger', 'sm') }}
+</form>
+{% endif %}
+</td>
+</tr>
+{% else %}
+{{ empty_row('Keine Einträge in diesem Monat.', 6) }}
+{% endfor %}
+{% endcall %}
+{% endblock %}
