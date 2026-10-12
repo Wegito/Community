@@ -4,6 +4,7 @@ The checks are generated from the routes themselves, so a new route is tested au
 and test_every_route_declares_access fails for a route without a declaration.
 """
 
+import html
 import re
 from datetime import date, timedelta
 
@@ -22,7 +23,7 @@ from community.modules.bookings.models import Resource
 from community.modules.bookings.services import create_booking
 from community.modules.tasks.models import Chore
 
-from .factories import give_permissions, make_member, make_user
+from .factories import give_permissions, make_admin, make_member, make_officer, make_user
 
 
 def _rules():
@@ -155,3 +156,28 @@ def test_login_routes_work_without_permissions(client, login, data, rule, method
     make_user(email='nobody@example.org', name='No Rights', perms=[])
     login('nobody@example.org')
     assert client.get(url(rule, data)).status_code == 200
+
+
+@pytest.mark.parametrize('who', ['admin', 'senior', 'no rights'])
+def test_pages_link_only_to_pages_the_user_may_open(client, login, data, who):
+    """Every <a href> on every page a user opens leads to a page they may open (never 403)."""
+    user = {
+        'admin': make_admin,
+        'senior': lambda: make_officer('senior', email='senior@example.org'),
+        'no rights': lambda: make_user(email='nobody@example.org', name='No Rights', perms=[]),
+    }[who]()
+    login(user)
+    status, forbidden = {}, []
+    for rule, method, access in RULES:
+        if method != 'GET' or access[0] == 'public':
+            continue
+        page = client.get(url(rule, data))
+        if page.status_code != 200:
+            continue
+        for href in re.findall(r'<a [^>]*href="(/[^"#]*)', page.get_data(as_text=True)):
+            href = html.unescape(href)
+            if href not in status and not href.startswith('/static/'):
+                status[href] = client.get(href).status_code
+            if status.get(href) == 403:
+                forbidden.append((rule, href))
+    assert forbidden == []

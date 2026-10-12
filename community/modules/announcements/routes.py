@@ -2,7 +2,7 @@ from flask import flash, redirect, render_template, url_for
 from flask_login import current_user
 from sqlalchemy import select
 
-from community.core.authz import can, require_login, require_perm
+from community.core.authz import can, current_permissions, require_login, require_perm
 from community.core.platform import audit
 from community.extensions import db
 
@@ -17,7 +17,12 @@ def index():
     anns = []
     if can('announcements.view'):
         anns = db.session.scalars(select(Announcement).order_by(Announcement.created_at.desc()).limit(10)).all()
-    return render_template('announcements/index.html', anns=anns)
+    return render_template(
+        'announcements/index.html',
+        anns=anns,
+        former=not current_user.member.is_active_member,
+        has_rights=bool(current_permissions()),
+    )
 
 
 @bp.route('/announcements', endpoint='list')

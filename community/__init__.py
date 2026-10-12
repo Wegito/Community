@@ -82,7 +82,7 @@ def create_app(config=None):
 
     from community.core.assets import asset_url
     from community.core.authz import can, policies
-    from community.core.nav import nav_links
+    from community.core.nav import may_open, nav_links
 
     @app.context_processor
     def inject_globals():
@@ -92,6 +92,7 @@ def create_app(config=None):
             'can': can,
             'policies': policies,
             'nav_links': nav_links,
+            'may_open': may_open,
             'unread_notifications': current_unread_count,
         }
 

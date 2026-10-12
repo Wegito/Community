@@ -28,5 +28,5 @@
 {{ submit(form.submit) }}
 </form>
 {% endcall %}
-{{ back_link('Zurück zu den Buchungen', url_for('bookings.calendar')) }}
+{% if may_open('bookings.calendar') %}{{ back_link('Zurück zu den Buchungen', url_for('bookings.calendar')) }}{% endif %}
 {% endblock %}

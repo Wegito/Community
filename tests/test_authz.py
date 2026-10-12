@@ -21,7 +21,7 @@ from community.core.identity.models import MemberStatus
 from community.core.time import today_local
 from community.extensions import db
 
-from .factories import give_permissions, make_member, make_user
+from .factories import give_permissions, make_admin, make_member, make_user
 
 
 def test_every_declared_code_is_synced(app):
@@ -110,7 +110,43 @@ def test_navigation_shows_only_allowed_links(client, login):
     assert 'Putzplan' in page
     assert 'Buchungen' not in page
     assert 'Protokoll' not in page
-    assert 'noch keine Rechte' in page
+    assert 'noch keine Rechte' not in page  # one right is not "no rights"
+
+
+NO_RIGHTS = 'Dein Konto hat noch keine Rechte'
+
+
+def test_start_page_for_a_member(client, login):
+    login(make_user())
+    page = client.get('/').get_data(as_text=True)
+    assert 'Neueste Ankündigungen' in page and NO_RIGHTS not in page
+
+
+def test_start_page_without_any_rights(client, login):
+    login(make_user(perms=[]))
+    page = client.get('/').get_data(as_text=True)
+    assert NO_RIGHTS in page and 'Neueste Ankündigungen' not in page
+
+
+def test_start_page_for_the_technical_admin(client, login):
+    # custom.sysadmin has rights, but not announcements.view (§6.5).
+    login(make_admin())
+    page = client.get('/').get_data(as_text=True)
+    assert NO_RIGHTS not in page and 'Neueste Ankündigungen' not in page
+    assert 'Willkommen, Admin!' in page and 'Verwaltung' in page
+
+
+def test_start_page_for_a_former_member(client, login):
+    from community.core.identity.models import ExitReason
+    from community.modules.members.services import exit_member
+
+    user = make_user()
+    exit_member(user.member, today_local(), ExitReason.AUSTRITT, recorded_by=make_admin())
+    db.session.commit()
+    login(user)
+    page = client.get('/').get_data(as_text=True)
+    assert NO_RIGHTS not in page and 'Neueste Ankündigungen' not in page
+    assert 'ehemaliges Mitglied' in page and 'href="/profile"' in page
 
 
 def test_member_without_view_all_sees_only_own_chores(client, login):
