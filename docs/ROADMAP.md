@@ -395,7 +395,7 @@ Conventions:
 |---|---|---|
 | `fin_book` | key, label | At least the Aktivenkasse; more after [Q21] |
 | `fin_account` | book_id, kind MEMBER/BANK/CASH/INCOME/EXPENSE/EQUITY/CLEARING, member_id?, name; uq(book_id, member_id) | Member accounts are created lazily |
-| `fin_category` | key, label | Semesterbeitrag, Veranstaltung, Getränke, Wäsche, Auslage, Spende, Sonstiges (Strafe only if [Q23]) |
+| `fin_category` | key, label, active | Cost centres (Kostenstellen), editable per semester: the Excel has about 30 (Kneipen, Vorträge, Stiftungsfest, Party, Renovierung, …; see the M3-0 spike). Events from M5 become cost centres. Earmarked reserves (Spenden, Fuxenkasse, Waschmaschine, LAN) are accounts, not categories. |
 | `fin_journal` | book_id, kind CHARGE/PAYMENT/SPLIT/SETTLEMENT/OPENING/REVERSAL/MANUAL, title, booked_on, semester_id?, source_type?, source_id?, idempotency_key uq?, reverses_journal_id uq?, posted_by, cosigned_by?, posted_at, note | Immutable after insert (service guard + tests) |
 | `fin_entry` | journal_id, debit_account_id, credit_account_id, amount_cents CHECK > 0, category_id, memo, external_ref? | Balanced by construction |
 | `settlement` | module DRINKS/LAUNDRY, book_id, period_to, status DRAFT/SUBMITTED/POSTED, submitted_by/at, posted_by/at, reject_note?, journal_id uq?, totals_json | Only one non-POSTED settlement per (module, book) |
@@ -807,15 +807,16 @@ The contract is published early as `docs/api/openapi.yaml` (M6-2) so the user ca
 ### 8.6 M3 — Finance (Kasse) → **R3 "Kasse & Saldo"**
 | ID | Title | Scope | Depends on | Size | Parallel-safe with |
 |---|---|---|---|---|---|
-| M3-0 | Excel analysis (spike) | Analyse the anonymised file [Q18]: sheets, columns, sign convention, laundry sheet; mapping config; findings in `docs/spikes/` | user input | S | everything |
+| M3-0 | Excel analysis (spike) ✅ | Done: `docs/spikes/m3-0-kasse-excel.md` (structure only; the file stays out of the repo) | user input | S | everything |
 | M3-1 | Ledger core | Books, accounts, categories, journal, entries; `post_journal()`, `reverse()`, `saldo()`, `statement()`; idempotency keys; immutability guard; person-based cosign rule; audit; money parse and format; invariant tests (≥ 90 % coverage) | M1-2, M1-3, M1-5 | L | M2-*, M4-1 … M4-4, M5-1 … M5-4 |
 | M3-2 | Saldo widget + Kontoauszug | Posted Saldo per book (no total across legally separate books), latest entries, payment details (IBAN, `payment_ref`); statement page | M3-1, M2-1 | S | M3-3 … M3-8 |
-| M3-3 | Kassenwart workspace | Saldenliste grid (members × books, filter by rank and status); htmx inline actions: record payment, single charge, reversal with reason; statements; Kassenwart tile | M3-1 | L | M3-2, M3-5, M3-6, M3-7 |
-| M3-4 | Bulk charges + splits | Bulk charge by rank or group (Semesterbeitrag); equal split (D20) or fixed price per rank; mandatory preview before posting | M3-3 | M | M3-5 … M3-8 |
+| M3-3 | Kassenwart workspace | Saldenliste grid (members × books, filter by rank and status); htmx inline actions: record payment, single charge, reversal with reason; member payments from one bank statement in one collective journal (`GS` Beleg); Beleg numbers per series (G, K, B, GS); statements; Kassenwart tile | M3-1 | L | M3-2, M3-5, M3-6, M3-7 |
+| M3-4 | Bulk charges + splits | Bulk charge by rank or group (Semesterbeitrag); recurring monthly charges per group (Aktivenbeiträge, Internetbeiträge with price levels); equal split (D20), fixed price per rank or an amount per person (event shares); mandatory preview before posting | M3-3 | M | M3-5 … M3-8 |
 | M3-5 | xlsx export ("better Excel") | Kassenbuch, Saldenliste, statements, semester report (openpyxl, formatted) | M3-1 | S | M3-2 … M3-4, M3-6 … M3-8 |
 | M3-6 | Opening-balance import | Procedure in §7.2: dry run, Decimal conversion, mapping, sign check, reconciliation report, sign-off, OPENING journals | M3-0, M3-1, M1-9 | M | M3-2 … M3-5, M3-7 |
 | M3-7 | Zahlungsaufforderung | Filter by Saldo below X → preview → personal emails via jobs (statement, IBAN, Verwendungszweck); reminders after N days (can be switched off); optional GiroCode **[verify EPC spec + library]** | M3-1, M1-6 | M | M3-4 … M3-6, M3-8 |
 | M3-8 | Club payments & Auslagen | Manual journals: supplier invoices (EXPENSE/BANK), member Auslage credit and payout, cash book | M3-3 | S | M3-4 … M3-7 |
+| M3-10 | Semesterabschluss | Bilanz and GuV from the journal; AH-Kontingent report (budget, spending by group, remainder); cash count by denomination that books the difference; carry balances into the next semester; all as sheets in the xlsx export | M3-1, M3-5 | M | M3-7, M3-8 |
 | M3-9 | Finance go-live (ops) | **Gate: M8-3 restore drill passed.** Import, one month of parallel running, archive Excel read-only. | M3-3, M3-6, M8-3 | S | — |
 
 ### 8.7 M4 — Laundry via QR → **R2 "Wäsche per QR"** (next after M1)
@@ -1008,7 +1009,7 @@ Each question names the tasks it blocks. Until a question is answered, the defau
 17. How does the Putzplan rotate today? Are Alte Herren or office holders exempt from tasks? → M2-4
 
 ### Before M3 (finance)
-18. Please share the Excel file(s), anonymised if needed. Which columns, which sign convention, is the laundry list a sheet in it, and what cutoff date should opening balances use? → M3-0, M3-6
+18. ~~Please share the Excel file(s)~~ **Answered** with the SS 25 journal (analysis in `docs/spikes/m3-0-kasse-excel.md`): one double-entry book, Kontokarte per member, positive = credit. Still open: the cutoff date and the latest closed semester for the opening balances. → M3-6
 19. **Central decision:** is a web grid plus a polished xlsx export acceptable instead of a new Excel file, or must the Kassenwart keep working in Excel? → D21, M3-3
 20. Should the app also be the bank Kassenbuch (supplier payments, Auslagen), or only track member Saldi? → M3-8
 21. Which Kassen exist (Aktivenkasse, Getränkekasse, Hauskasse, AHV)? Is the club a registered association (e.V.)? Is the AHV a separate legal association? → `fin_book` seed
