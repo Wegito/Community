@@ -61,6 +61,9 @@ class BaseConfig:
     # friendly message (413 handler in core/errors.py). Nginx's client_max_body_size must be higher.
     MAX_CONTENT_LENGTH = 2 * 1024 * 1024
 
+    # Form messages in German from WTForms' own translations (core/forms.py), not Flask-Babel.
+    WTF_I18N_ENABLED = False
+
     # Login throttling, counted per account in the database (works across workers).
     MAX_FAILED_LOGINS = env_int('MAX_FAILED_LOGINS', 5)
     LOGIN_LOCKOUT_MINUTES = env_int('LOGIN_LOCKOUT_MINUTES', 15)

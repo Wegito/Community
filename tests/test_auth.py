@@ -1,7 +1,11 @@
+import re
+import time
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
 from flask_migrate import upgrade
+from itsdangerous.timed import TimestampSigner
 from sqlalchemy import text
 
 from community import create_app
@@ -11,7 +15,7 @@ from community.core.security import safe_next
 from community.core.time import utcnow
 from community.extensions import db
 
-from .factories import DEFAULT_PASSWORD, make_user
+from .factories import DEFAULT_PASSWORD, make_invitation, make_user
 
 
 @pytest.mark.parametrize(
@@ -110,7 +114,49 @@ def test_logout_without_csrf_token_is_rejected(app, client, login):
     make_user()
     login('max@example.org')
     app.config['WTF_CSRF_ENABLED'] = True
-    assert client.post('/logout').status_code == 400
+    response = client.post('/logout')
+    # /logout only answers POST: back to the start page with a German message, still logged in.
+    assert response.status_code == 302 and response.location == '/'
+    page = client.get('/').get_data(as_text=True)
+    assert CSRF_MESSAGE in page and 'Abmelden' in page
+
+
+CSRF_MESSAGE = 'Die Seite war zu lange offen. Bitte noch einmal versuchen.'
+
+
+def test_expired_form_goes_back_to_the_form_with_a_german_message(app, client):
+    _, token = make_invitation()
+    app.config.update(WTF_CSRF_ENABLED=True, WTF_CSRF_TIME_LIMIT=1)
+    with patch.object(TimestampSigner, 'get_timestamp', return_value=int(time.time()) - 5):  # opened 5 s ago
+        page = client.get(f'/join/{token}').get_data(as_text=True)
+    csrf_token = re.search(r'name="csrf_token" type="hidden" value="([^"]+)"', page).group(1)
+    data = {'login_email': 'neu@example.org', 'password': 'x' * 12, 'confirm': 'x' * 12, 'csrf_token': csrf_token}
+    response = client.post(f'/join/{token}', data=data)
+    assert response.status_code == 302 and response.location == f'/join/{token}'
+    assert CSRF_MESSAGE in client.get(response.location).get_data(as_text=True)
+
+
+def test_form_without_session_cookie_goes_back_with_a_german_message(app, client):
+    app.config['WTF_CSRF_ENABLED'] = True
+    response = client.post('/login?next=/chores', data={'email': 'max@example.org', 'password': 'x', 'csrf_token': 'x'})
+    assert response.status_code == 302 and response.location == '/login?next=/chores'
+    assert CSRF_MESSAGE in client.get(response.location).get_data(as_text=True)
+
+
+def test_login_does_not_return_to_a_post_only_page(client):
+    # A stale "Abmelden" button after the session was ended elsewhere: login, then not to /logout (405).
+    make_user()
+    response = client.post('/logout')
+    assert response.status_code == 302 and response.location == '/login?next=%2Flogout'
+    response = client.post(response.location, data={'email': 'max@example.org', 'password': DEFAULT_PASSWORD})
+    assert response.status_code == 302 and response.location == '/'
+
+
+def test_logged_in_user_is_not_sent_to_a_post_only_next(client, login):
+    make_user()
+    login('max@example.org')
+    assert client.get('/login?next=/notifications/read-all').location == '/'
+    assert client.get('/login?next=/chores?x=1').location == '/chores?x=1'
 
 
 def _app_at_revision(tmp_path, revision):

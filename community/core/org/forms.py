@@ -1,6 +1,7 @@
-from flask_wtf import FlaskForm
 from wtforms import BooleanField, DateField, SelectField, StringField, SubmitField, TextAreaField, ValidationError
 from wtforms.validators import DataRequired, Length, Optional, Regexp
+
+from community.core.forms import FlaskForm
 
 from .models import GroupKind, SemesterKind, SemesterStatus
 

@@ -1,7 +1,7 @@
-from flask_wtf import FlaskForm
 from wtforms import DateTimeLocalField, SelectField, StringField, SubmitField, ValidationError
 from wtforms.validators import DataRequired, Length
 
+from community.core.forms import FlaskForm
 from community.core.time import exists_locally, local_to_utc
 
 SKIPPED_TIME = 'Diese Uhrzeit gibt es wegen der Zeitumstellung nicht.'

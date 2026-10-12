@@ -149,7 +149,7 @@ def test_htmx_requests_carry_the_csrf_token_as_header(app, client, login):
     login(user)
     app.config['WTF_CSRF_ENABLED'] = True
     token = _hx_csrf_token(_page(client, '/notifications'))
-    assert client.post('/notifications/read-all').status_code == 400  # no token: refused
+    assert client.post('/notifications/read-all').location == '/'  # no token: refused (core/errors.py)
     response = client.post('/notifications/read-all', headers={'X-CSRFToken': token, 'HX-Request': 'true'})
     assert response.status_code == 302
 

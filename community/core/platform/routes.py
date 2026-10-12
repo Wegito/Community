@@ -2,9 +2,9 @@
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
-from flask_wtf import FlaskForm
 
 from community.core.authz import require_login
+from community.core.forms import FlaskForm
 from community.core.security import safe_next
 from community.extensions import db
 

@@ -1,9 +1,9 @@
 from flask import flash, redirect, render_template, request, url_for
 from flask_login import current_user
-from flask_wtf import FlaskForm
 from sqlalchemy import func, select
 
 from community.core.authz import require_perm
+from community.core.forms import FlaskForm
 from community.core.platform import jobs as job_queue
 from community.core.platform.audit import AuditLog
 from community.extensions import db

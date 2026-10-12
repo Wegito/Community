@@ -14,7 +14,7 @@ from community.core.identity.services import (
     find_valid_invitation,
 )
 from community.core.platform import audit
-from community.core.security import safe_next
+from community.core.security import opens_with_get, safe_next
 from community.core.time import utcnow
 from community.extensions import db
 
@@ -87,6 +87,9 @@ def join(token):
 @public
 def login():
     next_url = safe_next(request.args.get('next'))
+    if next_url and not opens_with_get(next_url):
+        # A POST button on a page whose session had ended (e.g. "Abmelden"): its URL is no page.
+        next_url = None
     if current_user.is_authenticated:
         return redirect(next_url or url_for('announcements.index'))
     form = LoginForm()

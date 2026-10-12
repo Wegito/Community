@@ -1,5 +1,4 @@
 from flask import current_app
-from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField, FileRequired
 from wtforms import (
     BooleanField,
@@ -14,6 +13,7 @@ from wtforms import (
 )
 from wtforms.validators import DataRequired, Email, Length, Optional, Regexp
 
+from community.core.forms import FlaskForm
 from community.core.identity.models import ExitReason, InvitationChannel, normalize_email
 
 from .services import DELIVERY_NONE, EMAIL_NEEDED, PHONE_HINT, PHONE_PATTERN

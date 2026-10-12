@@ -1,6 +1,7 @@
-from flask_wtf import FlaskForm
 from wtforms import BooleanField, DateField, SelectField, StringField, SubmitField
 from wtforms.validators import DataRequired, Length, Optional
+
+from community.core.forms import FlaskForm
 
 
 def optional_int(value):

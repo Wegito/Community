@@ -1,7 +1,7 @@
-from flask_wtf import FlaskForm
 from wtforms import BooleanField, EmailField, PasswordField, SubmitField
 from wtforms.validators import DataRequired, Email, EqualTo, Length
 
+from community.core.forms import FlaskForm
 from community.core.identity.models import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, normalize_email
 
 
