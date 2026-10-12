@@ -7,13 +7,14 @@ from datetime import date, timedelta
 import pytest
 from sqlalchemy import select, update
 
-from community.core.authz.service import active_roles
+from community.core.authz.service import active_roles, permissions_for
 from community.core.identity.models import Invitation, InvitationChannel, InvitationState, Member, MemberStatus, User
 from community.core.identity.services import (
     EmailInUse,
     InvitationError,
     accept_invitation,
     create_invitation,
+    end_all_sessions,
     find_valid_invitation,
     open_invitations,
     revoke_invitation,
@@ -420,13 +421,133 @@ def test_invite_existing_member_with_other_members_address_is_refused(app):
     make_member('Andere Person', email='other@example.org')
     member = make_member('Neu Ling')
     with pytest.raises(members.EmailInUse):
-        members.invite(member, 'link', invited_by=None, email='other@example.org')
+        members.invite(member, 'link', invited_by=None, permissions=set(), email='other@example.org')
 
 
 def test_invite_existing_member_with_login_is_refused(app):
     user = make_user()
     with pytest.raises(members.MemberError, match='schon einen Login'):
-        members.invite(user.member, 'link', invited_by=None)
+        members.invite(user.member, 'link', invited_by=None, permissions=permissions_for(user.member))
+
+
+# --- Nobody gets a usable link to rights they lack (M1 review) -------------------
+
+BEYOND_INVITER = 'weder selbst hast noch vergeben darfst'
+
+
+def login_less_officer(office_key, valid_from=None, email='real@example.org'):
+    """A Bursch without login who holds an Amt from `valid_from` (today by default)."""
+    from community.core.org.services import assign_office, office_by_key
+
+    member = make_member('Real Officer', email=email)
+    set_rank(member, 'bursch')
+    assign_office(office_by_key(office_key), member, valid_from or today_local())
+    db.session.commit()
+    return member
+
+
+@pytest.mark.parametrize('starts_in_days', [0, 30])
+@pytest.mark.parametrize('channel', ['link', 'qr'])
+def test_no_link_for_a_member_with_rights_the_inviter_lacks(app, channel, starts_in_days):
+    """The Fuxmajor (no members.rank.change, no offices.assign) must not get a link that logs
+    him in as the Senior, also not while the Senior's term has not started yet."""
+    fm = make_officer('fuxmajor')
+    senior = login_less_officer('senior', today_local() + timedelta(days=starts_in_days))
+    with pytest.raises(members.MemberError, match=BEYOND_INVITER):
+        members.invite(senior, channel, invited_by=fm, permissions=permissions_for(fm.member))
+    assert db.session.scalar(select(Invitation)) is None
+
+
+@pytest.mark.parametrize('starts_in_days', [0, 10])
+def test_no_email_to_an_address_of_the_inviters_choice(app, starts_in_days):
+    consenior = make_officer('consenior')
+    senior = login_less_officer('senior', today_local() + timedelta(days=starts_in_days))
+    earlier, earlier_token = make_invitation(senior, channel='email', email='real@example.org')
+    with pytest.raises(members.MemberError, match='nur per E-Mail an die hinterlegte Adresse'):
+        members.invite(
+            senior,
+            'email',
+            invited_by=consenior,
+            permissions=permissions_for(consenior.member),
+            email='con@example.org',
+        )
+    db.session.rollback()
+    assert db.session.scalar(select(Job).where(Job.kind == 'mail.send')) is None
+    # The real invitee's link was not revoked.
+    assert find_valid_invitation(earlier_token).id == earlier.id
+
+
+def test_email_to_the_stored_address_is_allowed(app):
+    fm = make_officer('fuxmajor')
+    senior = login_less_officer('senior', email='real@example.org')
+    with app.test_request_context():
+        invitation, _ = members.invite(
+            senior, 'email', invited_by=fm, permissions=permissions_for(fm.member), email=' Real@Example.org '
+        )
+        db.session.commit()
+    assert invitation.email == 'real@example.org'
+    (job,) = db.session.scalars(select(Job).where(Job.kind == 'mail.send')).all()
+    assert job.payload['to'] == 'real@example.org'
+
+
+def test_without_stored_address_only_inviters_with_these_rights_invite(app):
+    fm = make_officer('fuxmajor')
+    senior = login_less_officer('senior', email=None)
+    with pytest.raises(members.MemberError, match='keine E-Mail-Adresse hinterlegt'):
+        members.invite(senior, 'email', invited_by=fm, permissions=permissions_for(fm.member), email='fm@example.org')
+    invitation, _ = members.invite(senior, 'link', invited_by=None, permissions=permissions_for(senior))
+    assert invitation.channel == 'link'
+
+
+def test_rights_from_a_later_rank_or_role_count_too(app):
+    from community.core.authz.models import SYSADMIN
+    from community.core.authz.service import grant_member_role
+
+    admin = make_admin()
+    member = make_member('Spe Fux')
+    set_rank(member, 'spefux')
+    set_rank(member, 'bursch', today_local() + timedelta(days=7))
+    with pytest.raises(members.MemberError, match=BEYOND_INVITER):
+        members.invite(member, 'link', invited_by=admin, permissions=permissions_for(admin.member))
+
+    fm = make_officer('fuxmajor')
+    other = make_member('Bald Admin')
+    set_rank(other, 'bursch')
+    grant_member_role(other, SYSADMIN, valid_from=today_local() + timedelta(days=7))
+    db.session.commit()
+    with pytest.raises(members.MemberError, match=BEYOND_INVITER):
+        members.invite(other, 'link', invited_by=fm, permissions=permissions_for(fm.member))
+
+
+def test_admin_gets_no_link_for_a_login_less_kassenwart(app):
+    admin = make_admin()
+    kassenwart = login_less_officer('kassenwart')
+    for channel in ('link', 'qr'):
+        with pytest.raises(members.MemberError, match=BEYOND_INVITER):
+            members.invite(kassenwart, channel, invited_by=admin, permissions=permissions_for(admin.member))
+
+
+@pytest.mark.parametrize('rank', ['spefux', 'fux', 'bursch', 'alter_herr'])
+def test_fuxmajor_still_sends_links_to_members_without_amt(app, rank):
+    """Go-live: the Fuxmajor (a Bursch) invites imported members of every rank by link."""
+    fm = make_officer('fuxmajor')
+    member = make_member('Ohne Login')
+    set_rank(member, rank)
+    invitation, _ = members.invite(member, 'link', invited_by=fm, permissions=permissions_for(fm.member))
+    assert invitation.channel == 'link'
+
+
+def test_admin_still_sends_links_to_new_spefuxe(app):
+    """The technical admin has no rank, but may start new members as Spefux and invite them."""
+    admin = make_admin()
+    perms = permissions_for(admin.member)
+    member, invitation, _ = members.add_member(
+        {'first_name': 'Neu'}, members.starting_ranks(perms)[0], 'link', invited_by=admin, permissions=perms
+    )
+    assert invitation.channel == 'link'
+    db.session.commit()
+    again, _ = members.invite(member, 'qr', invited_by=admin, permissions=perms)
+    assert again.channel == 'qr'
 
 
 # --- Routes: Neues Mitglied, invite, result page, revoke -------------------------
@@ -581,6 +702,64 @@ def test_invite_existing_member(client, login):
     token = LINK_RE.search(client.get(response.location).get_data(as_text=True)).group(1)
     assert find_valid_invitation(token).email == 'neu@example.org'
     assert find_valid_invitation(old_token) is None
+
+
+def test_invite_page_for_a_member_with_more_rights_offers_only_the_stored_address(client, login):
+    senior = login_less_officer('senior', email='real@example.org')
+    login(make_officer('fuxmajor'))
+    url = f'/m/{senior.public_id}/invite'
+    page = client.get(url).get_data(as_text=True)
+    assert BEYOND_INVITER in page
+    assert 'value="email"' in page and 'value="link"' not in page and 'value="qr"' not in page
+    for data in (
+        {'delivery': 'link', 'email': ''},
+        {'delivery': 'qr', 'email': ''},
+        {'delivery': 'email', 'email': 'fm-alt@example.org'},
+    ):
+        assert client.post(url, data=data).status_code == 200, data
+    assert db.session.scalar(select(Invitation)) is None
+    response = client.post(url, data={'delivery': 'email', 'email': 'real@example.org'})
+    assert response.status_code == 302
+    assert LINK_RE.search(client.get(response.location).get_data(as_text=True)) is None
+    assert db.session.scalar(select(Invitation)).email == 'real@example.org'
+
+
+def test_invite_page_without_stored_address_explains_who_may_invite(client, login):
+    senior = login_less_officer('senior', email=None)
+    login(make_officer('fuxmajor'))
+    page = client.get(f'/m/{senior.public_id}/invite').get_data(as_text=True)
+    assert 'keine E-Mail-Adresse hinterlegt' in page
+    assert 'name="delivery"' not in page
+
+
+def session_data(app, client):
+    """The session cookie as anyone with access to the browser can decode it (signed, not encrypted)."""
+    cookie = client.get_cookie(app.config['SESSION_COOKIE_NAME'])
+    if cookie is None:
+        return {}
+    return app.session_interface.get_signing_serializer(app).loads(cookie.value)
+
+
+@pytest.mark.parametrize('how', ['logout', 'logout_everywhere', 'ended_elsewhere'])
+def test_invitation_link_leaves_the_session_with_the_login(app, client, login, how):
+    """M1 review: the raw token must not stay in the cookie for the next person at the browser."""
+    fm = make_officer('fuxmajor')
+    login(fm)
+    response = client.post('/members/new', data=new_member_form())
+    raw_token = LINK_RE.search(client.get(response.location).get_data(as_text=True)).group(1)
+    assert raw_token in str(session_data(app, client))  # while logged in, a reload shows it again
+    if how == 'logout':
+        client.post('/logout')
+    elif how == 'logout_everywhere':
+        client.post('/profile/logout-everywhere')
+    else:  # e.g. "Überall abmelden" on another device; this browser comes back later
+        end_all_sessions(reload(fm))
+        db.session.commit()
+        client.get('/login')
+    assert raw_token not in str(session_data(app, client))
+    login(make_user(email='next@example.org', name='Next Person'))
+    assert raw_token not in str(session_data(app, client))
+    assert LINK_RE.search(client.get(response.location).get_data(as_text=True)) is None
 
 
 def test_member_with_login_is_not_invited(client, login):

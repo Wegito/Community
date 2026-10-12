@@ -10,6 +10,7 @@ import pytest
 from itsdangerous import TimestampSigner
 from sqlalchemy import func, select
 
+from community.core.authz.service import permissions_for
 from community.core.identity.models import Invitation, Member
 from community.core.org.services import current_rank_entry
 from community.core.platform.audit import AuditLog
@@ -413,7 +414,9 @@ def test_import_with_email_invitations(app):
     inviter = make_admin()
     rows = preview_of(GOOD_ROWS).rows
     with app.test_request_context():
-        result = importer.import_members(rows, imported_by=inviter, send_invites=True)
+        result = importer.import_members(
+            rows, imported_by=inviter, permissions=permissions_for(inviter.member), send_invites=True
+        )
         db.session.commit()
     assert result.invited == 2
     invitations = db.session.scalars(select(Invitation).order_by(Invitation.id)).all()

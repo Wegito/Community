@@ -64,16 +64,20 @@ def active_roles(member, day=None):
     return db.session.scalars(select(Role).where(Role.id.in_(ids)).order_by(Role.kind, Role.label)).all()
 
 
-def permissions_for(member, day=None):
-    ids = active_role_ids(member, day)
-    if not ids:
+def role_permissions(role_ids):
+    """The permission codes granted to any of these roles."""
+    if not role_ids:
         return frozenset()
     codes = db.session.scalars(
         select(Permission.code)
         .join(RolePermission, RolePermission.permission_id == Permission.id)
-        .where(RolePermission.role_id.in_(ids))
+        .where(RolePermission.role_id.in_(role_ids))
     )
     return frozenset(codes)
+
+
+def permissions_for(member, day=None):
+    return role_permissions(active_role_ids(member, day))
 
 
 def current_permissions():

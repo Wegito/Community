@@ -415,13 +415,14 @@ def load(token, *, user):
 # --- Importing -------------------------------------------------------------------
 
 
-def import_members(rows, *, imported_by, send_invites=False, filename=''):
+def import_members(rows, *, imported_by, permissions=frozenset(), send_invites=False, filename=''):
     """Create a member without login for every row, with rank and optional email invitation.
 
     All rows must be valid (checked just before, in the same request). The rank starts on the
     entry date, or today if the row has none. With send_invites, members with an email get an
-    invitation by email (the mails are queued as jobs). Commits nothing: the caller commits
-    once, or rolls back everything on MemberImportError.
+    invitation by email to that address (the mails are queued as jobs); `permissions` are the
+    importer's, checked by services.invite(). Commits nothing: the caller commits once, or
+    rolls back everything on MemberImportError.
     """
     if not rows or not all(row.is_valid for row in rows):
         raise ValueError('import_members needs valid rows only')
@@ -444,7 +445,9 @@ def import_members(rows, *, imported_by, send_invites=False, filename=''):
                 org.change_rank(member, row.rank, row.joined_on or today_local(), changed_by=imported_by)
                 ranked += 1
             if send_invites and member.email:
-                services.invite(member, InvitationChannel.EMAIL, invited_by=imported_by, email=member.email)
+                services.invite(
+                    member, InvitationChannel.EMAIL, invited_by=imported_by, permissions=permissions, email=member.email
+                )
                 invited += 1
     except IntegrityError:  # another request took one of the addresses meanwhile (unique index)
         raise MemberImportError(

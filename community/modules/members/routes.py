@@ -1,5 +1,5 @@
 from flask import abort, flash, make_response, redirect, render_template, request, session, url_for
-from flask_login import current_user, logout_user
+from flask_login import current_user, logout_user, user_logged_out
 
 from community.core.authz import can, current_permissions, require_login, require_perm
 from community.core.identity.models import Invitation, InvitationChannel
@@ -22,8 +22,24 @@ from .forms import (
 )
 
 # The raw token of the newest link/QR invitation, so the result page survives a reload
-# (only the hash is stored in the database). Bound to the inviter's user id.
+# (only the hash is stored in the database). Bound to the inviter's user id and removed
+# when that login ends in this browser: the session cookie is signed, not encrypted.
 INVITATION_SESSION_KEY = 'invitation_link'
+
+
+@user_logged_out.connect
+def _forget_invitation_link(sender, **extra):
+    """Logging out ("Abmelden", "Überall abmelden", password reset) drops the link at once."""
+    session.pop(INVITATION_SESSION_KEY, None)
+
+
+@bp.before_app_request
+def _drop_invitation_link_of_ended_login():
+    """A login ended elsewhere ("Überall abmelden", locked) leaves no logout here: drop the link
+    on the browser's next request, before anyone else can log in with this cookie."""
+    stored = session.get(INVITATION_SESSION_KEY)
+    if stored and not (current_user.is_authenticated and current_user.id == stored.get('user_id')):
+        session.pop(INVITATION_SESSION_KEY, None)
 
 
 def can_see_former_members():
@@ -156,12 +172,22 @@ def invite(public_id):
     member = member_or_404(public_id)
     form = InviteForm()
     invitable = member.user is None and member.is_active_member
+    # Members with rights beyond the inviter's only get an email to their stored address.
+    restriction = services.email_only_reason(member, current_permissions()) if invitable else None
+    if restriction:
+        form.delivery.choices = [c for c in form.delivery.choices if c[0] == InvitationChannel.EMAIL]
     if request.method == 'GET':
         form.email.data = member.email
+        if restriction:
+            form.delivery.data = InvitationChannel.EMAIL
     if invitable and form.validate_on_submit():
         try:
             invitation, raw_token = services.invite(
-                member, form.delivery.data, invited_by=current_user, email=form.email.data
+                member,
+                form.delivery.data,
+                invited_by=current_user,
+                permissions=current_permissions(),
+                email=form.email.data,
             )
         except services.EmailInUse as error:
             db.session.rollback()
@@ -177,6 +203,7 @@ def invite(public_id):
         member=member,
         form=form,
         invitable=invitable,
+        restriction=restriction,
         invitations=open_invitations(member) if invitable else [],
         button_form=ButtonForm(),
     )
@@ -307,7 +334,13 @@ def import_confirm():
         return _import_preview(rows, filename, status=409, send_invites=bool(form.send_invites.data))
     send_invites = bool(form.send_invites.data) and can('members.invite')
     try:
-        result = importer.import_members(rows, imported_by=current_user, send_invites=send_invites, filename=filename)
+        result = importer.import_members(
+            rows,
+            imported_by=current_user,
+            permissions=current_permissions(),
+            send_invites=send_invites,
+            filename=filename,
+        )
     except importer.MemberImportError as error:
         db.session.rollback()
         flash(str(error), 'danger')

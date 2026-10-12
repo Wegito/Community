@@ -11,15 +11,20 @@
 {% endcall %}
 {% else %}
 <p class="mb-4">Mit dem Link legt {{ member.first_name }} selbst E-Mail-Adresse und Passwort fest. Eine neue Einladung macht ältere Links ungültig.</p>
+{% if restriction %}
+{% call alert('warning', class='mb-4') %}{{ restriction }}{% endcall %}
+{% endif %}
+{% if not restriction or member.email %}
 {% call card() %}
 <form method="post" class="space-y-4" novalidate>
 {{ form.hidden_tag() }}
 {{ radios(form.delivery) }}
-{{ field(form.email, autocomplete='off') }}
+{{ field(form.email, autocomplete='off', readonly=restriction is not none) }}
 <p class="-mt-2 {{ muted }}">Nötig für die Einladung per E-Mail; sonst wird sie als Login-Adresse vorgeschlagen.</p>
 {{ submit(form.submit) }}
 </form>
 {% endcall %}
+{% endif %}
 {{ section_header('Offene Einladungen') }}
 {% call card() %}{% include 'members/_invitations.html' %}{% endcall %}
 {% endif %}

@@ -6,11 +6,13 @@ from typing import NamedTuple
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from community.core.authz.service import clear_cache, end_all_member_roles
+from community.core.authz.models import MemberRole
+from community.core.authz.service import clear_cache, end_all_member_roles, permissions_for, role_permissions
 from community.core.identity import services as identity
 from community.core.identity.models import ExitReason, InvitationChannel, Member, MemberStatus, User, normalize_email
 from community.core.identity.services import end_all_sessions
 from community.core.org import services as org
+from community.core.org.models import GroupMembership, OfficeAssignment, RankHistory
 from community.core.platform import audit
 from community.core.platform.mail import absolute_url, queue_mail
 from community.core.platform.notify import notify
@@ -364,6 +366,13 @@ DELIVERY_NONE = 'none'
 
 EMAIL_NEEDED = 'Für den Versand per E-Mail bitte eine E-Mail-Adresse angeben.'
 
+# A login for such a member must not reach the inviter: no link, no QR code, no address of their choice.
+BEYOND_INVITER = (
+    '{name} hat Rechte (durch Rang, Amt, Gruppe oder Rolle), die du weder selbst hast noch vergeben darfst.'
+)
+ONLY_STORED_EMAIL = ' Die Einladung geht deshalb nur per E-Mail an die hinterlegte Adresse.'
+NO_STORED_EMAIL = ' Es ist keine E-Mail-Adresse hinterlegt, deshalb kann nur jemand mit diesen Rechten einladen.'
+
 
 def starting_ranks(permissions):
     """Ranks a new member may start in: every rank for holders of members.rank.change, else Spefux."""
@@ -407,7 +416,7 @@ def add_member(data, rank, delivery, *, invited_by, permissions):
         raise MemberError(str(error)) from None
     if delivery == DELIVERY_NONE:
         return member, None, None
-    invitation, raw_token = invite(member, delivery, invited_by=invited_by, email=email)
+    invitation, raw_token = invite(member, delivery, invited_by=invited_by, permissions=permissions, email=email)
     return member, invitation, raw_token
 
 
@@ -434,18 +443,51 @@ def new_member(first_name, last_name='', *, actor, source=None, email=None, **fi
     return member
 
 
-def invite(member, channel, *, invited_by, email=None):
+def _start_days(member, day):
+    """`day` and every later day on which one of the member's ranks, Ämter, groups or roles starts.
+
+    Roles only start on these days, so the rights on any later day are a subset of those on one of them.
+    """
+    days = {day}
+    for model in (RankHistory, OfficeAssignment, GroupMembership, MemberRole):
+        days.update(
+            db.session.scalars(select(model.valid_from).where(model.member_id == member.id, model.valid_from > day))
+        )
+    return sorted(days)
+
+
+def email_only_reason(member, permissions, day=None):
+    """Why only an email to the member's stored address may invite `member`; None if any channel may.
+
+    That is the case when a login for `member` would carry rights that an inviter holding
+    `permissions` neither has nor may give a new member as starting rank, today or once a later
+    rank, Amt, group or role starts. A link or QR code (shown to the inviter), or a mail to an
+    address of the inviter's choice, would let the inviter join as that member.
+    """
+    day = day or today_local()
+    grantable = set(permissions) | role_permissions({rank.role_id for rank in starting_ranks(permissions)})
+    if not any(permissions_for(member, d) - grantable for d in _start_days(member, day)):
+        return None
+    return BEYOND_INVITER.format(name=member.full_name) + (ONLY_STORED_EMAIL if member.email else NO_STORED_EMAIL)
+
+
+def invite(member, channel, *, invited_by, permissions, email=None):
     """Invite a member without login. Returns (invitation, raw token). Commits nothing.
 
     channel: link (the inviter copies it), qr (shown on the inviter's screen) or email (needs
     `email`; the mail is queued now and sent by the job runner). `email` is also suggested as
     the login email on the join page. Older open invitations of the member are revoked.
+    permissions: the inviter's. Members with rights beyond them only get an email to their
+    stored contact address (email_only_reason).
     """
     email = normalize_email(email) or None
     if channel == InvitationChannel.EMAIL and not email:
         raise MemberError(EMAIL_NEEDED)
     if email and email_in_use(email, member):
         raise EmailInUse(EMAIL_IN_USE)
+    reason = email_only_reason(member, permissions)
+    if reason and not (channel == InvitationChannel.EMAIL and email == normalize_email(member.email)):
+        raise MemberError(reason)
     try:
         invitation, raw_token = identity.create_invitation(member, channel, created_by=invited_by, email=email)
     except identity.InvitationError as error:
