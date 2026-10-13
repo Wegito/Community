@@ -535,11 +535,12 @@ tasks.manage                         -  -  -  -  │  Y   Y   .   .   ?   ? │ 
 bookings.create_own                  -  Y  Y  Y  │  .   .   .   .   .   . │  .   .
 bookings.manage_any (+ resources)    -  -  -  -  │  .   Y   .   .   .   . │  .   Y
 finance.saldo.view_own               Y  Y  Y  Y  │  .   .   .   .   .   . │  .   .
-finance.ledger.view_all              -  -  -  -  │  ?   .   .   Y   .   . │  .   -
+finance.ledger.view_all              -  -  -  -  │  .   .   .   Y   .   . │  .   -   (+ Kassenprüfer)
 finance.journal.post                 -  -  -  -  │  .   .   .   Y   .   . │  .   -
 finance.journal.reverse              -  -  -  -  │  .   .   .   Y   .   . │  .   -
 finance.journal.cosign               -  -  -  -  │  Y   Y   .   .   .   . │  .   -
-finance.reports.view                 -  -  -  -  │  ?   .   .   Y   .   . │  .   -
+finance.reports.view                 -  -  -  -  │  .   .   .   Y   .   . │  .   -   (+ Kassenprüfer)
+finance.accounts.manage              -  -  -  -  │  .   .   .   Y   .   . │  .   -
 finance.payment_request.send         -  -  -  -  │  .   .   .   Y   .   . │  .   -
 drinks.view_own                      Y  Y  Y  Y  │  .   .   .   .   .   . │  .   .
 drinks.tally.record                  -  -  -  -  │  .   ?   .   .   .   Y │  .   .
@@ -560,7 +561,7 @@ system.admin                         -  -  -  -  │  .   .   .   .   .   . │ 
 drinks.consumption.ingest            API device tokens only, never a human role
 ```
 - A Saldo is **never** visible to other members. Only the member and holders of `finance.ledger.view_all` see it.
-- If a Kassenprüfer office is added, it gets `finance.ledger.view_all`, `finance.reports.view` and `finance.journal.cosign`, read-only.
+- The Kassenprüfer office (added in M3-1, up to two holders, Bursch or Alter Herr, incompatible with Kassenwart) gets `finance.ledger.view_all`, `finance.reports.view` and `finance.journal.cosign`, read-only.
 
 ### 6.6 Limits per rank (placeholders only, built in M7-7 after [Q35])
 v1 has **no** per-rank limits, only global config constants (e.g. `LAUNDRY_MAX_USES_PER_DAY`). The values below are illustrative and **not agreed**:
@@ -902,7 +903,8 @@ The owner wants to offer the app to other clubs (2026-10-12). One install per cl
 | M9-4 | Module switches | Per install: laundry, bookings, drinks, finance, calendar on or off. Menus, routes (404 when off), permissions and the wizard follow. | M9-1 | S | M9-2 |
 | M9-5 | Branding | Logo upload (PNG, size-limited, re-encoded), accent colour from an accessible palette, favicon. | M9-1 | S | M9-3, M9-4 |
 | M9-6 | Install kit | One documented way to install and update (container image or install script), an `.env` generator, versioned releases with a changelog, upgrade notes, a demo instance. | M8-2, M9-3 | M | — |
-| M9-7 | Licence and docs for others | Choose a licence [Q38]; README for other clubs (install, first run, backups, updates); keep this club's notes (`docs/decisions.md`, spikes) as history only. | — | S | all |
+| M9-7 | Commercial licence and docs | The owner sells the app; each Verbindung hosts its own copy (Q38, Q40). Proprietary licence text and a licence agreement per Verbindung (legal advice needed); `THIRD_PARTY_NOTICES` for the bundled open-source libraries (all permissive: MIT, BSD, ISC, Apache, PSF, Unlicense; checked 2026-10-13); README for customers (install, first run, backups, updates); keep this club's notes (`docs/decisions.md`, spikes) as history only. Owner action: make the repository private. | — | S | all |
+| M9-8 | Licence key (optional) | A signed licence file per Verbindung (club name, valid until, modules), checked offline with a public key; the app shows a notice when it is missing or expired. A self-hosted Python app can be patched, so the contract is the real protection; the key mainly makes the terms visible. | M9-3 | S | M9-6 |
 
 ### 8.13 Dependency tree
 ```
@@ -1029,7 +1031,7 @@ Each question names the tasks it blocks. Until a question is answered, the defau
 19. ~~Central decision: web grid or Excel?~~ **Answered 2026-10-13:** the Excel file stays untouched; Community gets its own Kasse with the Excel's structure and an export in the same layout. → D21, M3-3
 20. Should the app also be the bank Kassenbuch (supplier payments, Auslagen), or only track member Saldi? → M3-8
 21. **Partly answered 2026-10-13:** besides the main account there are separate Kassen, e.g. *Buka* (Burschenkasse) and *Fuka* (Fuxenkasse, which pays part of the Füxe's costs so they do not pay the full amount); one account is the club's **Heimverein**, the association that owns the house (named per club, optional; M9-1). Still open: (Aktivenkasse, Getränkekasse, Hauskasse, AHV)? Is the club a registered association (e.V.)? Is the AHV a separate legal association? → `fin_book` seed
-22. Besides the member and the Kassenwart, who may see other members' Saldo (Senior? Kassenprüfer?) → §6.5
+22. ~~Who may see other members' Saldo?~~ **Answered 2026-10-13:** only the Kassenwart and the Kassenprüfer have access to the Kasse; every member sees their own Saldo. The Senior does not. → §6.5
 23. How are event costs split (equal, fixed price, by rank, Füchse free)? Are there fines? Should a negative Saldo only warn or also block something? → M3-4, M5-5, §6.6
 24. Which payment methods are used? What is the club IBAN (for GiroCode)? Is there a club email domain or SMTP server? → M3-7, M8-6
 25. Who co-signs entries that benefit the Kassenwart personally (proposal: Senior or Consenior)? → §6.3
@@ -1057,9 +1059,9 @@ Each question names the tasks it blocks. Until a question is answered, the defau
 37. Can a tax adviser or the Kassenprüfer confirm the record-retention duties (e.g. §147 AO, if applicable) for ledger and tally data, and whether per-drink detail may be deleted after settlement?
 
 ### Before M9 (other clubs)
-38. Which licence? Open source (e.g. AGPL-3.0, so improvements by others stay open, or MIT) or source-available only? This decides whether and how other clubs may use and change the app. → M9-7
+38. ~~Which licence?~~ **Answered 2026-10-13:** commercial, not free; other Verbindungen pay to use it. Proprietary licence and agreement still to be drafted with legal advice. → M9-7, M9-8
 39. ~~Which clubs are "others"?~~ **Answered 2026-10-13:** other Studentenverbindungen, with a similar structure. The first preset is "Studentenverbindung"; a general Verein preset is not needed for now. → M9-2
-40. Does each club host its own copy, or would you run servers for them? Running servers for others brings duties (contracts, GDPR processing agreements, support). → M9-6
+40. ~~Who hosts?~~ **Answered 2026-10-13:** each Verbindung hosts its own copy. → M9-6
 
 ---
 

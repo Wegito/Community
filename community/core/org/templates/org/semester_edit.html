@@ -16,7 +16,7 @@
 {% endcall %}
 {{ section_header('Löschen') }}
 {% if in_use %}
-<p class="{{ muted }}">Bei diesem Semester sind Ämter oder Gruppen eingetragen, deshalb kann es nicht gelöscht werden.</p>
+<p class="{{ muted }}">Bei diesem Semester sind Ämter, Gruppen oder Buchungen eingetragen, deshalb kann es nicht gelöscht werden.</p>
 {% else %}
 <p class="mb-3 {{ muted }}">Bei diesem Semester ist nichts eingetragen; es kann gelöscht werden, z. B. wenn es versehentlich angelegt wurde.</p>
 {{ post_button(semester.code ~ ' löschen', url_for('org.delete_semester', semester_id=semester.id), 'danger', 'md') }}

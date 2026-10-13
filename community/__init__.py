@@ -13,6 +13,7 @@ MODULES = [
     'community.modules.tasks',
     'community.modules.bookings',
     'community.modules.laundry',
+    'community.modules.finance',
     'community.modules.admin',
 ]
 

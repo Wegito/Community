@@ -99,7 +99,13 @@ def update_semester(semester, code, kind, starts_on, ends_on):
 
 
 # Columns that point at a semester (informational, D8). A semester one of them uses is kept.
-SEMESTER_REFERENCES = (OfficeAssignment.semester_id, MemberGroup.semester_id)
+# Modules add theirs with add_semester_reference() (e.g. the Kasse's bookings).
+SEMESTER_REFERENCES = [OfficeAssignment.semester_id, MemberGroup.semester_id]
+
+
+def add_semester_reference(column):
+    if column not in SEMESTER_REFERENCES:
+        SEMESTER_REFERENCES.append(column)
 
 
 def semester_in_use(semester):
@@ -112,7 +118,9 @@ def semester_in_use(semester):
 def delete_semester(semester):
     """Delete a semester nothing refers to (e.g. one created by mistake). Commits nothing."""
     if semester_in_use(semester):
-        raise OrgError(f'{semester.code} ist bei Ämtern oder Gruppen eingetragen und kann nicht gelöscht werden.')
+        raise OrgError(
+            f'{semester.code} ist bei Ämtern, Gruppen oder Buchungen eingetragen und kann nicht gelöscht werden.'
+        )
     audit.record('org.semester.delete', semester, diff=audit.snapshot(semester, SEMESTER_FIELDS))
     db.session.delete(semester)
     db.session.flush()

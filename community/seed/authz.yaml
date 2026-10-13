@@ -107,8 +107,15 @@ grants:
     - finance.journal.reverse
     - finance.reports.view
     - finance.payment_request.send
+    - finance.accounts.manage
     - drinks.view_all
     - laundry.view_all
+
+  # Reads the whole Kasse, books nothing (Q22); cosigns what credits the Kassenwart.
+  office.kassenpruefer:
+    - finance.ledger.view_all
+    - finance.reports.view
+    - finance.journal.cosign
 
   office.fuxmajor:
     - members.contact.view
@@ -127,6 +134,7 @@ grants:
   group.hausbewohner:
     - laundry.use.create_own
     - laundry.view_own
+    - finance.saldo.view_own  # residents without rank pay for laundry too
 
   # Technical admin. Deliberately no finance write rights (roadmap §6.3, rule 6).
   custom.sysadmin:

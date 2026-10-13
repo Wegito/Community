@@ -31,9 +31,9 @@ def bursch(name='Bernd Bursch', email=None):
     return member
 
 
-def test_six_offices_are_seeded(app):
+def test_the_offices_are_seeded(app):
     keys = [o.key for o in db.session.scalars(select(office_by_key('senior').__class__))]
-    assert set(keys) == {'senior', 'consenior', 'schriftwart', 'kassenwart', 'fuxmajor', 'bierwart'}
+    assert set(keys) == {'senior', 'consenior', 'schriftwart', 'kassenwart', 'fuxmajor', 'bierwart', 'kassenpruefer'}
 
 
 def test_office_gives_its_permissions(app):

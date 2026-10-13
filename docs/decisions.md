@@ -125,3 +125,15 @@ An independent review (four reviewers, each finding checked by a second agent tr
 - **Separate Kassen** (Q21): the Burschenkasse (Buka) and the Fuxenkasse (Fuka), which pays part of the Füxe's costs. Each Kasse is its own account; a split can let a Kasse pay part of a share for a rank (M3-4).
 - **Heimverein:** the association that owns the house. Each club names it, and it is optional: a new field under Verwaltung → Verein (migration 0013), and a step in the setup wizard (M9-3). Its real name stays out of this public repository like every other name from the club's files.
 - **Other clubs = other Studentenverbindungen** (Q39). The first and for now only preset is "Studentenverbindung", with ranks and Ämter renamable in the wizard.
+- **Commercial, self-hosted** (Q38, Q40): the owner sells the app; each Verbindung runs its own copy. All bundled libraries use permissive licences (checked 2026-10-13), so a proprietary licence is possible as long as their notices are kept. Making the repository private is the owner's step on GitHub; what was public until then may already be copied. A licence key (M9-8) is optional; the contract is the real protection.
+- **Who sees the Kasse** (Q22): only the Kassenwart and the Kassenprüfer; every member sees their own Saldo; the Senior does not. A Kassenprüfer office is added with M3-1.
+
+## 2026-10-13 — M3-1 ledger core
+
+- **Accounts are data, seeded from the Excel's columns** (migration 0014): Girokonto, Barkasse, Sparkonto, Küche, Verschiedenes, Beiträge, Büro, Telefon und Internet, Burschenkasse, Fuxenkasse, Spenden, Rücklage Waschmaschine, AH-Kontingent, Altherrenschaft, Heimverein, Eigenkapital. Each has a kind (bank, cash, asset, fund, partner, result, equity) for Bilanz and GuV; Kontokarten (kind member) are created on first use. The Kassenwart will rename and add accounts (M3-3).
+- **Cost centres only where the Excel had them:** an account flag `needs_cost_centre` (set for "Verschiedenes") makes every entry on it name a cost centre; Büro or Telefon need none.
+- **Never edited:** ORM guards refuse updates and deletes of bookings; a mistake gets a reversal that also needs a reason. A reversal cannot be reversed again; the booking is entered anew instead.
+- **Four eyes in the service:** a booking that credits the poster's own Kontokarte needs `cosigned_by`, a different person with `finance.journal.cosign` (Senior, Consenior, Kassenprüfer). This also applies to reversing a charge on one's own card. Until the cosign flow exists in the UI (with Auslagen, M3-8), such bookings are refused with an explanation.
+- **Kassenprüfer** is a new Amt (up to two holders, Bursch or Alter Herr, incompatible with Kassenwart) with read access, reports and cosign. Hausbewohner without rank also get `finance.saldo.view_own`, because they pay for laundry.
+- **Receipt numbers** (Beleg) follow the Excel: a letter series (G bank, K cash, B internal) counted per semester; `next_beleg()` suggests the next one.
+- **A semester with bookings cannot be deleted:** modules now register their semester columns (`add_semester_reference`), and the existing safety-net test checks that every column is registered.
