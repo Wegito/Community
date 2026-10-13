@@ -48,7 +48,9 @@ Recommended order; cards on the same line of the order table can run in parallel
 | 6 | M3-7b · Zahlungsaufforderung by email | T2 | T3 | M3-7a |
 | 6 | M3-10b · Bilanz and GuV | T3 | T3 | M3-5a |
 | 7 | M3-10c · AH-Kontingent report | T4 → T2 | T2 | owner decision |
-| 7 | M3-6 · Opening balances from the Excel | T3 + T4 | T3 | owner file, M8-3 |
+| 7 | M3-6a · Column mapping for Excel import and export | T3 | T3 | M3-5a |
+| 8 | M3-6b · Import wizard (bookings from Excel) | T3 | T3 | M3-6a |
+| 8 | M3-6c · Opening balances from the Excel | T3 + T4 | T3 | M3-6b, owner file, M8-3 |
 
 ### P1 · Number columns right-aligned
 T1 · review T1 · depends on — · ~30 lines
@@ -147,10 +149,12 @@ T2 · review T3 (money) · depends on — · ~200 lines
   store the count (denominations) in the booking note.
 - **Done when:** tests for no difference (nothing booked), a shortfall and a surplus; `tools/check.sh` passes.
 
-### M3-8 · Second-person confirmation (cosign) and Auslagen
+### M3-8 · Push-TAN: the Kassenprüfer confirms (cosign) the Kassenwart's own bookings
 T3 · review T3 · depends on — · ~350 lines
-- **Goal:** A booking that credits the Kassenwart's own Kontokarte can be prepared by the Kassenwart and
-  confirmed by a second person (Senior, Consenior, Kassenprüfer); only then is it booked.
+- **Goal:** A booking that credits the Kassenwart's own Kontokarte (an Auslage, a reversed charge) is
+  prepared by the Kassenwart and confirmed by the **Kassenprüfer**, like a push-TAN (owner, 2026-10-13);
+  only then is it booked. The Kassenprüfer gets a notification (bell and email) and confirms or rejects
+  on one page.
 - **Files / example:** `ledger._check_cosign()`, `post_journal(cosigned_by=)`; roadmap §6.3 rule 2.
 - **Steps:** a `fin_request` table (prepared booking as JSON lines, status open/confirmed/rejected,
   requested_by, decided_by); the booking form offers "zur Gegenzeichnung vorlegen" when
@@ -184,6 +188,8 @@ T2 · review T3 (mails to many people) · depends on M3-7a · ~250 lines
 T3 · review T3 · depends on M3-5a · ~300 lines
 - **Goal:** Semester closing like the Excel sheets "Bilanz" and "GuV": assets and liabilities by
   account kind, income and spending, surplus or deficit; as a page and as sheets in the Excel export.
+  **Not automatic** (owner, 2026-10-13): the Kassenwart opens the closing for a semester, checks it and
+  presses one button; it should be easy, with no extra steps.
 - **Done when:** totals balance in tests built from known bookings; `tools/check.sh` passes.
 
 ### M3-10c · AH-Kontingent report
@@ -191,11 +197,36 @@ T4 → T2 · review T2 · depends on an owner decision
 - **Owner first:** which spending counts against the AH-Kontingent, in which groups, and the budget
   per semester. Then a T2 card for the report page and sheet.
 
-### M3-6 · Opening balances from the Excel
-T3 + T4 · review T3 · depends on the latest closed Excel file (owner) and M8-3 (backups)
-- **Goal:** Read the last closed semester's Excel (never write to it), map names to members, show a
-  reconciliation (every Kontokarte and account against the file), and after sign-off book one OPENING
-  booking. Dry run by default. The real file stays outside the repository.
+### M3-6a · Column mapping for Excel import and export
+T3 · review T3 · depends on M3-5a · ~300 lines
+- **Goal (owner, 2026-10-13):** Import and export are optional and guided. The user points each
+  Community field (Datum, Beleg, Buchungstext, Betrag, Soll, Haben, Kostenstelle, and the
+  "one column pair per account" layout of the Journal) to a column of their Excel, and can point extra
+  columns their file has but Community does not to **Zusatzfelder**. The default mapping is our
+  Journal layout (`docs/spikes/m3-0-kasse-excel.md`).
+- **Steps:** a mapping template table (name, layout "row per booking" or "column pair per account",
+  field → column letter or header, list of extra columns); bookings get an optional `extra` JSON field
+  (shown on the booking page and in the Kassenbuch export, never used for amounts); the export from
+  M3-5a can use any saved template; a page to create, test (show the first rows as they would be read)
+  and save templates.
+- **Done when:** tests for both layouts, extra columns round-trip (import → export keeps them),
+  wrong mappings give German errors naming the column; `tools/check.sh` passes.
+
+### M3-6b · Import wizard (bookings from Excel)
+T3 · review T3 · depends on M3-6a · ~350 lines
+- **Goal:** Upload an `.xlsx`, choose a template, map names to members (remembered), see every row as it
+  would be booked and every problem (unbalanced rows, unknown accounts, `#REF!`, typed arithmetic,
+  dates outside the semester), then book the good rows in one go. Dry run by default; the file is read,
+  never written, and not kept after the import.
+- **Done when:** tests with a made-up file in the Journal layout (no real data) cover a clean import,
+  each problem type, a second import of the same file (nothing booked twice), and the Kassenprüfer's
+  read-only view; `tools/check.sh` passes.
+
+### M3-6c · Opening balances from the Excel
+T3 + T4 · review T3 · depends on M3-6b, the latest closed Excel file (owner) and M8-3 (backups)
+- **Goal:** From the last closed semester's file: every Kontokarte and account balance as one OPENING
+  booking, with a reconciliation report the Kassenwart and the Kassenprüfer sign off. The real file stays
+  outside the repository.
 
 ---
 

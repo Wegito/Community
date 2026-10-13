@@ -206,8 +206,8 @@ def test_pages_link_only_to_pages_the_user_may_open(client, login, data, who):
         if method != 'GET' or access[0] == 'public':
             continue
         page = client.get(url(rule, data))
-        if page.status_code != 200:
-            continue
+        if page.status_code != 200 or not page.content_type.startswith('text/html'):
+            continue  # downloads (Excel, CSV) have no links
         for href in re.findall(r'<a [^>]*href="(/[^"#]*)', page.get_data(as_text=True)):
             href = html.unescape(href)
             if href not in status and not href.startswith('/static/'):

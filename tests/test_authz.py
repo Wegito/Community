@@ -10,6 +10,7 @@ from community.core.authz.registry import PERMISSIONS
 from community.core.authz.service import (
     active_role_ids,
     end_member_role,
+    expand_codes,
     grant_member_role,
     holders_of,
     load_seed,
@@ -47,6 +48,10 @@ def test_seed_codes_are_declared_or_planned():
     planned = {'events', 'finance', 'drinks', 'laundry', 'fux', 'documents'}
     for role_key, codes in load_seed().items():
         for code in codes:
+            if code.startswith('!') or any(char in code for char in '*?['):
+                module = code.lstrip('!').split('.')[0]
+                assert module == '*' or module in planned or any(c.startswith(module + '.') for c in PERMISSIONS)
+                continue
             assert code in PERMISSIONS or code.split('.')[0] in planned, (role_key, code)
 
 
@@ -60,17 +65,28 @@ def test_every_declared_code_is_in_the_roadmap_matrix(app):
 
 
 def test_seed_never_removes_grants(app):
-    sysadmin = role_by_key(SYSADMIN)
+    spefux = role_by_key('rank.spefux')
     extra = db.session.scalar(select(Permission).where(Permission.code == 'tasks.manage'))
-    db.session.add(RolePermission(role_id=sysadmin.id, permission_id=extra.id))
+    db.session.add(RolePermission(role_id=spefux.id, permission_id=extra.id))
     db.session.commit()
     result = seed_grants()
     assert result['added'] == 0
-    assert db.session.get(RolePermission, (sysadmin.id, extra.id)) is not None
+    assert db.session.get(RolePermission, (spefux.id, extra.id)) is not None
 
 
-def test_sysadmin_has_no_finance_write_rights():
-    assert not [code for code in load_seed()[SYSADMIN] if code.startswith('finance.')]
+def test_sysadmin_has_everything_except_the_kasse():
+    """Owner, 2026-10-13: the technical admin has full control, but only Kassenwart and Kassenprüfer see the Kasse."""
+    codes = set(expand_codes(load_seed()[SYSADMIN], PERMISSIONS))
+    assert not {code for code in codes if code.startswith('finance.')}
+    assert set(PERMISSIONS) - codes == {code for code in PERMISSIONS if code.startswith('finance.')}
+
+
+def test_seed_patterns():
+    codes = ['a.x', 'a.y', 'b.x', 'finance.post']
+    assert expand_codes(['*', '!finance.*'], codes) == ['a.x', 'a.y', 'b.x']
+    assert expand_codes(['a.*', 'b.x', 'a.x'], codes) == ['a.x', 'a.y', 'b.x']
+    assert expand_codes(['!a.y', 'a.*'], codes) == ['a.x']
+    assert expand_codes(['planned.code'], codes) == ['planned.code']
 
 
 def test_direct_role_respects_dates(app):
@@ -139,11 +155,10 @@ def test_start_page_without_any_rights(client, login):
 
 
 def test_start_page_for_the_technical_admin(client, login):
-    # custom.sysadmin has rights, but not announcements.view (§6.5).
+    # custom.sysadmin has every right except the Kasse (owner, 2026-10-13).
     login(make_admin())
     page = client.get('/').get_data(as_text=True)
-    assert NO_RIGHTS not in page and 'Neueste Ankündigungen' not in page
-    assert 'Willkommen, Admin!' in page and 'Verwaltung' in page
+    assert NO_RIGHTS not in page and 'Neueste Ankündigungen' in page and 'Verwaltung' in page
 
 
 def test_start_page_for_a_former_member(client, login):

@@ -258,3 +258,31 @@ def test_kasse_is_in_the_menu_only_for_those_who_see_it(client, login):
     client.post('/logout')
     login(make_officer('senior'))
     assert 'href="/kasse/"' not in client.get('/').get_data(as_text=True)
+
+
+def test_admin_appoints_kassenwart_and_kassenpruefer_but_never_sees_the_kasse(client, login):
+    """Owner, 2026-10-13: the admin has full control except the Kasse."""
+    from community.core.org.services import office_by_key, office_holders
+
+    from .factories import set_rank
+
+    kassenwart, pruefer = make_member('Kai Kasse'), make_member('Paula Prüfer')
+    set_rank(kassenwart, 'bursch')
+    set_rank(pruefer, 'alter_herr')
+    admin = make_admin()
+    login(admin)
+    for office, person in (('kassenwart', kassenwart), ('kassenpruefer', pruefer)):
+        response = client.post(
+            f'/org/offices/{office}/assign',
+            data={'member_id': person.id, 'valid_from': '2026-10-01', 'semester_id': 'None', 'end_previous': 'y'},
+        )
+        assert response.status_code == 302
+    assert [a.member_id for a in office_holders(office_by_key('kassenpruefer'), date(2026, 10, 2))] == [pruefer.id]
+    assert client.get('/kasse/').status_code == 403
+    assert client.get('/kasse/kassenbuch').status_code == 403
+    # Not even as Kassenwart: nobody assigns an Amt to themselves.
+    page = client.post(
+        '/org/offices/kassenwart/assign',
+        data={'member_id': admin.member_id, 'valid_from': '2026-10-01', 'semester_id': 'None', 'end_previous': 'y'},
+    )
+    assert page.status_code == 200 and 'selbst' in page.get_data(as_text=True)

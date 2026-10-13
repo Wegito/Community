@@ -503,12 +503,12 @@ def test_rights_from_a_later_rank_or_role_count_too(app):
     from community.core.authz.models import SYSADMIN
     from community.core.authz.service import grant_member_role
 
-    admin = make_admin()
+    inviter = make_user(email='inviter@example.org', perms=['members.invite'])  # may start new members as Spefux only
     member = make_member('Spe Fux')
     set_rank(member, 'spefux')
     set_rank(member, 'bursch', today_local() + timedelta(days=7))
     with pytest.raises(members.MemberError, match=BEYOND_INVITER):
-        members.invite(member, 'link', invited_by=admin, permissions=permissions_for(admin.member))
+        members.invite(member, 'link', invited_by=inviter, permissions=permissions_for(inviter.member))
 
     fm = make_officer('fuxmajor')
     other = make_member('Bald Admin')

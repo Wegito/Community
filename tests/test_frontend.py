@@ -202,7 +202,8 @@ def test_admin_sees_the_verwaltung_group(client, login):
         '/admin/jobs',
     ):
         assert f'href="{href}"' in page
-    assert 'href="/org/groups"' not in page  # custom.sysadmin lacks groups.manage
+    assert 'href="/org/groups"' in page and 'href="/admin/verein"' in page
+    assert 'href="/kasse/"' not in page  # full control, but not the Kasse (owner, 2026-10-13)
 
 
 @pytest.mark.parametrize('link', ADMIN, ids=lambda link: link.endpoint)

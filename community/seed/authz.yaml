@@ -4,6 +4,7 @@
 # Office roles list only the grants they add on top of the Bursch rank.
 # Codes of modules that do not exist yet are skipped until the module declares them.
 # Points the club has not decided yet (marked "?" in the roadmap) are left out = not granted.
+# Patterns work too: '*' or 'tasks.*' grant every matching code, '!finance.*' takes matches away again.
 
 grants:
   rank.spefux:
@@ -75,7 +76,6 @@ grants:
     - events.publish
     - events.attendance.record
     - tasks.manage
-    - finance.journal.cosign
     - fux.progress.view_all
     - documents.manage
 
@@ -88,7 +88,6 @@ grants:
     - events.attendance.record
     - tasks.manage
     - bookings.manage_any
-    - finance.journal.cosign
     - laundry.view_all
     - laundry.machines.manage
     - laundry.settlement.submit
@@ -111,7 +110,8 @@ grants:
     - drinks.view_all
     - laundry.view_all
 
-  # Reads the whole Kasse, books nothing (Q22); cosigns what credits the Kassenwart.
+  # Reads the whole Kasse, books nothing (Q22). The only one who confirms ("push-TAN") bookings that
+  # credit the Kassenwart's own Kontokarte (owner, 2026-10-13).
   office.kassenpruefer:
     - finance.ledger.view_all
     - finance.reports.view
@@ -136,21 +136,13 @@ grants:
     - laundry.view_own
     - finance.saldo.view_own  # residents without rank pay for laundry too
 
-  # Technical admin. Deliberately no finance write rights (roadmap §6.3, rule 6).
+  # Technical admin: full control of the app, but not the Kasse (owner, 2026-10-13; roadmap §6.3
+  # rule 6). Only the Kassenwart and the Kassenprüfer see the Kasse. The admin assigns those Ämter,
+  # but nobody can assign an Amt to themselves (rule 1). Patterns: '*' = every code, '!x.*' = except.
   custom.sysadmin:
-    - members.directory.view
-    - members.contact.view
-    - members.invite
-    - members.import
-    - members.edit_any
-    - offices.assign
-    - org.semesters.manage
-    - authz.matrix.edit
-    - audit.view
-    - announcements.manage_any
-    - bookings.manage_any
-    - laundry.machines.manage
-    - system.admin
+    - '*'
+    - '!finance.*'
+    - '!drinks.consumption.ingest'  # API devices only, never a person (§6.5)
 
   system.former_member:
     - finance.saldo.view_own

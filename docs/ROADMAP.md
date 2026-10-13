@@ -484,11 +484,11 @@ perms(m) = ⋃ role_permission over active_roles        (additive; no deny rules
 
 ### 6.3 Invariants (in code, all compare *people*)
 1. Nobody changes their own rank or creates their own office assignment.
-2. A journal that **credits the poster's own member account** needs a cosign from a *different* person who holds `finance.journal.cosign` (Senior or Consenior). This covers the Kassenwart reimbursing their own Auslage.
+2. A journal that **credits the poster's own member account** needs a cosign from a *different* person who holds `finance.journal.cosign`: the **Kassenprüfer**, like a push-TAN (owner, 2026-10-13). This covers the Kassenwart reimbursing their own Auslage.
 3. A settlement's poster must be a different person from its submitter, otherwise a cosign is required. This covers one person being both Bierwart and Kassenwart.
 4. M7-2 workflow: approver ≠ requester ≠ subject member. At least **two** Ämter hold the approve right, so a request from the Senior, or the Senior's own Philistrierung, can still be decided.
 5. Granting or revoking a permission marked `is_sensitive` writes an audit entry and notifies the Senior and the Kassenwart.
-6. `custom.sysadmin` (technical admin) never holds finance write permissions. If the admin is also the Kassenwart, they get finance rights from the Amt, and the overlap is shown in the audit view.
+6. `custom.sysadmin` (technical admin) holds every permission **except the Kasse** (`finance.*`; owner, 2026-10-13). The admin appoints the Kassenwart and the Kassenprüfer but cannot appoint themselves (rule 1). If the admin is also the Kassenwart, they get finance rights from the Amt (assigned by someone else), and the overlap is shown in the audit view.
 
 ### 6.4 Rank and office edge cases
 - **Holder changes rank mid-term** (e.g. Bursch → Alter Herr). The "Rang ändern" form lists assignments that become ineligible. The user must choose either *close on date* or *keep as acting* (an audited exception).
@@ -505,6 +505,7 @@ Legend:
 - Columns: SF = Spefux, F = Fux, B = Bursch, AH = Alter Herr │ Sen, Con, Sch = Schriftwart, KW = Kassenwart, FM = Fuxmajor, BW = Bierwart │ Bew = Hausbewohner group, Adm = `custom.sysadmin`.
 - Office holders are Burschen, so they also get the B column; office columns show only the *extra* grants.
 - `Y` = granted, `-` = not granted, `.` = no extra grant, `?` = club decision needed (until answered, treat as **not granted**).
+- **Adm column, since 2026-10-13:** the technical admin gets every code except `finance.*` (seeded as the pattern `'*', '!finance.*'`, so new modules are included automatically). The marks in that column below are the older, narrower proposal.
 
 ```
 permission                           SF F  B  AH │ Sen Con Sch KW  FM  BW │ Bew Adm
@@ -538,7 +539,7 @@ finance.saldo.view_own               Y  Y  Y  Y  │  .   .   .   .   .   . │ 
 finance.ledger.view_all              -  -  -  -  │  .   .   .   Y   .   . │  .   -   (+ Kassenprüfer)
 finance.journal.post                 -  -  -  -  │  .   .   .   Y   .   . │  .   -
 finance.journal.reverse              -  -  -  -  │  .   .   .   Y   .   . │  .   -
-finance.journal.cosign               -  -  -  -  │  Y   Y   .   .   .   . │  .   -
+finance.journal.cosign               -  -  -  -  │  .   .   .   .   .   . │  .   -   (Kassenprüfer only: the "push-TAN")
 finance.reports.view                 -  -  -  -  │  .   .   .   Y   .   . │  .   -   (+ Kassenprüfer)
 finance.accounts.manage              -  -  -  -  │  .   .   .   Y   .   . │  .   -
 finance.payment_request.send         -  -  -  -  │  .   .   .   Y   .   . │  .   -
@@ -929,6 +930,7 @@ The owner wants to offer the app to other clubs (2026-10-12). One install per cl
 | M9-5 | Branding | Logo upload (PNG, size-limited, re-encoded), accent colour from an accessible palette, favicon. | M9-1 | S | M9-3, M9-4 |
 | M9-6 | Install kit | One documented way to install and update (container image or install script), an `.env` generator, versioned releases with a changelog, upgrade notes, a demo instance. | M8-2, M9-3 | M | — |
 | M9-7 | Commercial licence and docs | The owner sells the app; each Verbindung hosts its own copy (Q38, Q40). Proprietary licence text and a licence agreement per Verbindung (legal advice needed); `THIRD_PARTY_NOTICES` for the bundled open-source libraries (all permissive: MIT, BSD, ISC, Apache, PSF, Unlicense; checked 2026-10-13); README for customers (install, first run, backups, updates); keep this club's notes (`docs/decisions.md`, spikes) as history only. Owner action: make the repository private. | — | S | all |
+| M9-9 | Subscription (Abo) option, on hold | Decide later (owner, 2026-10-13): either a yearly licence for self-hosted copies (enforced by contract, the licence key only reminds), or managed hosting where we run one copy per Verbindung (the code never leaves our servers, billing per month or year, but we carry operations, backups, support and the GDPR processor role). Keep the app ready for both: one install per club (D27), install kit (M9-6), presets (M9-2). | M9-6, M9-7 | — | — |
 | M9-8 | Licence key (optional) | A signed licence file per Verbindung (club name, valid until, modules), checked offline with a public key; the app shows a notice when it is missing or expired. A self-hosted Python app can be patched, so the contract is the real protection; the key mainly makes the terms visible. | M9-3 | S | M9-6 |
 
 ### 8.13 Dependency tree
@@ -1059,7 +1061,7 @@ Each question names the tasks it blocks. Until a question is answered, the defau
 22. ~~Who may see other members' Saldo?~~ **Answered 2026-10-13:** only the Kassenwart and the Kassenprüfer have access to the Kasse; every member sees their own Saldo. The Senior does not. → §6.5
 23. How are event costs split (equal, fixed price, by rank, Füchse free)? Are there fines? Should a negative Saldo only warn or also block something? → M3-4, M5-5, §6.6
 24. Which payment methods are used? What is the club IBAN (for GiroCode)? Is there a club email domain or SMTP server? → M3-7, M8-6
-25. Who co-signs entries that benefit the Kassenwart personally (proposal: Senior or Consenior)? → §6.3
+25. ~~Who co-signs entries that benefit the Kassenwart personally?~~ **Answered 2026-10-13:** always the Kassenprüfer, like a push-TAN. → §6.3
 
 ### Before M4 (laundry)
 26. ~~Laundry list columns and billing~~ answered 2026-10-12 (see §8.7). Still open: how many washers and dryers exist; what the "Timer" column is for; whether residents without membership get their own login; whether the old entries should be imported. → M4-2, M4-3, M4-5

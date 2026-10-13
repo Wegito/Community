@@ -143,7 +143,7 @@ def _check_cosign(lines, posted_by, cosigned_by):
     if cosigned_by is None:
         raise CosignRequired(
             'Diese Buchung schreibt dir selbst etwas gut. Sie braucht die Gegenzeichnung einer zweiten Person '
-            '(Senior, Consenior oder Kassenprüfer).'
+            '(Kassenprüfer).'
         )
     if cosigned_by.id == posted_by.id or cosigned_by.member_id == posted_by.member_id:
         raise CosignRequired('Gegenzeichnen muss eine andere Person.')

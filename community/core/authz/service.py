@@ -6,6 +6,7 @@ former-member role. Permissions are the union of the roles' grants (no deny rule
 The result is computed once per request and cached in flask.g.
 """
 
+import fnmatch
 from datetime import timedelta
 from pathlib import Path
 
@@ -224,6 +225,27 @@ def load_seed(path=None):
     return data.get('grants', {})
 
 
+def expand_codes(entries, all_codes):
+    """Codes of one seed entry list. Plain codes stay as they are; patterns select from `all_codes`:
+    '*' or 'tasks.*' adds every matching code, '!finance.*' removes matches again (wherever it stands).
+    """
+    include, exclude = [], []
+    for entry in entries or []:
+        (exclude if entry.startswith('!') else include).append(entry.lstrip('!'))
+    codes = []
+    for entry in include:
+        if any(char in entry for char in '*?['):
+            codes.extend(sorted(code for code in all_codes if fnmatch.fnmatchcase(code, entry)))
+        else:
+            codes.append(entry)
+    seen = set()
+    return [
+        code
+        for code in codes
+        if not any(fnmatch.fnmatchcase(code, pattern) for pattern in exclude) and not (code in seen or seen.add(code))
+    ]
+
+
 def seed_grants(path=None, *, granted_by=None, only_codes=None):
     """Add the default grants from seed/authz.yaml (or `path`). Never removes grants. Commits.
 
@@ -244,7 +266,7 @@ def seed_grants(path=None, *, granted_by=None, only_codes=None):
             missing_roles.add(role_key)
             continue
         new_codes = []
-        for code in codes or []:
+        for code in expand_codes(codes, permissions):
             if only_codes is not None and code not in only_codes:
                 continue
             permission = permissions.get(code)

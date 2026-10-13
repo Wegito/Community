@@ -151,3 +151,19 @@ An independent review (four reviewers, each finding checked by a second agent tr
 - **Preview is mandatory and posting recomputes:** the confirm step never trusts the previewed numbers; a token from the preview is the idempotency key, so a double click books once. Equal splits are exact to the cent (D20).
 - **Who pays:** ranks, a group and hand-picked members combined, each person once, only active members on the booking day.
 - **Monthly charges** (Aktivenbeitrag, Internet) are templates with an amount, Gegenkonto, optional cost centre and an audience (ranks and/or group). The Kassenwart books a month with one click after a preview; the idempotency key `recurring:<id>:<YYYY-MM>` makes a second booking of the same month impossible. Booked on the 1st; the audience is taken on that day. Fully automatic posting is left for later (task card) so a person still looks at the list.
+
+## 2026-10-13 — Admin rights, push-TAN, import/export, subscription
+
+- **The technical admin has full control except the Kasse** (owner). Seeded as the pattern `'*', '!finance.*'`
+  (the seed now understands `*` and `!` patterns, so codes of new modules reach the admin automatically on
+  `flask setup`); `drinks.consumption.ingest` stays excluded (API devices only). The admin appoints the
+  Kassenwart and the Kassenprüfer, but cannot appoint themselves (rule 1). Existing installs: run
+  `flask setup --seed` once to add the new admin grants (nothing is live yet).
+- **The Kassenprüfer is the only cosigner** (owner: "always the push-TAN, the second check");
+  `finance.journal.cosign` was removed from the Senior's and Consenior's defaults.
+- **Import and export are optional and guided** (owner): the user maps each Community field to a column
+  of their Excel and can keep extra columns as Zusatzfelder; the default mapping is the club's Journal
+  layout. Cards M3-6a to M3-6c.
+- **Semester closing is a button, not a job** (owner): easy, checked by the Kassenwart, never automatic.
+- **Subscription model on hold** (owner): the app stays ready for both a yearly licence for self-hosted
+  copies and managed hosting (M9-9). Legal help is needed before selling.

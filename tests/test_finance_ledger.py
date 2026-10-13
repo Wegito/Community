@@ -238,7 +238,7 @@ def test_reversing_a_charge_on_your_own_card_needs_a_second_person(app):
     journal = charge(kassenwart.member, 500, posted_by=kassenwart)
     with pytest.raises(CosignRequired):
         reverse(journal, reversed_by=kassenwart, reason='falsch')
-    reverse(journal, reversed_by=kassenwart, reason='falsch', cosigned_by=make_officer('senior'))
+    reverse(journal, reversed_by=kassenwart, reason='falsch', cosigned_by=make_officer('kassenpruefer'))
     assert saldo(kassenwart.member) == 0
 
 
