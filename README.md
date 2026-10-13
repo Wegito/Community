@@ -1,9 +1,10 @@
 # Community
 
-Internal web app for the club: announcements, Putzplan (chores) and room/equipment bookings today; member profiles, Ämter, Kasse/Saldo, laundry via QR, drinks and the semester calendar are planned.
+Internal web app for the club: members and invitations, ranks, Ämter and permissions, laundry by QR code, the Kasse with a Saldo for every member, announcements, Putzplan and bookings. Drinks and the semester calendar are planned.
 
 - **Plan:** [`docs/ROADMAP.md`](docs/ROADMAP.md) (milestones, task IDs, open questions)
 - **Decisions and deviations from the plan:** [`docs/decisions.md`](docs/decisions.md)
+- **Work queue (task cards by difficulty):** [`docs/TASKS.md`](docs/TASKS.md); how agents work through it: [`docs/AGENTS.md`](docs/AGENTS.md); rules for every change: [`CLAUDE.md`](CLAUDE.md)
 
 ## ⚠️ Do this first on the server (roadmap task M0-1)
 
@@ -75,10 +76,8 @@ Password and login email are changed on *Mein Profil*.
 ### Checks (the same ones CI runs)
 
 ```bash
-ruff check . && ruff format --check .
-python -m pytest --cov
-flask db check                       # models and migrations agree
-tools/build-css.sh && git diff --exit-code -- community/static/app.css   # committed CSS is up to date
+tools/check.sh          # lint, format, CSS, migrations (upgrade, check, downgrade), tests
+tools/check.sh quick    # lint, format, tests only; CHECK_TESTS=tests/test_x.py for one file
 ```
 
 ### CSS and htmx (frontend)

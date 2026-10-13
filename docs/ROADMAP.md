@@ -707,6 +707,31 @@ The contract is published early as `docs/api/openapi.yaml` (M6-2) so the user ca
 
 ## 8. Delivery plan
 
+### 8.0 Where we stand (2026-10-13)
+
+All work so far is on branch `claude/awesome-knuth-9a9r3n` (pull request Wegito/Community#1, not merged
+yet): 15 migrations, about 870 tests, CI green. Nothing is deployed yet (see "Owner" below).
+
+| Milestone | Status | What exists |
+|---|---|---|
+| M0 Rescue | ✅ done | App starts, secured, tests, CI |
+| M1 Members & rights | ✅ done | Members without login, personal invitations (link, QR, email), ranks, Ämter, groups, semesters, permission system, audit log, jobs, mail, notifications, import, member lifecycle |
+| M4 Wäsche per QR | ✅ done except M4-5, M4-6 | QR form, prices, monthly statement and Excel, import of the old list |
+| M3 Kasse & Saldo | 🟡 about half | Ledger (M3-1), Saldo on the profile (M3-2), Kasse pages (M3-3 first part), Umlage with Kasse subsidy and monthly charges (M3-4). Open: Sammelzahlung, Excel export, payment requests, cosign flow, closing (Bilanz, GuV, Kassenzählung, AH-Kontingent), opening balances |
+| M9 Other Verbindungen | 🟡 started | Club name, short name, Heimverein editable (M9-1) |
+| M2, M5, M6, M7 | ⬜ open | Planned below |
+| M8 Operations | ⬜ open | Needs the owner: server, domain, backups |
+
+**Next:** Wave 1 in `docs/TASKS.md` (finish the Kasse, laundry onto the Kontokarten), then M8 so the app
+can go live, then M2. The remaining work is split into task cards ranked by difficulty (T1 light,
+T2 standard, T3 expert, T4 owner) for a team of agents; how that works is in `docs/AGENTS.md`.
+
+**Owner (T4), before going live:** M0-1 server checklist (rotate `SECRET_KEY`, move `.env` aside before
+the first `git pull`, check accounts), domain and HTTPS, backups with one restore tested, make the
+repository private, licence agreement with a lawyer, the latest closed Kasse Excel for opening balances,
+answers to the laundry questions (machines, prices, "Timer" column, import of old entries) and to
+M3-10c (AH-Kontingent).
+
 ### 8.1 Conventions (Definition of Done for every task)
 - One concern per PR, roughly 400 changed lines or fewer excluding migrations. Branch and commit messages start with the task ID (`M0-9: safe next redirect`).
 - Tests are required:
@@ -961,7 +986,7 @@ M3-9 is gated by M8-3 and needs the Excel file from [Q18].
 | R7 Ämter-Workflows | M7 | Fux curriculum, rank workflow, handover, documents |
 | R8 Eigene Community | M9 | Other clubs install their own copy: first-run wizard, presets, module switches, branding |
 
-Recommended order for a single maintainer: **R0 → R1 → R2 → R3 → R4 → R5 → R6 → R7**. R2 (laundry) comes right after R1, by the owner's decision of 2026-10-12, because it replaces a Google Form in daily use. Start R3 as soon as the Excel file arrives. M8 tasks run alongside. Of R8, M9-1 is done; M9-2 (presets) fits best right after R3, before later modules add more club-specific seed data; the rest of M9 when another club actually wants to start. Until then every milestone follows D27: club-specific names and numbers are data, never code.
+Recommended order for a single maintainer: **R0 → R1 → R2 → R3 → R4 → R5 → R6 → R7**. R2 (laundry) comes right after R1, by the owner's decision of 2026-10-12, because it replaces a Google Form in daily use. Start R3 as soon as the Excel file arrives. M8 tasks run alongside. R3 is about half done (§8.0, `docs/TASKS.md` Wave 1). Of R8, M9-1 is done; M9-2 (presets) fits best right after R3, before later modules add more club-specific seed data; the rest of M9 when another club actually wants to start. Until then every milestone follows D27: club-specific names and numbers are data, never code.
 
 ---
 
