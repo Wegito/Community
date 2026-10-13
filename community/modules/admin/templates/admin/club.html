@@ -10,6 +10,8 @@
 {{ field(form.name) }}
 {{ field(form.short_name) }}
 <p class="-mt-2 {{ muted }}">Für die Menüleiste, wenn der Name dort zu lang ist.</p>
+{{ field(form.heimverein) }}
+<p class="-mt-2 {{ muted }}">Der Verein, dem euer Haus gehört, so wie ihr ihn nennt. Leer lassen, wenn es keinen gibt.</p>
 {% if from_env %}<p class="{{ muted }}">Noch nicht gespeichert: der Name kommt bisher aus der Server-Einstellung <code>CLUB_NAME</code>.</p>{% endif %}
 {{ submit(form.submit) }}
 </form>

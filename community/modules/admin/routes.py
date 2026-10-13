@@ -5,7 +5,7 @@ from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired, Length, Optional
 
 from community.core.authz import require_perm
-from community.core.club import NAME_MAX, SHORT_NAME_MAX, club_name, saved_club, update_club
+from community.core.club import HEIMVEREIN_MAX, NAME_MAX, SHORT_NAME_MAX, club_name, saved_club, update_club
 from community.core.forms import FlaskForm
 from community.core.platform import jobs as job_queue
 from community.core.platform.audit import AuditLog
@@ -75,6 +75,7 @@ def retry_job(job_id):
 class ClubForm(FlaskForm):
     name = StringField('Name', validators=[DataRequired(), Length(max=NAME_MAX)])
     short_name = StringField('Kurzname (optional)', validators=[Optional(), Length(max=SHORT_NAME_MAX)])
+    heimverein = StringField('Heimverein (optional)', validators=[Optional(), Length(max=HEIMVEREIN_MAX)])
     submit = SubmitField('Speichern')
 
 
@@ -82,9 +83,15 @@ class ClubForm(FlaskForm):
 @require_perm('system.admin')
 def club():
     saved = saved_club()
-    form = ClubForm(data={'name': club_name(), 'short_name': saved.short_name if saved else ''})
+    form = ClubForm(
+        data={
+            'name': club_name(),
+            'short_name': saved.short_name if saved else '',
+            'heimverein': saved.heimverein if saved else '',
+        }
+    )
     if form.validate_on_submit():
-        diff = update_club(form.name.data, form.short_name.data, actor=current_user)
+        diff = update_club(form.name.data, form.short_name.data, form.heimverein.data, actor=current_user)
         db.session.commit()
         flash('Gespeichert' if diff else 'Keine Änderungen', 'success')
         return redirect(url_for('admin.club'))

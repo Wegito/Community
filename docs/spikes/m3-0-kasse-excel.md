@@ -19,7 +19,9 @@ A complete double-entry bookkeeping ("amerikanisches Journal") for one semester.
 
 ### Accounts (columns of the Journal)
 
-Giro (bank), Bar (cash box), Küche (drinks and food stock), Mitglieder (control account of all Kontokarten), Verschiedene (control account of the cost centres), Konti (AH-Kontingent), Buka, Büro, AH, Telefon, Beiträge (VDSt dues), Eppendorf, Sparkonto, Eigenkapital. Meaning of *Buka* and *Eppendorf* is to be confirmed with the owner.
+Giro (bank), Bar (cash box), Küche (drinks and food stock), Mitglieder (control account of all Kontokarten), Verschiedene (control account of the cost centres), Konti (AH-Kontingent), Buka (Burschenkasse), Büro, AH, Telefon, Beiträge (VDSt dues), the Heimverein (the association that owns the house; each club names it, optional), Sparkonto, Eigenkapital.
+
+The club keeps separate Kassen (owner, 2026-10-13): the Burschenkasse, and the Fuxenkasse (Fuka, a reserve in Versch), which pays part of the Füxe's costs so they do not pay the full amount. In the app each Kasse is its own account, and a split can let a Kasse pay part of a share for a rank (M3-4).
 
 ### Beleg numbers
 

@@ -67,3 +67,20 @@ def test_only_the_technical_admin_renames_the_club(client, login):
     login(make_user(email='member@example.org', name='Ein Mitglied'))
     assert client.post('/admin/verein', data={'name': 'Gekapert'}).status_code == 403
     assert db.session.scalar(select(Club)) is None
+
+
+def test_heimverein_is_optional_and_editable(app, client, login):
+    from community.core.club import heimverein_name
+
+    assert heimverein_name() is None
+    login(make_admin())
+    form = {'name': 'Corps Beispiel', 'short_name': '', 'heimverein': '  Hausverein Beispiel e. V.  '}
+    assert client.post('/admin/verein', data=form).status_code == 302
+    assert db.session.scalar(select(Club)).heimverein == 'Hausverein Beispiel e. V.'
+    assert 'Hausverein Beispiel e. V.' in client.get('/admin/verein').get_data(as_text=True)
+    entry = db.session.scalars(select(AuditLog).where(AuditLog.action == 'club.update')).first()
+    assert 'heimverein' in entry.diff_json
+
+    client.post('/admin/verein', data={'name': 'Corps Beispiel', 'short_name': '', 'heimverein': ''})
+    db.session.expire_all()
+    assert db.session.scalar(select(Club)).heimverein is None

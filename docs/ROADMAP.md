@@ -254,7 +254,7 @@ These resolve the contradictions between the earlier design drafts. If you devia
 | D18 | Event visibility | Audience by role (rank, Amt or group) | By rank only |
 | D19 | Laundry billing | Monthly totals through a settlement, with a price snapshot on each use | One ledger charge per wash |
 | D20 | Splits | Largest-remainder method with tie-break by member id: exact cents, deterministic | Leftover cents to a club account |
-| D21 | Excel | The app is the source of truth: a web grid plus xlsx export, and a one-time import [Q19] | Excel or Google Sheet as master, live two-way sync |
+| D21 | Excel | The owner's Excel file stays untouched. Community gets its own Kasse with the same structure (journal with one column pair per Kasse, Kontokarten, cost centres, Bilanz/GuV, AH-Kontingent) and becomes the source of truth; the Excel is only read (opening balances, parallel run), never written; the export reproduces the familiar layout. Decided 2026-10-13 [Q19] | Excel or Google Sheet as master, live two-way sync |
 | D22 | Google | The app is master and pushes one way. ICS first, then the club calendar with ACL sharing, plus email reminders. OIDC sign-in is optional. No per-user Google tokens until needed. | Two-way sync, per-user OAuth in v1 |
 | D23 | Four-eyes rules | Compare **people**, not roles | Role-based checks |
 | D24 | Language | German UI only, no Flask-Babel until English is needed [Q13]. Own filter formats `12,50 €`. | i18n from day one |
@@ -618,9 +618,10 @@ Whether a negative Saldo should only warn or should block something is a club po
 - All Google features are opt-in and hidden when `GOOGLE_*` config is missing.
 
 ### 7.2 Excel / Kasse
-- **Decision (D21, needs user acceptance [Q19]).** The user asked for "a new more robust Excel sheet with better UI connected to the server". The plan instead makes **Community the source of truth**:
+- **Decision (D21, accepted 2026-10-13 [Q19]).** The owner does not want the Excel file changed and asked for "a smart new system with a structure similar to the Excel". So **Community is the source of truth** with the Excel's structure (see `docs/spikes/m3-0-kasse-excel.md`); the Excel file is only ever read:
   - A web Saldenliste grid with htmx inline actions.
-  - An **xlsx export** that serves as the "better Excel": Kassenbuch, Saldenliste, statements and a semester report, with formatted tables, frozen header, autofilter and € format (openpyxl).
+  - A journal view laid out like the Excel: one row per posting, one Soll/Haben column pair per Kasse.
+  - An **xlsx export** in the familiar layout: Journal, Kontokarten (one column per person, like the sheet "Alle"), cost centres ("Versch"), AH-Kontingent ("Konti"), Bilanz/GuV, Kassenzählung; formatted tables, frozen header, autofilter and € format (openpyxl).
   - Reason: the Kassenwart changes every semester, and guarded forms with an audit trail survive a handover better than a spreadsheet anyone can break.
   - A read-only Google Sheets mirror and an interim improved Excel template stay in the backlog (§11).
 - **One-time import (M3-0 spike → M3-6):**
@@ -812,7 +813,7 @@ The contract is published early as `docs/api/openapi.yaml` (M6-2) so the user ca
 | M3-1 | Ledger core | Books, accounts, categories, journal, entries; `post_journal()`, `reverse()`, `saldo()`, `statement()`; idempotency keys; immutability guard; person-based cosign rule; audit; money parse and format; invariant tests (≥ 90 % coverage) | M1-2, M1-3, M1-5 | L | M2-*, M4-1 … M4-4, M5-1 … M5-4 |
 | M3-2 | Saldo widget + Kontoauszug | Posted Saldo per book (no total across legally separate books), latest entries, payment details (IBAN, `payment_ref`); statement page | M3-1, M2-1 | S | M3-3 … M3-8 |
 | M3-3 | Kassenwart workspace | Saldenliste grid (members × books, filter by rank and status); htmx inline actions: record payment, single charge, reversal with reason; member payments from one bank statement in one collective journal (`GS` Beleg); Beleg numbers per series (G, K, B, GS); statements; Kassenwart tile | M3-1 | L | M3-2, M3-5, M3-6, M3-7 |
-| M3-4 | Bulk charges + splits | Bulk charge by rank or group (Semesterbeitrag); recurring monthly charges per group (Aktivenbeiträge, Internetbeiträge with price levels); equal split (D20), fixed price per rank or an amount per person (event shares); mandatory preview before posting | M3-3 | M | M3-5 … M3-8 |
+| M3-4 | Bulk charges + splits | Bulk charge by rank or group (Semesterbeitrag); recurring monthly charges per group (Aktivenbeiträge, Internetbeiträge with price levels); equal split (D20), fixed price per rank or an amount per person (event shares); a Kasse can pay part of a share for a rank (the Fuxenkasse for Füxe); mandatory preview before posting | M3-3 | M | M3-5 … M3-8 |
 | M3-5 | xlsx export ("better Excel") | Kassenbuch, Saldenliste, statements, semester report (openpyxl, formatted) | M3-1 | S | M3-2 … M3-4, M3-6 … M3-8 |
 | M3-6 | Opening-balance import | Procedure in §7.2: dry run, Decimal conversion, mapping, sign check, reconciliation report, sign-off, OPENING journals | M3-0, M3-1, M1-9 | M | M3-2 … M3-5, M3-7 |
 | M3-7 | Zahlungsaufforderung | Filter by Saldo below X → preview → personal emails via jobs (statement, IBAN, Verwendungszweck); reminders after N days (can be switched off); optional GiroCode **[verify EPC spec + library]** | M3-1, M1-6 | M | M3-4 … M3-6, M3-8 |
@@ -895,9 +896,9 @@ The owner wants to offer the app to other clubs (2026-10-12). One install per cl
 
 | ID | Title | Scope | Depends on | Size | Parallel-safe with |
 |---|---|---|---|---|---|
-| M9-1 | Club settings ✅ | Name and short name (menu bar) editable under Verwaltung → Verein (`system.admin`), audited; used in the menu bar, browser tab and every mail; `CLUB_NAME` in `.env` is only the fallback until saved. Later fields: logo, accent colour, contact and legal links, IBAN (M3-7) | M1-3 | S | all |
-| M9-2 | Presets instead of seeds | The club's structure as one data file per kind of club (`community/presets/<key>.yaml`): ranks, Ämter (eligible ranks, descriptions, incompatibilities), groups, default grants, starting rank, the Amt told about new members, laundry and finance defaults (accounts, cost centres). Ship "Studentenverbindung" (today's seed) and "Verein, allgemein" (Mitglied, Ehrenmitglied, Vorstand). New installs get their data from the chosen preset, not from migrations; existing installs keep theirs. The last hard-coded keys (`STARTING_RANK`, `NEW_MEMBER_OFFICE`) become settings. | M9-1 | M | M2-*, M3-* |
-| M9-3 | First-run wizard | `/einrichtung`, open only while no login exists and only with the one-time setup code that `flask setup` prints (otherwise anyone who finds a fresh server first becomes its admin). Steps: club name → first admin (name, email, password) → choose a preset → review ranks and Ämter (rename, remove, add) → modules on or off → done, with links to "Mitglieder importieren" and "Einladen". Each step is audited; the wizard locks itself when finished. | M9-2, M9-4 | M | M9-5 |
+| M9-1 | Club settings ✅ | Name, short name (menu bar) and the optional name of the Heimverein editable under Verwaltung → Verein (`system.admin`), audited; used in the menu bar, browser tab and every mail; `CLUB_NAME` in `.env` is only the fallback until saved. Later fields: logo, accent colour, contact and legal links, IBAN (M3-7) | M1-3 | S | all |
+| M9-2 | Presets instead of seeds | The club's structure as one data file per kind of club (`community/presets/<key>.yaml`): ranks, Ämter (eligible ranks, descriptions, incompatibilities), groups, default grants, starting rank, the Amt told about new members, laundry and finance defaults (accounts, cost centres). Ship "Studentenverbindung" (today's seed, renamable ranks and Ämter, so other Verbindungen adapt it in the wizard). New installs get their data from the chosen preset, not from migrations; existing installs keep theirs. The last hard-coded keys (`STARTING_RANK`, `NEW_MEMBER_OFFICE`) become settings. | M9-1 | M | M2-*, M3-* |
+| M9-3 | First-run wizard | `/einrichtung`, open only while no login exists and only with the one-time setup code that `flask setup` prints (otherwise anyone who finds a fresh server first becomes its admin). Steps: club name and, optionally, the Heimverein's name → first admin (name, email, password) → choose a preset → review ranks and Ämter (rename, remove, add) → modules on or off → done, with links to "Mitglieder importieren" and "Einladen". Each step is audited; the wizard locks itself when finished. | M9-2, M9-4 | M | M9-5 |
 | M9-4 | Module switches | Per install: laundry, bookings, drinks, finance, calendar on or off. Menus, routes (404 when off), permissions and the wizard follow. | M9-1 | S | M9-2 |
 | M9-5 | Branding | Logo upload (PNG, size-limited, re-encoded), accent colour from an accessible palette, favicon. | M9-1 | S | M9-3, M9-4 |
 | M9-6 | Install kit | One documented way to install and update (container image or install script), an `.env` generator, versioned releases with a changelog, upgrade notes, a demo instance. | M8-2, M9-3 | M | — |
@@ -1025,9 +1026,9 @@ Each question names the tasks it blocks. Until a question is answered, the defau
 
 ### Before M3 (finance)
 18. ~~Please share the Excel file(s)~~ **Answered** with the SS 25 journal (analysis in `docs/spikes/m3-0-kasse-excel.md`): one double-entry book, Kontokarte per member, positive = credit. Still open: the cutoff date and the latest closed semester for the opening balances. → M3-6
-19. **Central decision:** is a web grid plus a polished xlsx export acceptable instead of a new Excel file, or must the Kassenwart keep working in Excel? → D21, M3-3
+19. ~~Central decision: web grid or Excel?~~ **Answered 2026-10-13:** the Excel file stays untouched; Community gets its own Kasse with the Excel's structure and an export in the same layout. → D21, M3-3
 20. Should the app also be the bank Kassenbuch (supplier payments, Auslagen), or only track member Saldi? → M3-8
-21. Which Kassen exist (Aktivenkasse, Getränkekasse, Hauskasse, AHV)? Is the club a registered association (e.V.)? Is the AHV a separate legal association? → `fin_book` seed
+21. **Partly answered 2026-10-13:** besides the main account there are separate Kassen, e.g. *Buka* (Burschenkasse) and *Fuka* (Fuxenkasse, which pays part of the Füxe's costs so they do not pay the full amount); one account is the club's **Heimverein**, the association that owns the house (named per club, optional; M9-1). Still open: (Aktivenkasse, Getränkekasse, Hauskasse, AHV)? Is the club a registered association (e.V.)? Is the AHV a separate legal association? → `fin_book` seed
 22. Besides the member and the Kassenwart, who may see other members' Saldo (Senior? Kassenprüfer?) → §6.5
 23. How are event costs split (equal, fixed price, by rank, Füchse free)? Are there fines? Should a negative Saldo only warn or also block something? → M3-4, M5-5, §6.6
 24. Which payment methods are used? What is the club IBAN (for GiroCode)? Is there a club email domain or SMTP server? → M3-7, M8-6
@@ -1057,7 +1058,7 @@ Each question names the tasks it blocks. Until a question is answered, the defau
 
 ### Before M9 (other clubs)
 38. Which licence? Open source (e.g. AGPL-3.0, so improvements by others stay open, or MIT) or source-available only? This decides whether and how other clubs may use and change the app. → M9-7
-39. Which clubs are "others": other VDSt chapters, other Studentenverbindungen, any Verein? This decides which presets ship first. → M9-2
+39. ~~Which clubs are "others"?~~ **Answered 2026-10-13:** other Studentenverbindungen, with a similar structure. The first preset is "Studentenverbindung"; a general Verein preset is not needed for now. → M9-2
 40. Does each club host its own copy, or would you run servers for them? Running servers for others brings duties (contracts, GDPR processing agreements, support). → M9-6
 
 ---
