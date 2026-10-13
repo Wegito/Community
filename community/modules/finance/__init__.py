@@ -7,7 +7,7 @@ booking must balance before it is saved, and nothing is ever edited: mistakes ar
 from flask import Blueprint
 
 # Permission codes, tables, and the guard that keeps bookings from being edited.
-from . import models, permissions, services  # noqa: F401
+from . import charges, models, permissions, services  # noqa: F401
 
 bp = Blueprint('finance', __name__, url_prefix='/kasse', template_folder='templates')
 

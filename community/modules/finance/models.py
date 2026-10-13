@@ -156,3 +156,31 @@ class FinEntry(db.Model):
 
 # A semester with bookings is kept (core/org: delete_semester).
 add_semester_reference(FinJournal.semester_id)
+
+
+class FinRecurring(db.Model):
+    """A monthly charge (Aktivenbeitrag, Internetbeitrag): same amount for everyone in an audience.
+
+    The audience is the members with one of `rank_keys` (comma-separated) and/or in `group_id`
+    on the booking day. Posting a month twice is impossible (idempotency key per month).
+    """
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(120), nullable=False)
+    amount_cents = db.Column(db.Integer, nullable=False)
+    target_account_id = db.Column(db.Integer, db.ForeignKey('fin_account.id'), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('fin_category.id'))
+    rank_keys = db.Column(db.String(200), nullable=False, default='')
+    group_id = db.Column(db.Integer, db.ForeignKey('member_group.id'))
+    archived_at = db.Column(UTCDateTime)
+    created_at = db.Column(UTCDateTime, nullable=False, default=utcnow)
+
+    __table_args__ = (db.CheckConstraint('amount_cents > 0', name='positive_amount'),)
+
+    target_account = db.relationship('FinAccount')
+    category = db.relationship('FinCategory')
+    group = db.relationship('MemberGroup')
+
+    @property
+    def rank_key_list(self):
+        return [key for key in (self.rank_keys or '').split(',') if key]

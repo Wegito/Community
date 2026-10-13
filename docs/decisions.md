@@ -144,3 +144,10 @@ An independent review (four reviewers, each finding checked by a second agent tr
 - **One booking form that mirrors an Excel row** (date, Beleg, text, amount, Soll, Haben, cost centre) instead of separate forms per case. Presets fill it for Zahlung, Bareinzahlung, Belastung and Auslage, e.g. from a Kontokarte. Member cards appear in the Soll/Haben lists and are created on first use. The kind (Zahlung, Belastung, Auslage, Buchung) follows from the accounts.
 - **The Kasse lives under Verwaltung → Kasse** and is visible to the Kassenwart and Kassenprüfer only; the Kassenprüfer sees everything but no buttons that book.
 - **A Kontokarte of a former member stays reachable** for the Kasse (they may still owe money), unlike their member page.
+
+## 2026-10-13 — M3-4 Umlage and monthly charges
+
+- **Umlage = one booking** with one line per person (D Kontokarte / C Gegenkonto) plus, where a Kasse pays part, a line D Kasse / C Gegenkonto with memo "Anteil <Name>". The event's account receives the full amount; the Fux pays the rest. The subsidy is per person and never exceeds the share.
+- **Preview is mandatory and posting recomputes:** the confirm step never trusts the previewed numbers; a token from the preview is the idempotency key, so a double click books once. Equal splits are exact to the cent (D20).
+- **Who pays:** ranks, a group and hand-picked members combined, each person once, only active members on the booking day.
+- **Monthly charges** (Aktivenbeitrag, Internet) are templates with an amount, Gegenkonto, optional cost centre and an audience (ranks and/or group). The Kassenwart books a month with one click after a preview; the idempotency key `recurring:<id>:<YYYY-MM>` makes a second booking of the same month impossible. Booked on the 1st; the audience is taken on that day. Fully automatic posting is left for later (task card) so a person still looks at the list.

@@ -1,0 +1,12 @@
+{# A MultiCheckboxField as a wrapping list of checkboxes. #}
+{% macro checkbox_list(f, columns='sm:grid-cols-2 lg:grid-cols-3') -%}
+<fieldset>
+<legend class="mb-1 block text-sm font-medium">{{ f.label.text }}</legend>
+<div class="grid gap-x-4 gap-y-1 {{ columns }}">
+{% for option in f %}
+<label class="flex items-center gap-2 text-sm">{{ option(class='size-4 shrink-0 accent-slate-900') }} {{ option.label.text }}</label>
+{% endfor %}
+</div>
+{% if f.errors %}<p class="mt-1 text-sm text-red-700">{{ f.errors|join(' ') }}</p>{% endif %}
+</fieldset>
+{%- endmacro %}

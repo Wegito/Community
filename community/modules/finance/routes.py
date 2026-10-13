@@ -4,27 +4,36 @@ Only the Kassenwart and the Kassenprüfer see the whole Kasse (finance.ledger.vi
 every member sees their own Saldo (finance.saldo.view_own).
 """
 
+import secrets
+from datetime import date
+
 from flask import abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 from sqlalchemy import or_, select
 
 from community.core.authz import can, require_perm
 from community.core.identity.models import Member, MemberStatus
+from community.core.money import format_cents
+from community.core.org import services as org
+from community.core.org.models import MemberGroup
 from community.core.time import today_local
 from community.core.widgets import profile_card
 from community.extensions import db
 
-from . import bp
+from . import bp, charges
 from . import services as ledger
 from .forms import (
     AccountEditForm,
     AccountForm,
     BookingForm,
+    ButtonForm,
     CategoryEditForm,
     CategoryForm,
+    RecurringForm,
     ReverseForm,
+    UmlageForm,
 )
-from .models import AccountKind, FinAccount, FinCategory, FinJournal
+from .models import AccountKind, FinAccount, FinCategory, FinJournal, FinRecurring
 
 JOURNAL_PAGE_LIMIT = 300
 
@@ -328,3 +337,209 @@ def edit_category(category_id):
             flash('Gespeichert' if diff else 'Keine Änderungen', 'success')
             return redirect(url_for('finance.accounts'))
     return render_template('finance/edit_category.html', category=category, form=form)
+
+
+# --- Umlage: charge many members at once (M3-4) -----------------------------------------
+
+
+def _target_choices():
+    return [(a.id, ledger.account_label(a)) for a in ledger.accounts() if a.kind != AccountKind.MEMBER]
+
+
+def _category_choices():
+    return [('', '– keine –')] + [(str(c.id), c.name) for c in ledger.categories()]
+
+
+def _rank_choices(key_values=False):
+    return [(r.key if key_values else r.id, r.label) for r in org.ranks()]
+
+
+def _group_choices():
+    return [(0, '– keine –')] + [(g.id, g.name) for g in org.groups()]
+
+
+@bp.route('/umlage', methods=['GET', 'POST'])
+@require_perm('finance.journal.post')
+def umlage():
+    form = UmlageForm()
+    form.target.choices = _target_choices()
+    form.category.choices = _category_choices()
+    form.rank_ids.choices = form.subsidy_rank_ids.choices = _rank_choices()
+    form.group_id.choices = _group_choices()
+    form.member_ids.choices = [(m.id, m.full_name) for m in _members_for_choices() if m.is_active_member]
+    funds = [a for a in ledger.accounts([AccountKind.FUND])]
+    form.subsidy_account.choices = [(0, '– kein Zuschuss –')] + [(a.id, ledger.account_label(a)) for a in funds]
+    if request.method == 'GET':
+        form.booked_on.data = today_local()
+        form.beleg.data = ledger.next_beleg('B', form.booked_on.data)
+        verschiedenes = ledger.account_by_key('verschiedenes')
+        form.target.data = verschiedenes.id if verschiedenes else None
+        fuxenkasse = ledger.account_by_key('fuxenkasse')
+        fux = org.rank_by_key('fux')
+        if fuxenkasse is not None and fux is not None:
+            form.subsidy_rank_ids.data = [fux.id]
+    shares, sums = None, None
+    if form.validate_on_submit():
+        try:
+            day = form.booked_on.data
+            group = db.session.get(MemberGroup, form.group_id.data) if form.group_id.data else None
+            members = charges.audience(day, rank_ids=form.rank_ids.data, group=group, member_ids=form.member_ids.data)
+            subsidy = None
+            if form.subsidy_account.data:
+                subsidy = charges.Subsidy(
+                    db.session.get(FinAccount, form.subsidy_account.data),
+                    frozenset(form.subsidy_rank_ids.data),
+                    form.subsidy_amount.cents,
+                )
+            per_person = form.amount.cents if form.mode.data == 'person' else None
+            total = form.amount.cents if form.mode.data == 'total' else None
+            shares = charges.plan(members, day, per_person_cents=per_person, total_cents=total, subsidy=subsidy)
+            sums = charges.totals(shares)
+            if form.confirm.data and form.token.data:
+                target = db.session.get(FinAccount, form.target.data)
+                category = db.session.get(FinCategory, int(form.category.data)) if form.category.data else None
+                journal, _ = charges.post(
+                    shares,
+                    title=form.title.data,
+                    booked_on=day,
+                    target=target,
+                    category=category,
+                    posted_by=current_user,
+                    subsidy=subsidy,
+                    beleg=form.beleg.data,
+                    idempotency_key=f'umlage:{form.token.data}',
+                )
+                db.session.commit()
+                flash(f'Umlage gebucht: {sums["people"]} Personen, {format_cents(sums["share"])}.', 'success')
+                return redirect(url_for('finance.booking', journal_id=journal.id))
+            form.token.data = secrets.token_urlsafe(16)
+        except ledger.FinanceError as error:
+            db.session.rollback()
+            flash(str(error), 'danger')
+            shares = None
+    return render_template('finance/umlage.html', form=form, shares=shares, sums=sums)
+
+
+# --- Monthly charges ----------------------------------------------------------------------------
+
+
+def _recurring_form(recurring=None):
+    form = RecurringForm(obj=recurring)
+    form.target.choices = _target_choices()
+    form.category.choices = _category_choices()
+    form.rank_keys.choices = _rank_choices(key_values=True)
+    form.group_id.choices = _group_choices()
+    if request.method == 'GET' and recurring is not None:
+        form.amount.data = format_cents(recurring.amount_cents).replace(' €', '')
+        form.target.data = recurring.target_account_id
+        form.category.data = str(recurring.category_id or '')
+        form.rank_keys.data = recurring.rank_key_list
+        form.group_id.data = recurring.group_id or 0
+    return form
+
+
+def _save_recurring(form, recurring):
+    return charges.save_recurring(
+        recurring,
+        title=form.title.data,
+        amount_cents=form.amount.cents,
+        target=db.session.get(FinAccount, form.target.data),
+        category=db.session.get(FinCategory, int(form.category.data)) if form.category.data else None,
+        rank_keys=form.rank_keys.data,
+        group=db.session.get(MemberGroup, form.group_id.data) if form.group_id.data else None,
+        actor=current_user,
+    )
+
+
+def _month_arg():
+    raw = request.args.get('monat', '')
+    try:
+        year, month = (int(part) for part in raw.split('-'))
+        return date(year, month, 1)
+    except ValueError:
+        today = today_local()
+        return date(today.year, today.month, 1)
+
+
+@bp.route('/monatlich', methods=['GET', 'POST'])
+@require_perm('finance.journal.post')
+def recurring_list():
+    form = _recurring_form()
+    if form.validate_on_submit():
+        try:
+            item = _save_recurring(form, None)
+        except ledger.FinanceError as error:
+            db.session.rollback()
+            flash(str(error), 'danger')
+        else:
+            db.session.commit()
+            flash('Monatliche Belastung angelegt.', 'success')
+            return redirect(url_for('finance.recurring', recurring_id=item.id))
+    month = _month_arg()
+    items = [(item, charges.recurring_posted(item, month)) for item in charges.recurring_items()]
+    return render_template(
+        'finance/recurring_list.html',
+        items=items,
+        form=form,
+        month=month,
+        month_label=charges.month_label(month),
+        rank_labels={r.key: r.label for r in org.ranks()},
+    )
+
+
+@bp.route('/monatlich/<int:recurring_id>', methods=['GET', 'POST'])
+@require_perm('finance.journal.post')
+def recurring(recurring_id):
+    item = db.get_or_404(FinRecurring, recurring_id)
+    month = _month_arg()
+    button_form = ButtonForm()
+    if request.method == 'POST' and button_form.validate_on_submit():
+        try:
+            journal, created = charges.post_recurring(item, month, posted_by=current_user)
+        except ledger.FinanceError as error:
+            db.session.rollback()
+            flash(str(error), 'danger')
+        else:
+            db.session.commit()
+            flash('Gebucht.' if created else 'Dieser Monat war schon gebucht.', 'success' if created else 'info')
+            return redirect(url_for('finance.booking', journal_id=journal.id))
+    posted = charges.recurring_posted(item, month)
+    try:
+        shares = charges.recurring_plan(item, month) if posted is None else []
+    except ledger.FinanceError:
+        shares = []
+    previous = date(month.year - (month.month == 1), (month.month - 2) % 12 + 1, 1)
+    following = date(month.year + (month.month == 12), month.month % 12 + 1, 1)
+    return render_template(
+        'finance/recurring.html',
+        item=item,
+        month=month,
+        month_label=charges.month_label(month),
+        previous=previous,
+        following=following,
+        posted=posted,
+        shares=shares,
+        sums=charges.totals(shares),
+        button_form=button_form,
+        edit_form=_recurring_form(item),
+        rank_labels={r.key: r.label for r in org.ranks()},
+    )
+
+
+@bp.route('/monatlich/<int:recurring_id>/bearbeiten', methods=['POST'])
+@require_perm('finance.journal.post')
+def edit_recurring(recurring_id):
+    item = db.get_or_404(FinRecurring, recurring_id)
+    form = _recurring_form(item)
+    if form.validate_on_submit():
+        try:
+            _save_recurring(form, item)
+        except ledger.FinanceError as error:
+            db.session.rollback()
+            flash(str(error), 'danger')
+        else:
+            db.session.commit()
+            flash('Gespeichert.', 'success')
+    else:
+        flash('Bitte die Angaben prüfen.', 'danger')
+    return redirect(url_for('finance.recurring', recurring_id=item.id))

@@ -1,0 +1,70 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, radios, submit %}
+{% from 'macros/ui.html' import page_header, section_header, card, table, cell, back_link, muted, alert %}
+{% from 'finance/_checkboxes.html' import checkbox_list %}
+{% block title %}Umlage{% endblock %}
+{% block content %}
+{{ page_header('Umlage', 'Viele Mitglieder auf einmal belasten, z. B. eine Kneipe oder eine Fahrt. Eine Kasse kann für einzelne Ränge einen Teil übernehmen.') }}
+<form method="post" class="space-y-6">
+{{ form.hidden_tag() }}
+{% call card(class='space-y-4') %}
+<div class="grid gap-4 sm:grid-cols-3">
+{{ field(form.booked_on) }}
+{{ field(form.beleg) }}
+{{ field(form.title, placeholder='z. B. Stiftungsfest Dresden') }}
+</div>
+<div class="grid gap-4 sm:grid-cols-2">
+{{ field(form.target) }}
+{{ field(form.category) }}
+</div>
+<div class="grid gap-4 sm:grid-cols-2">
+{{ radios(form.mode) }}
+{{ field(form.amount, inputmode='decimal', placeholder='70,00') }}
+</div>
+{% endcall %}
+{{ section_header('Wer zahlt?') }}
+{% call card(class='space-y-4') %}
+{{ checkbox_list(form.rank_ids, 'sm:grid-cols-4') }}
+{{ field(form.group_id) }}
+<details{% if form.member_ids.data %} open{% endif %}>
+<summary class="cursor-pointer text-sm font-medium">Einzelne Personen auswählen</summary>
+<div class="mt-3">{{ checkbox_list(form.member_ids) }}</div>
+</details>
+<p class="{{ muted }}">Alle Ausgewählten zusammen; jeder nur einmal. Nur aktive Mitglieder am Buchungstag.</p>
+{% endcall %}
+{{ section_header('Zuschuss (optional)') }}
+{% call card(class='space-y-4') %}
+<div class="grid gap-4 sm:grid-cols-2">
+{{ field(form.subsidy_account) }}
+{{ field(form.subsidy_amount, inputmode='decimal', placeholder='30,00') }}
+</div>
+{{ checkbox_list(form.subsidy_rank_ids, 'sm:grid-cols-4') }}
+<p class="{{ muted }}">Beispiel: Die Fuxenkasse zahlt für jeden Fux 30 € seines Anteils; der Fux zahlt den Rest.</p>
+{% endcall %}
+<div class="flex flex-wrap gap-3">{{ submit(form.preview, 'secondary') }}</div>
+
+{% if shares %}
+{{ section_header('Vorschau') }}
+{% call table(['Name', 'Rang', 'Anteil', 'Zuschuss', 'zahlt selbst']) %}
+{% for s in shares %}
+<tr>
+<td class="{{ cell }}">{{ s.member.full_name }}</td>
+<td class="{{ cell }}">{{ s.rank.label if s.rank else '–' }}</td>
+<td class="{{ cell }} text-right tabular-nums">{{ s.share_cents|cents }}</td>
+<td class="{{ cell }} text-right tabular-nums">{{ s.subsidy_cents|cents if s.subsidy_cents else '' }}</td>
+<td class="{{ cell }} text-right font-medium tabular-nums">{{ s.due_cents|cents }}</td>
+</tr>
+{% endfor %}
+<tr class="bg-slate-50 font-semibold">
+<td class="{{ cell }}">{{ sums.people }} Personen</td><td class="{{ cell }}"></td>
+<td class="{{ cell }} text-right tabular-nums">{{ sums.share|cents }}</td>
+<td class="{{ cell }} text-right tabular-nums">{{ sums.subsidy|cents }}</td>
+<td class="{{ cell }} text-right tabular-nums">{{ sums.due|cents }}</td>
+</tr>
+{% endcall %}
+{% call alert('info', class='mt-4') %}Noch nicht gebucht. Prüfen, dann „Jetzt buchen“. Änderungen oben? Erst wieder „Vorschau“.{% endcall %}
+<div class="mt-4">{{ submit(form.confirm) }}</div>
+{% endif %}
+</form>
+{{ back_link('Kasse', url_for('finance.overview')) }}
+{% endblock %}

@@ -23,6 +23,7 @@ from community.extensions import db
 from community.modules.auth.services import email_change_token, password_reset_token
 from community.modules.bookings.models import Resource
 from community.modules.bookings.services import create_booking
+from community.modules.finance.charges import save_recurring
 from community.modules.finance.models import FinCategory
 from community.modules.finance.services import Line, account_by_key, member_account, post_journal
 from community.modules.laundry.models import LaundryMachine
@@ -75,6 +76,16 @@ def data(app):
         [Line(account_by_key('giro'), member_account(member.member), 100)],
         posted_by=None,
     )
+    recurring = save_recurring(
+        None,
+        title='Smoke',
+        amount_cents=750,
+        target=account_by_key('beitraege'),
+        category=None,
+        rank_keys=['bursch'],
+        group=None,
+        actor=None,
+    )
     db.session.commit()
     # URL parameters by name, filled in for rules like /chores/edit/<int:cid>.
     return {
@@ -97,6 +108,7 @@ def data(app):
         'journal_id': journal.id,
         'account_id': account_by_key('bar').id,
         'category_id': db.session.scalars(select(FinCategory)).first().id,
+        'recurring_id': recurring.id,
     }
 
 

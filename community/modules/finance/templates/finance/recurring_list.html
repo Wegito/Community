@@ -1,0 +1,36 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% from 'macros/ui.html' import page_header, section_header, card, table, cell, empty_row, link_class, muted, badge, back_link %}
+{% from 'finance/_checkboxes.html' import checkbox_list %}
+{% block title %}Monatliche Belastungen{% endblock %}
+{% block content %}
+{{ page_header('Monatliche Belastungen', 'Gleicher Betrag jeden Monat für eine Zielgruppe, z. B. Aktivenbeitrag oder Internet. Jeder Monat wird genau einmal gebucht.') }}
+{% call table(['Titel', 'Betrag', 'Zielgruppe', month_label]) %}
+{% for item, posted in items %}
+<tr>
+<td class="{{ cell }}"><a class="{{ link_class }}" href="{{ url_for('finance.recurring', recurring_id=item.id, monat=month.strftime('%Y-%m')) }}">{{ item.title }}</a></td>
+<td class="{{ cell }} tabular-nums">{{ item.amount_cents|cents }}</td>
+<td class="{{ cell }}">{% for key in item.rank_key_list %}{{ rank_labels.get(key, key) }}{{ ', ' if not loop.last }}{% endfor %}{% if item.group %}{{ ' · ' if item.rank_key_list }}{{ item.group.name }}{% endif %}</td>
+<td class="{{ cell }}">{% if posted %}{{ badge('gebucht', 'success') }}{% else %}{{ badge('offen', 'warning') }}{% endif %}</td>
+</tr>
+{% else %}
+{{ empty_row('Noch keine monatlichen Belastungen.', 4) }}
+{% endfor %}
+{% endcall %}
+{{ section_header('Neue monatliche Belastung') }}
+{% call card(class='max-w-3xl') %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+<div class="grid gap-4 sm:grid-cols-2">
+{{ field(form.title, placeholder='z. B. Aktivenbeitrag') }}
+{{ field(form.amount, inputmode='decimal', placeholder='7,50') }}
+{{ field(form.target) }}
+{{ field(form.category) }}
+</div>
+{{ checkbox_list(form.rank_keys, 'sm:grid-cols-4') }}
+{{ field(form.group_id) }}
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+{{ back_link('Kasse', url_for('finance.overview')) }}
+{% endblock %}

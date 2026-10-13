@@ -4,7 +4,7 @@
 {% block title %}Kasse{% endblock %}
 {% block content %}
 {% call page_header('Kasse') %}
-{% if can('finance.journal.post') %}{{ link_button('Neue Buchung', url_for('finance.new_booking'), 'primary') }}{% endif %}
+{% if can('finance.journal.post') %}{{ link_button('Neue Buchung', url_for('finance.new_booking'), 'primary') }}{{ link_button('Umlage', url_for('finance.umlage')) }}{{ link_button('Monatlich', url_for('finance.recurring_list')) }}{% endif %}
 {{ link_button('Kassenbuch', url_for('finance.journal')) }}
 {{ link_button('Konten', url_for('finance.accounts')) }}
 {% endcall %}
