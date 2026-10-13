@@ -89,6 +89,7 @@ def create_app(config=None):
     from community.core.authz import can, policies
     from community.core.club import club_name, club_short_name
     from community.core.nav import may_open, nav_links
+    from community.core.widgets import profile_cards
 
     @app.context_processor
     def inject_globals():
@@ -100,6 +101,7 @@ def create_app(config=None):
             'policies': policies,
             'nav_links': nav_links,
             'may_open': may_open,
+            'profile_cards': profile_cards,
             'unread_notifications': current_unread_count,
         }
 

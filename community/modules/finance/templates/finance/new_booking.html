@@ -1,0 +1,41 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% from 'macros/ui.html' import page_header, card, back_link, muted, btn_class %}
+{% block title %}Neue Buchung{% endblock %}
+{% block content %}
+{{ page_header('Neue Buchung', 'Eine Zeile im Kassenbuch: Soll bekommt das Geld, Haben gibt es.') }}
+<div class="grid gap-x-8 lg:grid-cols-3">
+{% call card(class='lg:col-span-2') %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+<div class="grid gap-4 sm:grid-cols-2">
+{{ field(form.booked_on) }}
+<div>{{ field(form.beleg) }}<p class="mt-1 {{ muted }}">Nächste Nummern: {{ next_numbers|join(' · ') }}</p></div>
+</div>
+{{ field(form.title, placeholder='z. B. Kneipe 12.10., Überweisung, Einkauf Selgros') }}
+{{ field(form.amount, inputmode='decimal', placeholder='12,50') }}
+<div class="grid gap-4 sm:grid-cols-2">
+{{ field(form.debit) }}
+{{ field(form.credit) }}
+</div>
+{{ field(form.category) }}
+{{ field(form.note, rows=2) }}
+<div class="flex flex-wrap gap-3">
+{{ submit(form.submit) }}
+<button type="submit" name="weiter" value="1" class="{{ btn_class('secondary') }}">Buchen und nächste</button>
+</div>
+</form>
+{% endcall %}
+<aside class="mt-6 space-y-3 text-sm lg:mt-0">
+<p class="font-medium">Typische Buchungen</p>
+<ul class="list-disc space-y-1 pl-5 text-slate-700">
+<li><strong>Zahlung</strong> eines Mitglieds: Soll Girokonto (oder Barkasse), Haben seine Kontokarte.</li>
+<li><strong>Belastung</strong> (Kneipe, Beitrag): Soll Kontokarte, Haben Verschiedenes oder Beiträge.</li>
+<li><strong>Auslage</strong> („auf KK“): Soll Verschiedenes oder Büro, Haben die Kontokarte dessen, der bezahlt hat.</li>
+<li><strong>Rechnung</strong> bezahlt: Soll Verschiedenes, Küche oder Büro, Haben Girokonto.</li>
+</ul>
+<p class="{{ muted }}">Auf „Verschiedenes“ braucht jede Buchung eine Kostenstelle.</p>
+</aside>
+</div>
+{{ back_link('Kasse', url_for('finance.overview')) }}
+{% endblock %}

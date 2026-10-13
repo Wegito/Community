@@ -1,0 +1,29 @@
+{# Amounts in the Kasse. A Saldo is red when the member owes, green when they have credit. #}
+{% macro saldo_amount(cents, class='') -%}
+<span class="font-semibold tabular-nums {{ 'text-red-700' if cents < 0 else ('text-green-700' if cents > 0 else 'text-slate-900') }} {{ class }}">{{ cents|cents }}</span>
+{%- endmacro %}
+
+{% macro saldo_text(cents) -%}
+{% if cents < 0 %}offen{% elif cents > 0 %}Guthaben{% else %}ausgeglichen{% endif %}
+{%- endmacro %}
+
+{# Rows of a Kontoauszug (StatementRow), newest first. #}
+{% macro statement_table(rows, link_bookings=false) -%}
+{% from 'macros/ui.html' import table, cell, empty_row %}
+{% call table(['Datum', 'Beleg', 'Buchung', 'Betrag', 'Saldo danach']) %}
+{% for row in rows %}
+<tr>
+<td class="{{ cell }} whitespace-nowrap">{{ row.journal.booked_on|d }}</td>
+<td class="{{ cell }}">{{ row.journal.beleg or '' }}</td>
+<td class="{{ cell }}">
+{% if link_bookings %}<a class="font-medium underline decoration-slate-400 underline-offset-2 hover:decoration-slate-900" href="{{ url_for('finance.booking', journal_id=row.journal.id) }}">{{ row.journal.title }}</a>{% else %}{{ row.journal.title }}{% endif %}
+{% if row.entry.category %}<span class="text-sm text-slate-600"> · {{ row.entry.category.name }}</span>{% endif %}
+</td>
+<td class="{{ cell }} whitespace-nowrap text-right">{{ saldo_amount(row.amount_cents) }}</td>
+<td class="{{ cell }} whitespace-nowrap text-right tabular-nums">{{ row.balance_cents|cents }}</td>
+</tr>
+{% else %}
+{{ empty_row('Noch keine Buchungen.', 5) }}
+{% endfor %}
+{% endcall %}
+{%- endmacro %}

@@ -1,0 +1,38 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, link_button, table, cell, empty_row, link_class, muted, badge, button %}
+{% from 'macros/forms.html' import inline_input_class %}
+{% block title %}Kassenbuch{% endblock %}
+{% block content %}
+{% call page_header('Kassenbuch', 'Alle Buchungen, die neuesten zuerst. Wie das Journal der Excel-Datei, nur ohne Fehler-Spalten: jede Buchung ist ausgeglichen.') %}
+{% if can('finance.journal.post') %}{{ link_button('Neue Buchung', url_for('finance.new_booking'), 'primary') }}{% endif %}
+{% endcall %}
+<form method="get" class="mb-4 flex flex-wrap items-end gap-3">
+<div><label for="konto" class="mb-1 block text-sm font-medium">Konto</label>
+<select id="konto" name="konto" class="{{ inline_input_class }}"><option value="">alle</option>
+{% for a in accounts %}<option value="{{ a.id }}"{% if account and account.id == a.id %} selected{% endif %}>{{ a|account_label }}</option>{% endfor %}
+</select></div>
+<div><label for="kostenstelle" class="mb-1 block text-sm font-medium">Kostenstelle</label>
+<select id="kostenstelle" name="kostenstelle" class="{{ inline_input_class }}"><option value="">alle</option>
+{% for c in categories %}<option value="{{ c.id }}"{% if category and category.id == c.id %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+</select></div>
+{{ button('Filtern', 'secondary', 'sm') }}
+</form>
+{% call table(['Datum', 'Beleg', 'Buchung', 'Soll', 'Haben', 'Kostenstelle', 'Betrag']) %}
+{% for item in items %}
+{% for e in item.entries %}
+<tr{% if item.reversed_by or item.kind == 'reversal' %} class="text-slate-500"{% endif %}>
+<td class="{{ cell }} whitespace-nowrap">{% if loop.first %}{{ item.booked_on|d }}{% endif %}</td>
+<td class="{{ cell }}">{% if loop.first %}{{ item.beleg or '' }}{% endif %}</td>
+<td class="{{ cell }}">{% if loop.first %}<a class="{{ link_class }}" href="{{ url_for('finance.booking', journal_id=item.id) }}">{{ item.title }}</a>{% if item.reversed_by %} {{ badge('storniert') }}{% elif item.kind == 'reversal' %} {{ badge('Storno') }}{% endif %}{% endif %}{% if e.memo %}<div class="{{ muted }}">{{ e.memo }}</div>{% endif %}</td>
+<td class="{{ cell }}">{{ e.debit_account|account_label }}</td>
+<td class="{{ cell }}">{{ e.credit_account|account_label }}</td>
+<td class="{{ cell }}">{{ e.category.name if e.category else '' }}</td>
+<td class="{{ cell }} whitespace-nowrap text-right tabular-nums">{{ e.amount_cents|cents }}</td>
+</tr>
+{% endfor %}
+{% else %}
+{{ empty_row('Keine Buchungen.', 7) }}
+{% endfor %}
+{% endcall %}
+{% if truncated %}<p class="mt-3 {{ muted }}">Nur die neuesten Buchungen; für ältere nach Konto oder Kostenstelle filtern.</p>{% endif %}
+{% endblock %}

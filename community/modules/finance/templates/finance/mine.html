@@ -1,0 +1,12 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, card, muted %}
+{% from 'finance/_macros.html' import saldo_amount, saldo_text, statement_table %}
+{% block title %}Mein Konto{% endblock %}
+{% block content %}
+{{ page_header('Mein Konto', 'Alle Buchungen auf deiner Kontokarte, die neuesten zuerst.') }}
+{% call card(class='mb-6') %}
+<p class="flex flex-wrap items-baseline gap-x-3">Saldo: {{ saldo_amount(saldo, 'text-xl') }} <span class="{{ muted }}">{{ saldo_text(saldo) }}</span></p>
+{% if payment_ref %}<p class="mt-1 {{ muted }}">Verwendungszweck für Überweisungen: <strong class="text-slate-900">{{ payment_ref }}</strong></p>{% endif %}
+{% endcall %}
+{{ statement_table(rows) }}
+{% endblock %}

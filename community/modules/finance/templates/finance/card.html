@@ -1,0 +1,18 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, card, link_button, back_link, muted %}
+{% from 'finance/_macros.html' import saldo_amount, saldo_text, statement_table %}
+{% block title %}Kontokarte {{ member.full_name }}{% endblock %}
+{% block content %}
+{% call page_header('Kontokarte ' ~ member.full_name, member.payment_ref and 'Verwendungszweck ' ~ member.payment_ref) %}
+{% if can('finance.journal.post') %}
+{{ link_button('Zahlung', url_for('finance.new_booking', vorlage='zahlung', mitglied=member.public_id), 'primary') }}
+{{ link_button('Belastung', url_for('finance.new_booking', vorlage='belastung', mitglied=member.public_id)) }}
+{{ link_button('Auslage', url_for('finance.new_booking', vorlage='auslage', mitglied=member.public_id)) }}
+{% endif %}
+{% endcall %}
+{% call card(class='mb-6') %}
+<p class="flex flex-wrap items-baseline gap-x-3">Saldo: {{ saldo_amount(saldo, 'text-xl') }} <span class="{{ muted }}">{{ saldo_text(saldo) }}</span></p>
+{% endcall %}
+{{ statement_table(rows, link_bookings=true) }}
+{{ back_link('Kasse', url_for('finance.overview')) }}
+{% endblock %}

@@ -1,0 +1,20 @@
+{% from 'macros/ui.html' import section_header, card, link_class, muted %}
+{% from 'finance/_macros.html' import saldo_amount, saldo_text %}
+{{ section_header('Mein Saldo') }}
+{% call card(class='mb-6 space-y-3') %}
+<div class="flex flex-wrap items-baseline gap-x-3">
+{{ saldo_amount(widget.saldo, 'text-2xl') }}
+<span class="{{ muted }}">{{ saldo_text(widget.saldo) }}</span>
+</div>
+{% if widget.saldo < 0 %}
+<p class="{{ muted }}">Bitte an die Kasse überweisen{% if widget.payment_ref %}, Verwendungszweck <strong class="text-slate-900">{{ widget.payment_ref }}</strong>{% endif %}.</p>
+{% endif %}
+{% if widget.recent %}
+<ul role="list" class="divide-y divide-slate-100 text-sm">
+{% for row in widget.recent %}
+<li class="flex justify-between gap-4 py-1.5"><span>{{ row.journal.booked_on|d }} · {{ row.journal.title }}</span>{{ saldo_amount(row.amount_cents) }}</li>
+{% endfor %}
+</ul>
+{% endif %}
+<p><a class="{{ link_class }}" href="{{ url_for('finance.mine') }}">Kontoauszug</a></p>
+{% endcall %}

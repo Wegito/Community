@@ -137,3 +137,10 @@ An independent review (four reviewers, each finding checked by a second agent tr
 - **Kassenprüfer** is a new Amt (up to two holders, Bursch or Alter Herr, incompatible with Kassenwart) with read access, reports and cosign. Hausbewohner without rank also get `finance.saldo.view_own`, because they pay for laundry.
 - **Receipt numbers** (Beleg) follow the Excel: a letter series (G bank, K cash, B internal) counted per semester; `next_beleg()` suggests the next one.
 - **A semester with bookings cannot be deleted:** modules now register their semester columns (`add_semester_reference`), and the existing safety-net test checks that every column is registered.
+
+## 2026-10-13 — M3-2 and M3-3 (first part)
+
+- **Saldo on the profile through a small card registry** (`core/widgets.py`, `@profile_card`): the members module does not import the Kasse; M2-1 ("Mein Bereich") will build on it. The card shows the Saldo, the last three bookings, the Verwendungszweck when money is owed, and a link to the full Kontoauszug (`/kasse/mein-konto`).
+- **One booking form that mirrors an Excel row** (date, Beleg, text, amount, Soll, Haben, cost centre) instead of separate forms per case. Presets fill it for Zahlung, Bareinzahlung, Belastung and Auslage, e.g. from a Kontokarte. Member cards appear in the Soll/Haben lists and are created on first use. The kind (Zahlung, Belastung, Auslage, Buchung) follows from the accounts.
+- **The Kasse lives under Verwaltung → Kasse** and is visible to the Kassenwart and Kassenprüfer only; the Kassenprüfer sees everything but no buttons that book.
+- **A Kontokarte of a former member stays reachable** for the Kasse (they may still owe money), unlike their member page.

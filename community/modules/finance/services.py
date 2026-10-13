@@ -15,9 +15,10 @@ from typing import NamedTuple
 from sqlalchemy import event, func, select
 
 from community.core.authz.service import permissions_for
+from community.core.club import heimverein_name
 from community.core.org.services import current_semester
 from community.core.platform import audit
-from community.core.time import today_local
+from community.core.time import today_local, utcnow
 from community.extensions import db
 
 from .models import AccountKind, FinAccount, FinBook, FinCategory, FinEntry, FinJournal, JournalKind
@@ -401,3 +402,143 @@ def next_beleg(prefix, booked_on, *, book=None):
         if match and match.group(1).upper() == prefix.upper():
             highest = max(highest, int(match.group(2)))
     return f'{prefix.upper()}{highest + 1}'
+
+
+# --- What the forms need -----------------------------------------------------------
+
+
+def kind_for(debit, credit):
+    """The booking kind for a single entry, from the accounts it moves money between."""
+    if credit.kind == AccountKind.MEMBER and debit.kind in AccountKind.MONEY:
+        return JournalKind.PAYMENT
+    if debit.kind == AccountKind.MEMBER and credit.kind not in AccountKind.MONEY:
+        return JournalKind.CHARGE
+    if credit.kind == AccountKind.MEMBER:
+        return JournalKind.EXPENSE
+    return JournalKind.MANUAL
+
+
+def account_label(account):
+    """The name to show: a Kontokarte shows the member, the Heimverein the club's own name for it."""
+    if account.kind == AccountKind.MEMBER:
+        return account.member.full_name
+    if account.key == 'heimverein':
+        return heimverein_name() or account.name
+    return account.name
+
+
+# --- Managing accounts and cost centres (finance.accounts.manage) -------------------
+
+NAME_MAX = 80
+
+
+def _clean_name(name):
+    name = (name or '').strip()
+    if not name:
+        raise FinanceError('Bitte einen Namen angeben.')
+    if len(name) > NAME_MAX:
+        raise FinanceError(f'Der Name darf höchstens {NAME_MAX} Zeichen haben.')
+    return name
+
+
+def _name_taken(name, *, book, other_than=None):
+    query = select(FinAccount.id).where(
+        FinAccount.book_id == book.id,
+        FinAccount.kind != AccountKind.MEMBER,
+        func.lower(FinAccount.name) == name.lower(),
+    )
+    if other_than is not None:
+        query = query.where(FinAccount.id != other_than.id)
+    return db.session.scalar(query.limit(1)) is not None
+
+
+def create_account(name, kind, *, needs_cost_centre=False, actor, book=None):
+    """A new account (not a Kontokarte; those are created on first use). Commits nothing."""
+    book = book or default_book()
+    name = _clean_name(name)
+    if kind not in AccountKind.ALL or kind == AccountKind.MEMBER:
+        raise FinanceError('Bitte eine Kontoart wählen.')
+    if _name_taken(name, book=book):
+        raise FinanceError(f'Ein Konto „{name}“ gibt es schon.')
+    highest = db.session.scalar(select(func.max(FinAccount.sort_order)).where(FinAccount.book_id == book.id)) or 0
+    account = FinAccount(
+        book_id=book.id, kind=kind, name=name, needs_cost_centre=bool(needs_cost_centre), sort_order=highest + 10
+    )
+    db.session.add(account)
+    db.session.flush()
+    audit.record('finance.account.create', account, actor=actor, diff={'name': name, 'kind': kind})
+    return account
+
+
+def update_account(account, *, name, needs_cost_centre, archived, actor):
+    """Rename an account, change whether it needs a cost centre, archive or restore it."""
+    if account.kind == AccountKind.MEMBER:
+        raise FinanceError('Kontokarten heißen wie das Mitglied und werden nicht umbenannt.')
+    name = _clean_name(name)
+    book = db.session.get(FinBook, account.book_id)
+    if _name_taken(name, book=book, other_than=account):
+        raise FinanceError(f'Ein Konto „{name}“ gibt es schon.')
+    if archived and account.archived_at is None and account_balance(account) != 0:
+        raise FinanceError('Ein Konto mit Bestand kann nicht archiviert werden; erst ausgleichen.')
+    before = audit.snapshot(account, ('name', 'needs_cost_centre', 'archived_at'))
+    account.name = name
+    account.needs_cost_centre = bool(needs_cost_centre)
+    if archived and account.archived_at is None:
+        account.archived_at = utcnow()
+    elif not archived:
+        account.archived_at = None
+    diff = audit.changes(account, ('name', 'needs_cost_centre', 'archived_at'), before)
+    if diff:
+        audit.record('finance.account.update', account, actor=actor, diff=diff)
+    return diff
+
+
+def create_category(name, *, actor):
+    name = _clean_name(name)
+    if db.session.scalar(select(FinCategory.id).where(func.lower(FinCategory.name) == name.lower()).limit(1)):
+        raise FinanceError(f'Die Kostenstelle „{name}“ gibt es schon.')
+    highest = db.session.scalar(select(func.max(FinCategory.sort_order))) or 0
+    category = FinCategory(name=name, sort_order=highest + 10)
+    db.session.add(category)
+    db.session.flush()
+    audit.record('finance.category.create', category, actor=actor, diff={'name': name})
+    return category
+
+
+def update_category(category, *, name, archived, actor):
+    name = _clean_name(name)
+    taken = select(FinCategory.id).where(func.lower(FinCategory.name) == name.lower(), FinCategory.id != category.id)
+    if db.session.scalar(taken.limit(1)):
+        raise FinanceError(f'Die Kostenstelle „{name}“ gibt es schon.')
+    before = audit.snapshot(category, ('name', 'archived_at'))
+    category.name = name
+    if archived and category.archived_at is None:
+        category.archived_at = utcnow()
+    elif not archived:
+        category.archived_at = None
+    diff = audit.changes(category, ('name', 'archived_at'), before)
+    if diff:
+        audit.record('finance.category.update', category, actor=actor, diff=diff)
+    return diff
+
+
+def category_totals(*, book=None, start=None, end=None):
+    """{category_id: net_cents} on cost centres: income (credits) minus spending (debits)."""
+    book = book or default_book()
+    query = (
+        select(FinEntry.category_id, FinEntry.debit_account_id, FinEntry.credit_account_id, FinEntry.amount_cents)
+        .join(FinJournal, FinJournal.id == FinEntry.journal_id)
+        .where(FinJournal.book_id == book.id, FinEntry.category_id.is_not(None))
+    )
+    if start is not None:
+        query = query.where(FinJournal.booked_on >= start)
+    if end is not None:
+        query = query.where(FinJournal.booked_on <= end)
+    flagged = set(db.session.scalars(select(FinAccount.id).where(FinAccount.needs_cost_centre.is_(True))))
+    totals = {}
+    for category_id, debit_id, credit_id, cents in db.session.execute(query):
+        if credit_id in flagged:
+            totals[category_id] = totals.get(category_id, 0) + cents
+        if debit_id in flagged:
+            totals[category_id] = totals.get(category_id, 0) - cents
+    return totals

@@ -48,6 +48,19 @@ MAIN = (
 
 # "Verwaltung": shown only to someone who may open at least one of these pages.
 ADMIN = (
+    NavLink(
+        'Kasse',
+        'finance.overview',
+        also=(
+            'finance.card',
+            'finance.journal',
+            'finance.booking',
+            'finance.new_booking',
+            'finance.accounts',
+            'finance.edit_account',
+            'finance.edit_category',
+        ),
+    ),
     NavLink('Import', 'members.import_upload', also=('members.import_confirm',)),
     NavLink('Gruppen', 'org.groups', also=('org.group',)),
     NavLink('Semester', 'org.semesters', also=('org.edit_semester',)),

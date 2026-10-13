@@ -23,6 +23,8 @@ from community.extensions import db
 from community.modules.auth.services import email_change_token, password_reset_token
 from community.modules.bookings.models import Resource
 from community.modules.bookings.services import create_booking
+from community.modules.finance.models import FinCategory
+from community.modules.finance.services import Line, account_by_key, member_account, post_journal
 from community.modules.laundry.models import LaundryMachine
 from community.modules.laundry.services import record_use
 from community.modules.tasks.models import Chore
@@ -66,6 +68,13 @@ def data(app):
     notification = notify(member.member, 'rank_changed', 'Test')
     invitation, _ = create_invitation(make_member('Neu Ling'), 'link', created_by=member)
     laundry_use, _ = record_use(member.member, washes=1, dried=False, submission_id='smoke', recorded_by=member)
+    journal, _ = post_journal(
+        'payment',
+        'Smoke',
+        date(2026, 10, 2),
+        [Line(account_by_key('giro'), member_account(member.member), 100)],
+        posted_by=None,
+    )
     db.session.commit()
     # URL parameters by name, filled in for rules like /chores/edit/<int:cid>.
     return {
@@ -85,6 +94,9 @@ def data(app):
         'use_id': laundry_use.id,
         'machine_id': db.session.scalars(select(LaundryMachine)).first().id,
         'qr_id': tokens_for('laundry')[0].id,
+        'journal_id': journal.id,
+        'account_id': account_by_key('bar').id,
+        'category_id': db.session.scalars(select(FinCategory)).first().id,
     }
 
 
