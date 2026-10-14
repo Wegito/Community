@@ -62,6 +62,8 @@ ADMIN = (
             'finance.umlage',
             'finance.recurring_list',
             'finance.recurring',
+            'finance.cosign_list',
+            'finance.cosign_request',
         ),
     ),
     NavLink('Import', 'members.import_upload', also=('members.import_confirm',)),

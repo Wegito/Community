@@ -138,3 +138,8 @@ class RecurringForm(FlaskForm):
 
 class ButtonForm(FlaskForm):
     """CSRF-only form for single-button actions."""
+
+
+class RejectForm(FlaskForm):
+    reason = StringField('Grund', validators=[DataRequired(), Length(max=500)])
+    submit = SubmitField('Ablehnen')

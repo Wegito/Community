@@ -24,7 +24,7 @@ from community.modules.auth.services import email_change_token, password_reset_t
 from community.modules.bookings.models import Resource
 from community.modules.bookings.services import create_booking
 from community.modules.finance.charges import save_recurring
-from community.modules.finance.models import FinCategory
+from community.modules.finance.models import FinCategory, FinRequest
 from community.modules.finance.services import Line, account_by_key, member_account, post_journal
 from community.modules.laundry.models import LaundryMachine
 from community.modules.laundry.services import record_use
@@ -86,6 +86,17 @@ def data(app):
         group=None,
         actor=None,
     )
+    cosign_request = FinRequest(
+        book_id=journal.book_id,
+        kind='expense',
+        title='Smoke',
+        booked_on=date(2026, 10, 2),
+        lines_json=[
+            {'debit': account_by_key('buero').id, 'credit': member_account(member.member).id, 'amount_cents': 100}
+        ],
+        requested_by_user_id=member.id,
+    )
+    db.session.add(cosign_request)
     db.session.commit()
     # URL parameters by name, filled in for rules like /chores/edit/<int:cid>.
     return {
@@ -109,6 +120,7 @@ def data(app):
         'account_id': account_by_key('bar').id,
         'category_id': db.session.scalars(select(FinCategory)).first().id,
         'recurring_id': recurring.id,
+        'request_id': cosign_request.id,
     }
 
 

@@ -20,7 +20,7 @@ from community.core.time import today_local
 from community.core.widgets import profile_card
 from community.extensions import db
 
-from . import bp, charges
+from . import bp, charges, cosign
 from . import services as ledger
 from .forms import (
     AccountEditForm,
@@ -30,10 +30,11 @@ from .forms import (
     CategoryEditForm,
     CategoryForm,
     RecurringForm,
+    RejectForm,
     ReverseForm,
     UmlageForm,
 )
-from .models import AccountKind, FinAccount, FinCategory, FinJournal, FinRecurring
+from .models import AccountKind, FinAccount, FinCategory, FinJournal, FinRecurring, FinRequest, RequestStatus
 
 JOURNAL_PAGE_LIMIT = 300
 
@@ -92,6 +93,7 @@ def overview():
         money=money,
         only_debts=only_debts,
         recent=ledger.journals(limit=8),
+        open_requests=len(cosign.open_requests()),
     )
 
 
@@ -134,7 +136,14 @@ def journal():
 @require_perm('finance.ledger.view_all')
 def booking(journal_id):
     item = db.get_or_404(FinJournal, journal_id)
-    return render_template('finance/booking.html', item=item, form=ReverseForm())
+    return render_template('finance/booking.html', item=item, form=ReverseForm(), pending=_pending_reversal(item))
+
+
+def _pending_reversal(journal):
+    query = select(FinRequest).where(
+        FinRequest.reverses_journal_id == journal.id, FinRequest.status == RequestStatus.OPEN
+    )
+    return db.session.scalar(query)
 
 
 @bp.route('/buchung/<int:journal_id>/storno', methods=['POST'])
@@ -146,14 +155,26 @@ def reverse(journal_id):
         flash('Bitte einen Grund für das Storno angeben.', 'danger')
         return redirect(url_for('finance.booking', journal_id=item.id))
     try:
-        reversal = ledger.reverse(item, reversed_by=current_user, reason=form.reason.data)
+        if request.form.get('vorlegen'):
+            pending, _ = cosign.request_reversal(item, requested_by=current_user, reason=form.reason.data)
+        else:
+            reversal = ledger.reverse(item, reversed_by=current_user, reason=form.reason.data)
+    except ledger.CosignRequired:
+        db.session.rollback()
+        return render_template('finance/booking.html', item=item, form=form, cosign_needed=True, pending=None)
     except ledger.FinanceError as error:
         db.session.rollback()
         flash(str(error), 'danger')
         return redirect(url_for('finance.booking', journal_id=item.id))
     db.session.commit()
+    if request.form.get('vorlegen'):
+        flash(SUBMITTED_FOR_COSIGN, 'success')
+        return redirect(url_for('finance.cosign_request', request_id=pending.id))
     flash('Storniert.', 'success')
     return redirect(url_for('finance.booking', journal_id=reversal.id))
+
+
+SUBMITTED_FOR_COSIGN = 'Zur Gegenzeichnung vorgelegt. Gebucht wird erst, wenn der Kassenprüfer bestätigt.'
 
 
 # --- Booking form --------------------------------------------------------------------------
@@ -218,31 +239,46 @@ def new_booking():
             form.credit.data = _preset_value(credit, member)
             form.beleg.data = ledger.next_beleg(series, form.booked_on.data)
             form.title.data = title
+    cosign_needed = False
     if form.validate_on_submit():
         debit, credit = _resolve(form.debit.data), _resolve(form.credit.data)
         category = db.session.get(FinCategory, int(form.category.data)) if form.category.data else None
+        booking_args = (
+            ledger.kind_for(debit, credit),
+            form.title.data,
+            form.booked_on.data,
+            [ledger.Line(debit, credit, form.amount.cents, category)],
+        )
+        submit_for_cosign = bool(request.form.get('vorlegen'))
         try:
-            journal, _ = ledger.post_journal(
-                ledger.kind_for(debit, credit),
-                form.title.data,
-                form.booked_on.data,
-                [ledger.Line(debit, credit, form.amount.cents, category)],
-                posted_by=current_user,
-                beleg=form.beleg.data,
-                note=form.note.data,
-            )
+            if submit_for_cosign:
+                pending, _ = cosign.request_booking(
+                    *booking_args, requested_by=current_user, beleg=form.beleg.data, note=form.note.data
+                )
+            else:
+                journal, _ = ledger.post_journal(
+                    *booking_args, posted_by=current_user, beleg=form.beleg.data, note=form.note.data
+                )
+        except ledger.CosignRequired:
+            db.session.rollback()
+            cosign_needed = True
         except ledger.FinanceError as error:
             db.session.rollback()
             flash(str(error), 'danger')
         else:
             db.session.commit()
+            if submit_for_cosign:
+                flash(SUBMITTED_FOR_COSIGN, 'success')
+                return redirect(url_for('finance.cosign_request', request_id=pending.id))
             flash(f'Gebucht: {journal.title}', 'success')
             if request.form.get('weiter'):
                 return redirect(url_for('finance.new_booking'))
             return redirect(url_for('finance.booking', journal_id=journal.id))
     day = form.booked_on.data or today_local()
     next_numbers = [ledger.next_beleg(series, day) for series in BELEG_SERIES]
-    return render_template('finance/new_booking.html', form=form, next_numbers=next_numbers, member=member)
+    return render_template(
+        'finance/new_booking.html', form=form, next_numbers=next_numbers, member=member, cosign_needed=cosign_needed
+    )
 
 
 # --- Accounts and cost centres ----------------------------------------------------------
@@ -543,3 +579,77 @@ def edit_recurring(recurring_id):
     else:
         flash('Bitte die Angaben prüfen.', 'danger')
     return redirect(url_for('finance.recurring', recurring_id=item.id))
+
+
+# --- Gegenzeichnung (push-TAN, M3-8) ---------------------------------------------------------
+
+
+@bp.route('/gegenzeichnung')
+@require_perm('finance.ledger.view_all')
+def cosign_list():
+    return render_template(
+        'finance/cosign_list.html', open_items=cosign.open_requests(), decided=cosign.decided_requests()
+    )
+
+
+def _request_page(item, reject_form=None, status=200):
+    try:
+        lines = cosign.request_lines(item)
+    except ledger.FinanceError as error:
+        lines, problem = [], str(error)
+    else:
+        problem = None
+    may_decide = (
+        item.is_open and can('finance.journal.cosign') and item.requested_by.member_id != current_user.member_id
+    )
+    page = render_template(
+        'finance/cosign_request.html',
+        item=item,
+        lines=lines,
+        problem=problem,
+        total=sum(line.amount_cents for line in lines),
+        may_decide=may_decide,
+        reject_form=reject_form or RejectForm(),
+    )
+    return page, status
+
+
+@bp.route('/gegenzeichnung/<int:request_id>')
+@require_perm('finance.ledger.view_all')
+def cosign_request(request_id):
+    return _request_page(db.get_or_404(FinRequest, request_id))
+
+
+@bp.route('/gegenzeichnung/<int:request_id>/bestaetigen', methods=['POST'])
+@require_perm('finance.journal.cosign')
+def cosign_confirm(request_id):
+    item = db.get_or_404(FinRequest, request_id)
+    if not ButtonForm().validate_on_submit():
+        abort(400)
+    try:
+        journal = cosign.confirm(item, confirmed_by=current_user)
+    except ledger.FinanceError as error:
+        db.session.rollback()
+        flash(str(error), 'danger')
+        return redirect(url_for('finance.cosign_request', request_id=item.id))
+    db.session.commit()
+    flash(f'Bestätigt und gebucht: {journal.title}', 'success')
+    return redirect(url_for('finance.booking', journal_id=journal.id))
+
+
+@bp.route('/gegenzeichnung/<int:request_id>/ablehnen', methods=['POST'])
+@require_perm('finance.journal.cosign')
+def cosign_reject(request_id):
+    item = db.get_or_404(FinRequest, request_id)
+    form = RejectForm()
+    if not form.validate_on_submit():
+        return _request_page(item, form, 400)
+    try:
+        cosign.reject(item, rejected_by=current_user, reason=form.reason.data)
+    except ledger.FinanceError as error:
+        db.session.rollback()
+        flash(str(error), 'danger')
+        return redirect(url_for('finance.cosign_request', request_id=item.id))
+    db.session.commit()
+    flash('Abgelehnt. Es wurde nichts gebucht.', 'success')
+    return redirect(url_for('finance.cosign_list'))

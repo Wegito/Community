@@ -133,12 +133,16 @@ def _check_lines(lines, book, *, allow_archived):
             raise FinanceError(f'Buchungen auf „{needs[0]}“ brauchen eine Kostenstelle.')
 
 
+def credits_own_card(lines, user):
+    """True if a line credits `user`'s own Kontokarte (then a second person must confirm)."""
+    if user is None:  # server operator (CLI, import)
+        return False
+    return any(line.credit.kind == AccountKind.MEMBER and line.credit.member_id == user.member_id for line in lines)
+
+
 def _check_cosign(lines, posted_by, cosigned_by):
     """Rule 2 of §6.3: nobody credits their own Kontokarte alone."""
-    if posted_by is None:  # server operator (CLI, import)
-        return
-    own = any(line.credit.kind == AccountKind.MEMBER and line.credit.member_id == posted_by.member_id for line in lines)
-    if not own:
+    if not credits_own_card(lines, posted_by):
         return
     if cosigned_by is None:
         raise CosignRequired(
@@ -149,6 +153,21 @@ def _check_cosign(lines, posted_by, cosigned_by):
         raise CosignRequired('Gegenzeichnen muss eine andere Person.')
     if COSIGN_PERMISSION not in permissions_for(cosigned_by.member):
         raise CosignRequired(f'{cosigned_by.member.full_name} darf keine Buchungen gegenzeichnen.')
+
+
+def check_booking(kind, title, booked_on, lines, book, *, allow_archived=False):
+    """Everything post_journal() checks except the cosign. Returns the cleaned title."""
+    title = (title or '').strip()
+    if not title:
+        raise FinanceError('Bitte einen Buchungstext angeben.')
+    if len(title) > TITLE_MAX:
+        raise FinanceError(f'Der Buchungstext darf höchstens {TITLE_MAX} Zeichen haben.')
+    if kind not in JournalKind.LABELS:
+        raise FinanceError(f'Unbekannte Buchungsart {kind!r}.')
+    if not isinstance(booked_on, date):
+        raise FinanceError('Bitte ein Buchungsdatum angeben.')
+    _check_lines(lines, book, allow_archived=allow_archived)
+    return title
 
 
 def post_journal(
@@ -177,17 +196,8 @@ def post_journal(
     if existing is not None:
         return existing, False
     book = book or default_book()
-    title = (title or '').strip()
-    if not title:
-        raise FinanceError('Bitte einen Buchungstext angeben.')
-    if len(title) > TITLE_MAX:
-        raise FinanceError(f'Der Buchungstext darf höchstens {TITLE_MAX} Zeichen haben.')
-    if kind not in JournalKind.LABELS:
-        raise FinanceError(f'Unbekannte Buchungsart {kind!r}.')
-    if not isinstance(booked_on, date):
-        raise FinanceError('Bitte ein Buchungsdatum angeben.')
     lines = list(lines)
-    _check_lines(lines, book, allow_archived=_allow_archived)
+    title = check_booking(kind, title, booked_on, lines, book, allow_archived=_allow_archived)
     _check_cosign(lines, posted_by, cosigned_by)
 
     semester = current_semester(booked_on)
@@ -238,8 +248,13 @@ def post_journal(
     return journal, True
 
 
-def reverse(journal, *, reversed_by, reason, booked_on=None, cosigned_by=None):
-    """Cancel a booking with a second one that moves every amount back. Returns the reversal."""
+def reversal_lines(journal):
+    """The lines that move every amount of `journal` back."""
+    return [Line(e.credit_account, e.debit_account, e.amount_cents, e.category, e.memo) for e in journal.entries]
+
+
+def check_reversible(journal, reason):
+    """Raise FinanceError unless `journal` may be reversed for `reason`. Returns the cleaned reason."""
     reason = (reason or '').strip()
     if not reason:
         raise FinanceError('Bitte einen Grund für das Storno angeben.')
@@ -247,7 +262,13 @@ def reverse(journal, *, reversed_by, reason, booked_on=None, cosigned_by=None):
         raise FinanceError('Ein Storno kann nicht storniert werden; bitte die Buchung neu erfassen.')
     if journal.reversed_by is not None:
         raise FinanceError('Diese Buchung ist bereits storniert.')
-    lines = [Line(e.credit_account, e.debit_account, e.amount_cents, e.category, e.memo) for e in journal.entries]
+    return reason
+
+
+def reverse(journal, *, reversed_by, reason, booked_on=None, cosigned_by=None):
+    """Cancel a booking with a second one that moves every amount back. Returns the reversal."""
+    reason = check_reversible(journal, reason)
+    lines = reversal_lines(journal)
     reversal, _ = post_journal(
         JournalKind.REVERSAL,
         f'Storno: {journal.title}'[:TITLE_MAX],

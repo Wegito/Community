@@ -184,3 +184,61 @@ class FinRecurring(db.Model):
     @property
     def rank_key_list(self):
         return [key for key in (self.rank_keys or '').split(',') if key]
+
+
+class RequestStatus:
+    OPEN = 'open'
+    CONFIRMED = 'confirmed'
+    REJECTED = 'rejected'
+    LABELS = {OPEN: 'offen', CONFIRMED: 'bestätigt', REJECTED: 'abgelehnt'}
+
+
+class FinRequest(db.Model):
+    """A booking the Kassenwart prepared that credits their own Kontokarte (push-TAN, M3-8).
+
+    Nothing is booked until a second person with finance.journal.cosign (the Kassenprüfer)
+    confirms it; then the booking is posted with them as cosigner. A rejection books nothing.
+    Either a new booking (`lines_json`) or the reversal of `reverses_journal_id`.
+    """
+
+    __table_args__ = (
+        db.CheckConstraint("status IN ('open', 'confirmed', 'rejected')", name='known_status'),
+        db.CheckConstraint("(status = 'confirmed') = (journal_id IS NOT NULL)", name='confirmed_iff_journal'),
+        db.CheckConstraint("(status = 'open') = (decided_at IS NULL)", name='decided_iff_closed'),
+        db.CheckConstraint('(reverses_journal_id IS NULL) != (lines_json IS NULL)', name='booking_or_reversal'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    book_id = db.Column(db.Integer, db.ForeignKey('fin_book.id'), nullable=False)
+    status = db.Column(db.String(10), nullable=False, default=RequestStatus.OPEN, index=True)
+    kind = db.Column(db.String(12), nullable=False)  # JournalKind of the booking it will become
+    title = db.Column(db.String(200), nullable=False)
+    booked_on = db.Column(db.Date, nullable=False)
+    beleg = db.Column(db.String(20))
+    note = db.Column(db.Text)  # the booking's note; for a reversal, the reason
+    # [{"debit": account id, "credit": account id, "amount_cents": n, "category": id|null, "memo": str|null}]
+    lines_json = db.Column(db.JSON(none_as_null=True))
+    reverses_journal_id = db.Column(db.Integer, db.ForeignKey('fin_journal.id'))
+    requested_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    requested_at = db.Column(UTCDateTime, nullable=False, default=utcnow)
+    decided_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    decided_at = db.Column(UTCDateTime)
+    reject_reason = db.Column(db.String(500))
+    journal_id = db.Column(db.Integer, db.ForeignKey('fin_journal.id'), unique=True)
+
+    requested_by = db.relationship('User', foreign_keys=[requested_by_user_id])
+    decided_by = db.relationship('User', foreign_keys=[decided_by_user_id])
+    reverses = db.relationship('FinJournal', foreign_keys=[reverses_journal_id])
+    journal = db.relationship('FinJournal', foreign_keys=[journal_id])
+
+    @property
+    def status_label(self):
+        return RequestStatus.LABELS.get(self.status, self.status)
+
+    @property
+    def kind_label(self):
+        return JournalKind.LABELS.get(self.kind, self.kind)
+
+    @property
+    def is_open(self):
+        return self.status == RequestStatus.OPEN

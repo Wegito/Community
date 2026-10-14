@@ -167,3 +167,22 @@ An independent review (four reviewers, each finding checked by a second agent tr
 - **Semester closing is a button, not a job** (owner): easy, checked by the Kassenwart, never automatic.
 - **Subscription model on hold** (owner): the app stays ready for both a yearly licence for self-hosted
   copies and managed hosting (M9-9). Legal help is needed before selling.
+
+## 2026-10-14 — M3-8 push-TAN
+
+- **A request, not a half-booked journal.** A booking that credits the poster's own Kontokarte is saved as
+  a `fin_request` (the lines as JSON, or the journal to reverse); the ledger stays untouched until a
+  Kassenprüfer confirms. Confirming posts the booking with the Kassenwart as poster and the Kassenprüfer
+  as cosigner, so the existing cosign check in `post_journal()` runs again.
+- **Booked exactly once:** the status moves from "open" with a conditional UPDATE (two clicks or two
+  Kassenprüfer at once: the second one gets "bereits entschieden"), and the booking carries the
+  idempotency key `request:<id>` (a reversal is unique per journal anyway).
+- **Everything is checked again at confirmation:** the accounts (an account archived in between stops
+  it), whether the requester still may book (an ended Amt stops it), and that the confirmer is someone
+  else with `finance.journal.cosign`. The Kassenprüfer can always reject instead; a reject needs a reason.
+- **Only offered when needed.** The booking form and the Storno show "Zur Gegenzeichnung vorlegen" only
+  after the ledger said a cosign is required, and the service refuses requests that do not need one. If
+  no one else holds the right (no Kassenprüfer appointed), submitting is refused with a hint.
+- **Notifications:** every cosigner gets "Buchung zur Gegenzeichnung" (bell and email, as each chose);
+  the Kassenwart gets the decision. Both are new kinds members can switch off in their settings.
+- **Not built:** withdrawing a request (the Kassenprüfer rejects it instead) and requests that expire.

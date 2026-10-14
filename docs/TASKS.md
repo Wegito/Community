@@ -43,7 +43,7 @@ Recommended order; cards on the same line of the order table can run in parallel
 | 3 | M3-7a · Club IBAN and payment details | T2 | T2 | — |
 | 4 | M3-4b · Monthly charges booked automatically (opt-in) | T2 | T3 | — |
 | 4 | M3-10a · Kassenzählung (cash count) | T2 | T3 | — |
-| 5 | M3-8 · Second-person confirmation (cosign) and Auslagen | T3 | T3 | — |
+| 5 | M3-8 · Second-person confirmation (cosign) and Auslagen ✅ | T3 | T3 | — |
 | 5 | M4-5 · Laundry month onto the Kontokarten | T3 | T3 | — |
 | 6 | M3-7b · Zahlungsaufforderung by email | T2 | T3 | M3-7a |
 | 6 | M3-10b · Bilanz and GuV | T3 | T3 | M3-5a |
@@ -149,7 +149,7 @@ T2 · review T3 (money) · depends on — · ~200 lines
   store the count (denominations) in the booking note.
 - **Done when:** tests for no difference (nothing booked), a shortfall and a surplus; `tools/check.sh` passes.
 
-### M3-8 · Push-TAN: the Kassenprüfer confirms (cosign) the Kassenwart's own bookings
+### M3-8 · Push-TAN: the Kassenprüfer confirms (cosign) the Kassenwart's own bookings ✅
 T3 · review T3 · depends on — · ~350 lines
 - **Goal:** A booking that credits the Kassenwart's own Kontokarte (an Auslage, a reversed charge) is
   prepared by the Kassenwart and confirmed by the **Kassenprüfer**, like a push-TAN (owner, 2026-10-13);

@@ -708,17 +708,17 @@ The contract is published early as `docs/api/openapi.yaml` (M6-2) so the user ca
 
 ## 8. Delivery plan
 
-### 8.0 Where we stand (2026-10-13)
+### 8.0 Where we stand (2026-10-14)
 
 All work so far is on branch `claude/awesome-knuth-9a9r3n` (pull request Wegito/Community#1, not merged
-yet): 15 migrations, about 870 tests, CI green. Nothing is deployed yet (see "Owner" below).
+yet): 16 migrations, about 900 tests, CI green. Nothing is deployed yet (see "Owner" below).
 
 | Milestone | Status | What exists |
 |---|---|---|
 | M0 Rescue | ✅ done | App starts, secured, tests, CI |
 | M1 Members & rights | ✅ done | Members without login, personal invitations (link, QR, email), ranks, Ämter, groups, semesters, permission system, audit log, jobs, mail, notifications, import, member lifecycle |
 | M4 Wäsche per QR | ✅ done except M4-5, M4-6 | QR form, prices, monthly statement and Excel, import of the old list |
-| M3 Kasse & Saldo | 🟡 about half | Ledger (M3-1), Saldo on the profile (M3-2), Kasse pages (M3-3 first part), Umlage with Kasse subsidy and monthly charges (M3-4). Open: Sammelzahlung, Excel export, payment requests, cosign flow, closing (Bilanz, GuV, Kassenzählung, AH-Kontingent), opening balances |
+| M3 Kasse & Saldo | 🟡 about half | Ledger (M3-1), Saldo on the profile (M3-2), Kasse pages (M3-3 first part), Umlage with Kasse subsidy and monthly charges (M3-4), push-TAN confirmation by the Kassenprüfer (M3-8). Open: Sammelzahlung, Excel export, payment requests, closing (Bilanz, GuV, Kassenzählung, AH-Kontingent), opening balances |
 | M9 Other Verbindungen | 🟡 started | Club name, short name, Heimverein editable (M9-1) |
 | M2, M5, M6, M7 | ⬜ open | Planned below |
 | M8 Operations | ⬜ open | Needs the owner: server, domain, backups |
@@ -844,7 +844,7 @@ M3-10c (AH-Kontingent).
 | M3-5 | xlsx export ("better Excel") | Kassenbuch, Saldenliste, statements, semester report (openpyxl, formatted) | M3-1 | S | M3-2 … M3-4, M3-6 … M3-8 |
 | M3-6 | Opening-balance import | Procedure in §7.2: dry run, Decimal conversion, mapping, sign check, reconciliation report, sign-off, OPENING journals | M3-0, M3-1, M1-9 | M | M3-2 … M3-5, M3-7 |
 | M3-7 | Zahlungsaufforderung | Filter by Saldo below X → preview → personal emails via jobs (statement, IBAN, Verwendungszweck); reminders after N days (can be switched off); optional GiroCode **[verify EPC spec + library]** | M3-1, M1-6 | M | M3-4 … M3-6, M3-8 |
-| M3-8 | Club payments & Auslagen | Manual journals: supplier invoices (EXPENSE/BANK), member Auslage credit and payout, cash book | M3-3 | S | M3-4 … M3-7 |
+| M3-8 | Club payments & Auslagen ✅ (push-TAN by the Kassenprüfer) | Manual journals: supplier invoices (EXPENSE/BANK), member Auslage credit and payout, cash book | M3-3 | S | M3-4 … M3-7 |
 | M3-10 | Semesterabschluss | Bilanz and GuV from the journal; AH-Kontingent report (budget, spending by group, remainder); cash count by denomination that books the difference; carry balances into the next semester; all as sheets in the xlsx export | M3-1, M3-5 | M | M3-7, M3-8 |
 | M3-9 | Finance go-live (ops) | **Gate: M8-3 restore drill passed.** Import, one month of parallel running, archive Excel read-only. | M3-3, M3-6, M8-3 | S | — |
 

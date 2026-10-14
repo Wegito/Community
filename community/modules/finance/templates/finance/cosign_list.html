@@ -1,0 +1,32 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, section_header, table, cell, empty_row, link_class, muted, badge, back_link %}
+{% block title %}Gegenzeichnung{% endblock %}
+{% block content %}
+{{ page_header('Gegenzeichnung', 'Buchungen, die dem Kassenwart selbst etwas gutschreiben, bucht erst der Kassenprüfer (wie eine Push-TAN).') }}
+{% call table(['Vorgelegt', 'Buchung', 'Von', 'Datum']) %}
+{% for item in open_items %}
+<tr>
+<td class="{{ cell }} whitespace-nowrap">{{ item.requested_at|dt }}</td>
+<td class="{{ cell }}"><a class="{{ link_class }}" href="{{ url_for('finance.cosign_request', request_id=item.id) }}">{{ item.title }}</a> <span class="{{ muted }}">({{ item.kind_label }})</span></td>
+<td class="{{ cell }}">{{ item.requested_by.member.full_name }}</td>
+<td class="{{ cell }} whitespace-nowrap">{{ item.booked_on|d }}</td>
+</tr>
+{% else %}
+{{ empty_row('Nichts wartet auf Gegenzeichnung.', 4) }}
+{% endfor %}
+{% endcall %}
+{{ section_header('Zuletzt entschieden') }}
+{% call table(['Entschieden', 'Buchung', 'Von', 'Ergebnis']) %}
+{% for item in decided %}
+<tr>
+<td class="{{ cell }} whitespace-nowrap">{{ item.decided_at|dt }}</td>
+<td class="{{ cell }}"><a class="{{ link_class }}" href="{{ url_for('finance.cosign_request', request_id=item.id) }}">{{ item.title }}</a></td>
+<td class="{{ cell }}">{{ item.requested_by.member.full_name }}</td>
+<td class="{{ cell }}">{{ badge(item.status_label, 'success' if item.status == 'confirmed' else 'danger') }} {{ item.decided_by.member.full_name }}</td>
+</tr>
+{% else %}
+{{ empty_row('Noch nichts entschieden.', 4) }}
+{% endfor %}
+{% endcall %}
+{{ back_link('Kasse', url_for('finance.overview')) }}
+{% endblock %}

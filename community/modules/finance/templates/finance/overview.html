@@ -1,5 +1,5 @@
 {% extends 'layout.html' %}
-{% from 'macros/ui.html' import page_header, section_header, card, link_button, table, cell, empty_row, link_class, muted %}
+{% from 'macros/ui.html' import page_header, section_header, card, link_button, table, cell, empty_row, link_class, muted, alert %}
 {% from 'finance/_macros.html' import saldo_amount %}
 {% block title %}Kasse{% endblock %}
 {% block content %}
@@ -7,7 +7,11 @@
 {% if can('finance.journal.post') %}{{ link_button('Neue Buchung', url_for('finance.new_booking'), 'primary') }}{{ link_button('Umlage', url_for('finance.umlage')) }}{{ link_button('Monatlich', url_for('finance.recurring_list')) }}{% endif %}
 {{ link_button('Kassenbuch', url_for('finance.journal')) }}
 {{ link_button('Konten', url_for('finance.accounts')) }}
+{{ link_button('Gegenzeichnung', url_for('finance.cosign_list')) }}
 {% endcall %}
+{% if open_requests %}
+{% call alert('warning', class='mb-6') %}<a class="{{ link_class }}" href="{{ url_for('finance.cosign_list') }}">{{ open_requests }} {{ 'Buchung wartet' if open_requests == 1 else 'Buchungen warten' }} auf Gegenzeichnung</a>{% endcall %}
+{% endif %}
 
 <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
 {% for account, balance in money %}

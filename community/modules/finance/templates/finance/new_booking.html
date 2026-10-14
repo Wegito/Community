@@ -1,6 +1,6 @@
 {% extends 'layout.html' %}
 {% from 'macros/forms.html' import field, submit %}
-{% from 'macros/ui.html' import page_header, card, back_link, muted, btn_class %}
+{% from 'macros/ui.html' import page_header, card, back_link, muted, btn_class, alert, button %}
 {% block title %}Neue Buchung{% endblock %}
 {% block content %}
 {{ page_header('Neue Buchung', 'Eine Zeile im Kassenbuch: Soll bekommt das Geld, Haben gibt es.') }}
@@ -20,6 +20,12 @@
 </div>
 {{ field(form.category) }}
 {{ field(form.note, rows=2) }}
+{% if cosign_needed %}
+{% call alert('warning') %}
+<p>Diese Buchung schreibt dir selbst etwas gut. Gebucht wird sie erst, wenn ein Kassenprüfer sie bestätigt (wie eine Push-TAN).</p>
+<div class="mt-3">{{ button('Zur Gegenzeichnung vorlegen', name='vorlegen', value='1') }}</div>
+{% endcall %}
+{% endif %}
 <div class="flex flex-wrap gap-3">
 {{ submit(form.submit) }}
 <button type="submit" name="weiter" value="1" class="{{ btn_class('secondary') }}">Buchen und nächste</button>

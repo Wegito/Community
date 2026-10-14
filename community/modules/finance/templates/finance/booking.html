@@ -1,5 +1,5 @@
 {% extends 'layout.html' %}
-{% from 'macros/ui.html' import page_header, section_header, card, table, cell, back_link, badge, link_class, muted, alert %}
+{% from 'macros/ui.html' import page_header, section_header, card, table, cell, back_link, badge, link_class, muted, alert, button %}
 {% from 'macros/forms.html' import field, submit %}
 {% block title %}Buchung {{ item.beleg or item.id }}{% endblock %}
 {% block content %}
@@ -25,14 +25,23 @@
 {% if item.semester %}<dt class="text-slate-600">Semester</dt><dd>{{ item.semester.code }}</dd>{% endif %}
 {% if item.note and not item.reverses %}<dt class="text-slate-600">Notiz</dt><dd class="whitespace-pre-line">{{ item.note }}</dd>{% endif %}
 </dl>
-{% if can('finance.journal.reverse') and not item.reversed_by and item.kind != 'reversal' %}
+{% if pending %}
+{% call alert('info', class='mt-6') %}Ein <a class="{{ link_class }}" href="{{ url_for('finance.cosign_request', request_id=pending.id) }}">Storno dieser Buchung</a> wartet auf Gegenzeichnung.{% endcall %}
+{% elif can('finance.journal.reverse') and not item.reversed_by and item.kind != 'reversal' %}
 {{ section_header('Stornieren') }}
 {% call card(class='max-w-xl') %}
 <p class="mb-3 {{ muted }}">Buchungen werden nie geändert. Ein Storno bucht alle Beträge zurück; danach die richtige Buchung neu erfassen.</p>
 <form method="post" action="{{ url_for('finance.reverse', journal_id=item.id) }}" class="space-y-4">
 {{ form.hidden_tag() }}
 {{ field(form.reason) }}
+{% if cosign_needed %}
+{% call alert('warning') %}
+<p>Dieses Storno schreibt dir selbst etwas gut. Gebucht wird es erst, wenn ein Kassenprüfer es bestätigt.</p>
+<div class="mt-3">{{ button('Zur Gegenzeichnung vorlegen', name='vorlegen', value='1') }}</div>
+{% endcall %}
+{% else %}
 {{ submit(form.submit, 'danger') }}
+{% endif %}
 </form>
 {% endcall %}
 {% endif %}
