@@ -10,6 +10,7 @@ from datetime import date
 from flask import abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 
 from community.core.authz import can, require_perm
 from community.core.identity.models import Member, MemberStatus
@@ -34,7 +35,7 @@ from .forms import (
     ReverseForm,
     UmlageForm,
 )
-from .models import AccountKind, FinAccount, FinCategory, FinJournal, FinRecurring, FinRequest, RequestStatus
+from .models import AccountKind, FinAccount, FinCategory, FinJournal, FinRecurring, FinRequest
 
 JOURNAL_PAGE_LIMIT = 300
 
@@ -136,14 +137,8 @@ def journal():
 @require_perm('finance.ledger.view_all')
 def booking(journal_id):
     item = db.get_or_404(FinJournal, journal_id)
-    return render_template('finance/booking.html', item=item, form=ReverseForm(), pending=_pending_reversal(item))
-
-
-def _pending_reversal(journal):
-    query = select(FinRequest).where(
-        FinRequest.reverses_journal_id == journal.id, FinRequest.status == RequestStatus.OPEN
-    )
-    return db.session.scalar(query)
+    pending = cosign.pending_reversal(item)
+    return render_template('finance/booking.html', item=item, form=ReverseForm(), pending=pending)
 
 
 @bp.route('/buchung/<int:journal_id>/storno', methods=['POST'])
@@ -156,7 +151,7 @@ def reverse(journal_id):
         return redirect(url_for('finance.booking', journal_id=item.id))
     try:
         if request.form.get('vorlegen'):
-            pending, _ = cosign.request_reversal(item, requested_by=current_user, reason=form.reason.data)
+            pending, created = cosign.request_reversal(item, requested_by=current_user, reason=form.reason.data)
         else:
             reversal = ledger.reverse(item, reversed_by=current_user, reason=form.reason.data)
     except ledger.CosignRequired:
@@ -168,13 +163,17 @@ def reverse(journal_id):
         return redirect(url_for('finance.booking', journal_id=item.id))
     db.session.commit()
     if request.form.get('vorlegen'):
-        flash(SUBMITTED_FOR_COSIGN, 'success')
+        _flash_submitted(created)
         return redirect(url_for('finance.cosign_request', request_id=pending.id))
     flash('Storniert.', 'success')
     return redirect(url_for('finance.booking', journal_id=reversal.id))
 
 
-SUBMITTED_FOR_COSIGN = 'Zur Gegenzeichnung vorgelegt. Gebucht wird erst, wenn der Kassenprüfer bestätigt.'
+def _flash_submitted(created):
+    if created:
+        flash('Zur Gegenzeichnung vorgelegt. Gebucht wird erst, wenn der Kassenprüfer bestätigt.', 'success')
+    else:
+        flash('Diese Buchung liegt bereits zur Gegenzeichnung vor.', 'info')
 
 
 # --- Booking form --------------------------------------------------------------------------
@@ -252,7 +251,7 @@ def new_booking():
         submit_for_cosign = bool(request.form.get('vorlegen'))
         try:
             if submit_for_cosign:
-                pending, _ = cosign.request_booking(
+                pending, created = cosign.request_booking(
                     *booking_args, requested_by=current_user, beleg=form.beleg.data, note=form.note.data
                 )
             else:
@@ -268,7 +267,7 @@ def new_booking():
         else:
             db.session.commit()
             if submit_for_cosign:
-                flash(SUBMITTED_FOR_COSIGN, 'success')
+                _flash_submitted(created)
                 return redirect(url_for('finance.cosign_request', request_id=pending.id))
             flash(f'Gebucht: {journal.title}', 'success')
             if request.form.get('weiter'):
@@ -600,7 +599,9 @@ def _request_page(item, reject_form=None, status=200):
     else:
         problem = None
     may_decide = (
-        item.is_open and can('finance.journal.cosign') and item.requested_by.member_id != current_user.member_id
+        item.is_open
+        and cosign.may_confirm(current_user.member)
+        and item.requested_by.member_id != current_user.member_id
     )
     page = render_template(
         'finance/cosign_request.html',
@@ -628,6 +629,10 @@ def cosign_confirm(request_id):
         abort(400)
     try:
         journal = cosign.confirm(item, confirmed_by=current_user)
+    except IntegrityError:  # confirmed by someone else at the same moment; booked once
+        db.session.rollback()
+        flash('Diese Anfrage ist bereits entschieden.', 'danger')
+        return redirect(url_for('finance.cosign_request', request_id=item.id))
     except ledger.FinanceError as error:
         db.session.rollback()
         flash(str(error), 'danger')

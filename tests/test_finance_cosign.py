@@ -92,7 +92,8 @@ def test_kassenwart_submits_and_kassenpruefer_confirms_once(app, client, login, 
 
     response = submit(client, kassenwart)
     assert '/kasse/gegenzeichnung/' in response.location
-    submit(client, kassenwart)  # a double click prepares nothing new
+    page = client.get(submit(client, kassenwart).location).get_data(as_text=True)  # a double click
+    assert 'liegt bereits zur Gegenzeichnung vor' in page
     assert request_count() == 1 and journal_count() == 0
     item = db.session.scalar(select(FinRequest))
     assert item.status == RequestStatus.OPEN and item.requested_by_user_id == kassenwart.id
@@ -274,3 +275,19 @@ def test_only_kasse_officers_see_the_requests(client, login, officers):
 def test_a_plain_member_gets_403(client, login):
     login(make_user('plain@example.org'))
     assert client.get('/kasse/gegenzeichnung').status_code == 403
+
+
+def test_confirming_needs_the_right_to_see_the_kasse(app, client, login, officers):
+    kassenwart, _ = officers
+    blind = make_user('blind@example.org', name='Blind Signer', perms=['finance.journal.cosign'])
+    assert blind.member not in cosign.cosigners()
+    login(kassenwart)
+    submit(client, kassenwart)
+    item = db.session.scalar(select(FinRequest))
+    other = client_for(app, blind)
+    assert other.get(f'/kasse/gegenzeichnung/{item.id}').status_code == 403
+    other.post(f'/kasse/gegenzeichnung/{item.id}/bestaetigen')
+    other.post(f'/kasse/gegenzeichnung/{item.id}/ablehnen', data={'reason': 'x'})
+    db.session.expire_all()
+    assert journal_count() == 0 and item.is_open
+    assert notifications(blind, cosign.REQUEST_KIND) == []

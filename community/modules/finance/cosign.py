@@ -36,9 +36,28 @@ DECIDED_KIND = declare_kind('finance_cosign_decided', 'Gegenzeichnung bestätigt
 REASON_MAX = 500
 
 
+VIEW_PERMISSION = 'finance.ledger.view_all'
+
+
+def may_confirm(member):
+    """Confirming needs the cosign right and the right to see the Kasse (the request page)."""
+    return {COSIGN_PERMISSION, VIEW_PERMISSION} <= permissions_for(member)
+
+
 def cosigners(exclude=None):
-    """Active members who may confirm a request; `exclude` (the requester, a User) is left out."""
-    return [m for m in holders_of(COSIGN_PERMISSION) if exclude is None or m.id != exclude.member_id]
+    """Active members with a login who may confirm; `exclude` (the requester, a User) is left out."""
+    return [
+        m
+        for m in holders_of(COSIGN_PERMISSION)
+        if m.user is not None and (exclude is None or m.id != exclude.member_id) and may_confirm(m)
+    ]
+
+
+def pending_reversal(journal):
+    """The open request to reverse `journal`, or None."""
+    return db.session.scalar(
+        select(FinRequest).where(FinRequest.reverses_journal_id == journal.id, FinRequest.status == RequestStatus.OPEN)
+    )
 
 
 def open_requests():
@@ -112,9 +131,7 @@ def request_reversal(journal, *, requested_by, reason, booked_on=None):
     reason = check_reversible(journal, reason)
     lines = reversal_lines(journal)
     _needs_request(lines, requested_by)
-    existing = db.session.scalar(
-        select(FinRequest).where(FinRequest.reverses_journal_id == journal.id, FinRequest.status == RequestStatus.OPEN)
-    )
+    existing = pending_reversal(journal)
     if existing is not None:
         return existing, False
     fields = {
@@ -155,7 +172,7 @@ def _check_decider(item, user):
         raise FinanceError('Diese Anfrage ist bereits entschieden.')
     if user.id == item.requested_by_user_id or user.member_id == item.requested_by.member_id:
         raise FinanceError('Deine eigene Anfrage muss eine andere Person gegenzeichnen.')
-    if COSIGN_PERMISSION not in permissions_for(user.member):
+    if not may_confirm(user.member):
         raise FinanceError('Du darfst keine Buchungen gegenzeichnen.')
 
 

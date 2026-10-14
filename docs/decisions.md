@@ -185,4 +185,10 @@ An independent review (four reviewers, each finding checked by a second agent tr
   no one else holds the right (no Kassenprüfer appointed), submitting is refused with a hint.
 - **Notifications:** every cosigner gets "Buchung zur Gegenzeichnung" (bell and email, as each chose);
   the Kassenwart gets the decision. Both are new kinds members can switch off in their settings.
+- **Who confirms:** someone else who holds both `finance.journal.cosign` and `finance.ledger.view_all` (they
+  must be able to see what they confirm) and has a login; only they are notified.
+- **A double click submits once:** an identical open request of the same person (date, text, lines, Beleg,
+  note) is returned instead of a copy, with the message "liegt bereits zur Gegenzeichnung vor".
+- **Beleg numbers** suggested by the form only count booked journals, so a number used in an open request
+  can be suggested again; the Kassenwart sees the open requests on the Kasse page.
 - **Not built:** withdrawing a request (the Kassenprüfer rejects it instead) and requests that expire.
