@@ -55,6 +55,12 @@ flask run --debug
 Open http://127.0.0.1:5000 and log in with the admin account. Run `flask setup` again after every
 `flask db upgrade`.
 
+**To try it with a made-up club instead** (members, Ämter, Kasse, laundry, an open Gegenzeichnung),
+skip `flask create-admin` and run `flask seed demo` after `flask setup`. It works only with
+`APP_ENV=development` and an empty database, and prints the logins (Admin, Senior, Kassenwart,
+Kassenprüfer, Fuxmajor, Fux); all share the password `demo-passwort-123`. To start over, delete
+`instance/community.db` and run `flask db upgrade`, `flask setup` and `flask seed demo` again.
+
 The admin is the technical administrator (`custom.sysadmin`): members, invitations, import, Ämter
 and settings, but no rank and no finance rights. If the admin is also a member of the club, set
 their rank on the server (nobody sets their own rank in the app):

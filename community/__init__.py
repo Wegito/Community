@@ -51,6 +51,7 @@ def create_app(config=None):
     import community.core.org.services  # noqa: F401  (adds rank, office and group roles to authz)
     from community.core.authz.cli import authz_cli
     from community.core.bootstrap import setup
+    from community.core.demo import seed_cli
     from community.core.identity.cli import create_admin
     from community.core.org.cli import org_cli
     from community.core.org.routes import bp as org_bp
@@ -68,6 +69,7 @@ def create_app(config=None):
     app.cli.add_command(org_cli)
     app.cli.add_command(jobs_cli)
     app.cli.add_command(mail_cli)
+    app.cli.add_command(seed_cli)
     app.register_blueprint(org_bp)
     app.register_blueprint(notifications_bp)
     app.register_blueprint(qr_bp)

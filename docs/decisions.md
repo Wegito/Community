@@ -192,3 +192,15 @@ An independent review (four reviewers, each finding checked by a second agent tr
 - **Beleg numbers** suggested by the form only count booked journals, so a number used in an open request
   can be suggested again; the Kassenwart sees the open requests on the Kasse page.
 - **Not built:** withdrawing a request (the Kassenprüfer rejects it instead) and requests that expire.
+
+## 2026-10-15 — M8-4 (part): demo club
+
+- **`flask seed demo`** fills an empty development database with a made-up club so anyone can try the
+  app on their own computer: eleven members (with and without login), the usual Ämter including
+  Kassenwart and Kassenprüfer, the Hausbewohner group, announcements, chores, room bookings, laundry,
+  a few weeks of Kasse bookings with one Storno, and one Auslage of the Kassenwart waiting for
+  Gegenzeichnung. Dates are relative to the day it runs.
+- **It refuses in production and on a database with members**, so demo data can never mix with real
+  data. All demo logins share one password, printed by the command and in the README; that is
+  acceptable only because the command never runs outside development.
+- The staging instance (the other half of M8-4) waits for the server (M8-2).

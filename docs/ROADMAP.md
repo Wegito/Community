@@ -913,7 +913,7 @@ M3-10c (AH-Kontingent).
 | M8-1 | Domain, HTTPS, hosting | EU host, final domain, TLS. **Blocks QR printing, Google and email deliverability.** | — | S | all |
 | M8-2 | Deploy kit | gunicorn config; systemd service and jobs timer; nginx with TLS and static files; proxy hops matched to `TRUSTED_PROXY_HOPS`; `deploy.sh` (backup → pull → install → `flask db upgrade` → restart → health check); `/healthz`; logs with request ids | M0-13, M8-1 | M | M1-*, M2-* |
 | M8-3 | Backups + restore drill | Nightly SQLite online backup (`.backup` / `sqlite3.Connection.backup`), encrypted and off-site; retention 7 daily / 4 weekly / 12 monthly; backup before each migration; a restore performed and documented. **Hard gate for M3-9.** | M8-2 | M | all |
-| M8-4 | Staging + demo seed | `flask seed demo`; staging instance | M8-2 | S | all |
+| M8-4 | Staging + demo seed (🟡 `flask seed demo` done) | `flask seed demo`; staging instance | M8-2 | S | all |
 | M8-5 | Monitoring | Uptime check, error emails, log rotation | M8-2 | S | all |
 | M8-6 | Club-owned accounts | Club Google account, Cloud project, service-account key; shared password manager with at least 2 holders; mail sender (club domain or EU provider, SPF/DKIM) with AVV | M8-1 | S | all |
 | M8-7 | GDPR pack | Datenschutzerklärung, Verarbeitungsverzeichnis, retention policy (audit IPs, drinks detail vs. bookkeeping retention), AVVs, own-data export (Art. 15/20). Get advice. **Gate before bulk onboarding (M1-9 invite batch) and before any Google feature.** | — | M | all |
