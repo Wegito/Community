@@ -41,6 +41,7 @@ def build_demo(today):
     from community.modules.announcements.models import Announcement
     from community.modules.bookings.models import Resource
     from community.modules.bookings.services import create_booking
+    from community.modules.drinks.services import create_product, record_sheet
     from community.modules.finance import cosign
     from community.modules.finance.models import FinCategory
     from community.modules.finance.models import JournalKind as K
@@ -158,6 +159,28 @@ def build_demo(today):
         )
         notify(member['senior'], 'office_assigned', f'Du bist ab {since:%d.%m.%Y} Senior.')
 
+    # Drinks: a few evenings of the Bierwart's Strichliste.
+    pils = create_product(
+        'Pils 0,5', 120, counts_as_beer=True, volume_ml=500, valid_from=today - timedelta(days=60), actor=None
+    )
+    weizen = create_product(
+        'Weizen 0,5', 150, counts_as_beer=True, volume_ml=500, valid_from=today - timedelta(days=60), actor=None
+    )
+    cola = create_product('Cola', 100, counts_as_beer=False, valid_from=today - timedelta(days=60), actor=None)
+    create_product('Wasser', 50, counts_as_beer=False, valid_from=today - timedelta(days=60), actor=None)
+    evenings = {
+        9: {'fux1': (4, 0, 1), 'fux2': (3, 1, 0), 'bierwart': (5, 0, 0), 'senior': (2, 1, 0), 'consenior': (3, 0, 1)},
+        4: {'fux1': (6, 0, 0), 'fux2': (2, 2, 1), 'fuxmajor': (3, 0, 0), 'kassenwart': (1, 0, 2), 'ah': (4, 1, 0)},
+        1: {'fux1': (3, 0, 0), 'bierwart': (2, 1, 0), 'kassenpruefer': (2, 0, 0), 'senior': (1, 0, 1)},
+    }
+    for days_ago, sheet in evenings.items():
+        day = today - timedelta(days=days_ago)
+        counts = {}
+        for key, quantities in sheet.items():
+            for product, quantity in zip((pils, weizen, cola), quantities, strict=True):
+                counts[(member[key], product)] = quantity
+        record_sheet(day, counts, token=f'demo-{days_ago}', recorded_by=user['bierwart'])
+
     # Laundry of the last days.
     for index, (key, washes, dried, hours) in enumerate(
         [('fux1', 1, True, 26), ('fux2', 2, False, 20), ('consenior', 1, True, 15), ('fux1', 2, True, 9)]
@@ -178,6 +201,7 @@ def build_demo(today):
         ('Kassenwart', 'kasse@demo.de'),
         ('Kassenprüfer', 'pruefer@demo.de'),
         ('Fuxmajor', 'fm@demo.de'),
+        ('Bierwart (Strichliste, Geräte)', 'bier@demo.de'),
         ('Fux (normales Mitglied)', 'noah@demo.de'),
     ]
 

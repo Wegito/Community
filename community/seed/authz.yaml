@@ -130,6 +130,7 @@ grants:
     - drinks.stock
     - drinks.view_all
     - drinks.settlement.submit
+    - drinks.devices.manage
 
   group.hausbewohner:
     - laundry.use.create_own

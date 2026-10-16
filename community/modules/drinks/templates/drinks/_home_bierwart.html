@@ -1,0 +1,8 @@
+{% from 'macros/ui.html' import panel, stat, link_button %}
+{% call panel('Getränke', url_for('drinks.all_entries'), 'Alle Striche') %}
+<div class="grid grid-cols-2 gap-2">
+{{ stat(widget.rows, 'Einträge im ' ~ widget.month_name) }}
+{{ stat(widget.last|d if widget.last else '–', 'letzter Abend') }}
+</div>
+{{ link_button('Strichliste eintragen', url_for('drinks.sheet'), 'primary') }}
+{% endcall %}

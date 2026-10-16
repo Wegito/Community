@@ -1,0 +1,54 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, section_header, card, stat, table, cell, empty_row, link_button, muted, badge %}
+{% block title %}Getränke{% endblock %}
+{% block content %}
+{% call page_header('Mein Deckel', 'Deine Striche. Abgerechnet wird später über deine Kontokarte; die Beträge hier sind vorläufig.') %}
+{% if can('drinks.tally.record') %}{{ link_button('Strichliste', url_for('drinks.sheet'), 'primary') }}{% endif %}
+{% if can('drinks.view_all') %}{{ link_button('Alle Striche', url_for('drinks.all_entries')) }}{% endif %}
+{% if can('drinks.catalog.manage') %}{{ link_button('Getränke & Preise', url_for('drinks.catalog')) }}{% endif %}
+{% endcall %}
+<div class="grid gap-6 lg:grid-cols-3">
+<div class="space-y-6 lg:col-span-2">
+{% call card() %}
+<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+{{ stat(month.beers, 'Bier im ' ~ (month_start|month)) }}
+{{ stat(month.drinks, 'Getränke im Monat') }}
+{{ stat(month.total_cents|cents, 'vorläufig im Monat') }}
+{{ stat(semester.beers, 'Bier im Semester') }}
+</div>
+{% endcall %}
+{{ section_header('Letzte Striche') }}
+{% call table(['Wann', 'Was', 'Anzahl', 'Betrag']) %}
+{% for row in rows %}
+<tr>
+<td class="{{ cell }} whitespace-nowrap">{{ row.occurred_at|dt }}</td>
+<td class="{{ cell }}">{{ row.product.name }}{% if row.corrects_id %} {{ badge('Korrektur', 'warning') }}{% endif %}</td>
+<td class="{{ cell }} text-right tabular-nums">{{ row.quantity }}</td>
+<td class="{{ cell }} text-right tabular-nums">{{ row.total_cents|cents }}</td>
+</tr>
+{% else %}
+{{ empty_row('Noch keine Striche.', 4) }}
+{% endfor %}
+{% endcall %}
+</div>
+<section>
+{{ section_header('Bierkönig im ' ~ (month_start|month)) }}
+{% call card() %}
+{% if ranking %}
+<ol role="list" class="space-y-1 text-sm">
+{% for who, beers in ranking %}
+<li class="flex items-center gap-3 rounded-md px-2 py-1 {{ 'bg-amber-50 font-semibold' if who.id == current_user.member_id else '' }}">
+<span class="w-6 text-right tabular-nums text-slate-500">{{ loop.index }}.</span>
+<span class="min-w-0 flex-1 truncate">{{ who.full_name }}</span>
+<span class="tabular-nums">{{ beers }}</span>
+</li>
+{% endfor %}
+</ol>
+{% else %}
+<p class="{{ muted }}">Diesen Monat noch kein Bier gezählt.</p>
+{% endif %}
+<p class="mt-3 text-xs text-slate-500">Gezählt werden nur Biere, Beträge sieht niemand außer dir, dem Bierwart und der Kasse.</p>
+{% endcall %}
+</section>
+</div>
+{% endblock %}

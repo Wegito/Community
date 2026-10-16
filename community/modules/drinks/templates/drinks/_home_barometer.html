@@ -1,0 +1,6 @@
+{% from 'macros/ui.html' import panel, muted %}
+{% call panel('Fass-Barometer') %}
+<p><span class="text-3xl font-semibold tabular-nums">{{ widget.beers }}</span> <span class="{{ muted }}">Bier dieses Semester{% if widget.litres %} · {{ '%.1f'|format(widget.litres)|replace('.', ',') }} Liter{% endif %}</span></p>
+<progress class="h-3 w-full overflow-hidden rounded-full [&::-moz-progress-bar]:bg-amber-400 [&::-webkit-progress-bar]:bg-slate-100 [&::-webkit-progress-value]:bg-amber-400" max="100" value="{{ widget.percent }}">{{ widget.percent }} %</progress>
+<p class="{{ muted }}">Noch {{ widget.goal - widget.beers }} bis zum {{ widget.goal }}. Bier.</p>
+{% endcall %}

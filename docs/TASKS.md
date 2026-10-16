@@ -245,19 +245,23 @@ T3 + T4 · review T3 · depends on M3-6b, the latest closed Excel file (owner) a
 
 | Card | Tier | Notes |
 |---|---|---|
-| M2-1 · "Mein Bereich" page from profile cards (`core/widgets.py`) | T2 | landing page after login |
+| M2-1 · Start page from cards (`core/widgets.py`) ✅ | T2 | done 2026-10-16 |
 | M2-2 · Chores become tasks (assignee member, group or Amt) with data migration | T3 | migrates existing data |
 | M2-3 · Consenior workspace | T2 | |
 | M2-4 · Putzplan rotation and templates | T3 | scheduling rules |
 | M2-5 · Task notifications | T2 | |
-| M2-6 · Amt tiles on "Mein Bereich" | T1 | Amt pages exist |
+| M2-6 · Amt pages (job description, holders) | T1 | the tiles exist on the start page |
 | M2-7 · Einkaufsliste | T1 | |
 | M2-8 · Announcements: audience, pinning | T2 | |
 | M5-1 … M5-6, M5-10 · Events, program, RSVP, costs, ICS feeds, reminders | T2 (M5-5 costs: T3) | |
 | M5-7 … M5-9, M5-11 · Google calendar and sign-in | T3 + T4 | needs club Google account |
-| M6-0 · Drinks discovery | T4 | owner's existing drinks data |
-| M6-1 … M6-4, M6-8 · Catalog, Strichliste, stock, widget | T2 | |
-| M6-5, M6-6 · Drinks settlement, API with tokens | T3 | money, security |
+| M6-0 · Drinks discovery: the Bierwart's Excel (products, prices per rank?, guests, billing) | T4 → T2 | owner sends the file |
+| M6-1, M6-3, M6-8 · Catalog, Strichliste, Deckel, Bierkönig, Fass-Barometer ✅ | T2 | done 2026-10-16; prices per rank and guests after M6-0 |
+| M6-4 · Stock: Kisten and Fässer, counts, Schwund | T2 | Bierwart |
+| M6-3b · Members mark their own Striche as disputed | T2 | |
+| M6-2, M6-6 · API contract and device tokens ✅ | T3 | done 2026-10-16 (`docs/api/openapi.yaml`) |
+| M6-5 · Drinks onto the Kontokarten (monthly settlement, like M4-5) | T3 | after M6-0 |
+| M6-7 · Import of the Bierwart's old Excel | T2 | after M6-0 |
 | M7-1 … M7-7 · Fux curriculum, rank workflow, handover, documents, matrix editor, limits | T2 (M7-2, M7-6: T3) | |
 | M9-2 · Presets instead of seed migrations | T3 | must not change existing installs |
 | M9-3 · First-run wizard with setup code | T3 | security |

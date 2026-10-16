@@ -44,6 +44,17 @@ MAIN = (
     ),
     NavLink('Ämter', 'org.offices', also=('org.office', 'org.assign_office')),
     NavLink('Wäsche', 'laundry.mine', also=('laundry.new',)),
+    NavLink(
+        'Getränke',
+        'drinks.mine',
+        also=(
+            'drinks.sheet',
+            'drinks.all_entries',
+            'drinks.catalog',
+            'drinks.edit_product',
+            'drinks.devices',
+        ),
+    ),
 )
 
 # "Verwaltung": shown only to someone who may open at least one of these pages.

@@ -548,6 +548,7 @@ drinks.tally.record                  -  -  -  -  │  .   ?   .   .   .   Y │ 
 drinks.catalog.manage, drinks.stock  -  -  -  -  │  .   .   .   .   .   Y │  .   .
 drinks.view_all                      -  -  -  -  │  .   .   .   Y   .   Y │  .   .
 drinks.settlement.submit             -  -  -  -  │  .   .   .   .   .   Y │  .   .
+drinks.devices.manage                -  -  -  -  │  .   .   .   .   .   Y │  .   Y   (API tokens for the bar tablet)
 laundry.use.create_own               -  -  -  -  │  .   .   .   .   .   . │  Y   .
 laundry.view_own                     -  -  -  -  │  .   .   .   .   .   . │  Y   .
 laundry.view_all                     -  -  -  -  │  .   Y   .   Y   .   . │  .   .
@@ -721,7 +722,8 @@ yet): 16 migrations, about 900 tests, CI green. Nothing is deployed yet (see "Ow
 | M3 Kasse & Saldo | 🟡 about half | Ledger (M3-1), Saldo on the profile (M3-2), Kasse pages (M3-3 first part), Umlage with Kasse subsidy and monthly charges (M3-4), push-TAN confirmation by the Kassenprüfer (M3-8). Open: Sammelzahlung, Excel export, payment requests, closing (Bilanz, GuV, Kassenzählung, AH-Kontingent), opening balances |
 | M2 Profile & tasks | 🟡 started | Start page with cards from every module (M2-1): my Saldo, tasks, laundry, bookings, announcements, notifications; cards for the Ämter (Kasse, Gegenzeichnung, Putzplan, Wäsche, new members, system); news and numbers of the Bund |
 | M9 Other Verbindungen | 🟡 started | Club name, short name, Heimverein editable (M9-1) |
-| M5, M6, M7 | ⬜ open | Planned below |
+| M6 Getränke | 🟡 started | Products and prices, the Bierwart's Strichliste with corrections, my Deckel, Bierkönig (counts only), Fass-Barometer, API for the bar tablet with device tokens (`docs/api/openapi.yaml`). Open: the Bierwart's Excel (M6-0), billing onto the Kontokarte (M6-5), stock (M6-4) |
+| M5, M7 | ⬜ open | Planned below |
 | M8 Operations | ⬜ open | Needs the owner: server, domain, backups |
 
 **Next:** Wave 1 in `docs/TASKS.md` (finish the Kasse, laundry onto the Kontokarten), then M8 so the app
@@ -887,14 +889,14 @@ M3-10c (AH-Kontingent).
 | ID | Title | Scope | Depends on | Size | Parallel-safe with |
 |---|---|---|---|---|---|
 | M6-0 | Drinks discovery | Examine the existing drinks database "behind the scenes" [Q30]; decide import, integrate or replace; counter app separate or a module; devices; member identification [Q31] | user input | S | everything |
-| M6-1 | Catalog + prices | Products and price history; Bierwart UI | M6-0, M1-5 | S | M4-*, M5-* |
-| M6-2 | API contract | `docs/api/openapi.yaml` per §7.3, published early | M6-1 | S | M6-3, M6-4 |
-| M6-3 | Consumption + Strichliste | Sheet per evening; grid entry by the Bierwart (or delegates [Q32]); server pricing; correction rows; members see their own tallies and can dispute them | M6-1 | M | M6-2, M6-4 |
+| M6-1 | Catalog + prices ✅ (one price per product; prices per rank after M6-0) | Products and price history; Bierwart UI | M6-0, M1-5 | S | M4-*, M5-* |
+| M6-2 | API contract ✅ | `docs/api/openapi.yaml` per §7.3, published early | M6-1 | S | M6-3, M6-4 |
+| M6-3 | Consumption + Strichliste ✅ (disputes open) | Sheet per evening; grid entry by the Bierwart (or delegates [Q32]); server pricing; correction rows; members see their own tallies and can dispute them | M6-1 | M | M6-2, M6-4 |
 | M6-4 | Stock | Purchases; inventory counts (Schwund visible); low stock → task and notification | M6-1, M2-2, M1-6 | M | M6-2, M6-3 |
 | M6-5 | Settlement to the Kassenwart | "Abrechnung bis <Datum>" claims items with one `UPDATE … WHERE settlement_id IS NULL AND occurred_at <= :period_to` in one transaction; one open settlement per module and book; DRAFT → SUBMITTED → POSTED (rule §6.3-3); one entry per member; late items go to the next settlement; REJECTED returns to DRAFT | M6-3, M3-3 | M | M6-6, M6-7, M6-8 |
-| M6-6 | API v1 | `api_client` (hashed tokens, scopes, revoke); token UI for the Bierwart and sysadmin; endpoints and rules per §7.3 | M6-2, M6-3 | M | M6-4, M6-5, M6-8 |
+| M6-6 | API v1 ✅ (device tokens; personal tokens and settlements with M6-5) | `api_client` (hashed tokens, scopes, revoke); token UI for the Bierwart and sysadmin; endpoints and rules per §7.3 | M6-2, M6-3 | M | M6-4, M6-5, M6-8 |
 | M6-7 | Legacy drinks import | Depends on the outcome of M6-0 | M6-0, M6-3 | S–M | M6-4 … M6-6 |
-| M6-8 | Drinks widget + reports | Own consumption this period with a cost estimate labelled *vorläufig*; reports on consumption, Schwund and stock value | M6-3, M6-4, M2-1 | S | M6-5 … M6-7 |
+| M6-8 | Drinks widget + reports ✅ (start page cards; reports open) | Own consumption this period with a cost estimate labelled *vorläufig*; reports on consumption, Schwund and stock value | M6-3, M6-4, M2-1 | S | M6-5 … M6-7 |
 | M6-9 | Fridge QR self-service (optional) | A `/q/` handler for "+1 drink", only if the counter app will not cover it | M4-1, M6-3 | S | M6-4 … M6-8 |
 
 ### 8.10 M7 — Office workflows & documents → **R7 "Ämter-Workflows"**

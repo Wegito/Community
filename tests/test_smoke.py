@@ -15,6 +15,7 @@ from community import create_app
 from community.config import TestingConfig
 from community.core.identity.services import create_invitation
 from community.core.org.services import add_to_group, assign_office, create_group, create_semester, office_by_key
+from community.core.platform.api import create_client
 from community.core.platform.jobs import enqueue
 from community.core.platform.notify import notify
 from community.core.platform.qr import tokens_for
@@ -23,6 +24,7 @@ from community.extensions import db
 from community.modules.auth.services import email_change_token, password_reset_token
 from community.modules.bookings.models import Resource
 from community.modules.bookings.services import create_booking
+from community.modules.drinks.services import create_product, record
 from community.modules.finance.charges import save_recurring
 from community.modules.finance.models import FinCategory, FinRequest
 from community.modules.finance.services import Line, account_by_key, member_account, post_journal
@@ -86,6 +88,9 @@ def data(app):
         group=None,
         actor=None,
     )
+    product = create_product('Pils', 120, counts_as_beer=True, actor=None)
+    tally, _ = record(member.member, product, 1, utcnow(), source='sheet')
+    device, _ = create_client('Tablet', ['drinks:write'], created_by=None)
     cosign_request = FinRequest(
         book_id=journal.book_id,
         kind='expense',
@@ -121,11 +126,27 @@ def data(app):
         'category_id': db.session.scalars(select(FinCategory)).first().id,
         'recurring_id': recurring.id,
         'request_id': cosign_request.id,
+        'product_id': product.id,
+        'row_id': tally.id,
+        'client_id': device.id,
     }
 
 
 def url(rule, data):
     return re.sub(r'<(?:int:)?(\w+)>', lambda m: str(data[m.group(1)]), rule)
+
+
+@pytest.mark.parametrize(('rule', 'method', 'access'), [r for r in RULES if r[2][0] == 'api'], ids=ids)
+def test_api_routes_need_a_token_with_their_scope(client, data, rule, method, access):
+    from community.core.platform.api import SCOPES, create_client
+
+    response = client.open(url(rule, data), method=method)
+    assert response.status_code == 401 and response.mimetype == 'application/problem+json'
+    other_scope = next(scope for scope in SCOPES if scope != access[1])
+    _, token = create_client('Test', [other_scope], created_by=None)
+    db.session.commit()
+    response = client.open(url(rule, data), method=method, headers={'Authorization': f'Bearer {token}'})
+    assert response.status_code == 403
 
 
 def test_every_route_declares_access():
@@ -171,7 +192,7 @@ def test_public_token_routes_render_with_a_valid_token(client, valid_tokens, rul
     assert response.headers['Referrer-Policy'] == 'no-referrer'
 
 
-@pytest.mark.parametrize(('rule', 'method', 'access'), [r for r in RULES if r[2][0] != 'public'], ids=ids)
+@pytest.mark.parametrize(('rule', 'method', 'access'), [r for r in RULES if r[2][0] in ('login', 'perm')], ids=ids)
 def test_anonymous_is_sent_to_login(client, data, rule, method, access):
     response = client.open(url(rule, data), method=method)
     assert response.status_code == 302
@@ -215,7 +236,7 @@ def test_pages_link_only_to_pages_the_user_may_open(client, login, data, who):
     login(user)
     status, forbidden = {}, []
     for rule, method, access in RULES:
-        if method != 'GET' or access[0] == 'public':
+        if method != 'GET' or access[0] in ('public', 'api'):
             continue
         page = client.get(url(rule, data))
         if page.status_code != 200 or not page.content_type.startswith('text/html'):

@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from community.core.demo import DEMO_PASSWORD
 from community.core.identity.models import Member
 from community.extensions import db
+from community.modules.drinks.models import DrinkConsumption
 from community.modules.finance.models import FinJournal, FinRequest
 
 
@@ -16,7 +17,7 @@ def test_demo_club_can_be_used_right_away(app, client):
     result = app.test_cli_runner().invoke(args=['seed', 'demo'])
     assert result.exit_code == 0, result.output
     assert DEMO_PASSWORD in result.output and 'pruefer@demo.de' in result.output
-    assert count(Member) == 11 and count(FinJournal) >= 8 and count(FinRequest) == 1
+    assert count(Member) == 11 and count(FinJournal) >= 8 and count(FinRequest) == 1 and count(DrinkConsumption) > 10
 
     client.post('/login', data={'email': 'pruefer@demo.de', 'password': DEMO_PASSWORD})
     page = client.get('/kasse/').get_data(as_text=True)

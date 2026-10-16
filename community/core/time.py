@@ -58,3 +58,8 @@ MONTH_NAMES = (
 def format_month(value: date | None):
     """'Oktober 2026'; the `|month` filter."""
     return f'{MONTH_NAMES[value.month - 1]} {value.year}' if value else ''
+
+
+def local_day_start(day: date) -> datetime:
+    """UTC time of midnight in Berlin at the start of `day` (for "from day A to day B" queries)."""
+    return local_to_utc(datetime(day.year, day.month, day.day, tzinfo=LOCAL_TZ))

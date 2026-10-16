@@ -217,3 +217,27 @@ An independent review (four reviewers, each finding checked by a second agent tr
 - **The old announcement list on `/` is gone**; the newest three announcements are a card, the full
   list stays at `/announcements`.
 - **No birthdays** (owner): the fun part of the page will be the beer counter (M6), counts only.
+
+## 2026-10-16 — M6 Getränke, first part
+
+- **Who counts** (owner): the Bierwart enters the Strichliste for now; later every member counts on a
+  tablet at the bar, which sends the Striche through the API. Both end in the same table, so the
+  Deckel, the Bierkönig and the later billing do not care where a Strich came from.
+- **Striche are never edited or deleted**, like bookings: a mistake gets a correction row with the
+  negative quantity, at most one per row. The price of the day is copied into each row (D11).
+- **One price per product for now**, with a price history. Prices per rank, guests and the billing onto
+  the Kontokarte wait for the Bierwart's Excel (M6-0, M6-5); the amounts on "Mein Deckel" are labelled
+  vorläufig.
+- **What others see** (owner: "only how many beers"): the Bierkönig and the Fass-Barometer show beer
+  counts, never amounts or soft drinks. Amounts are seen by the member, the Bierwart and the Kasse.
+  A product counts as beer when the Bierwart ticks "Zählt als Bier"; litres come from its volume.
+- **The Strichliste is one form per evening** (members × products, like the paper list). A token in the
+  form makes a second submit store nothing new.
+- **The API is a generic core piece** (`core/platform/api.py`): device tokens (`cmt_…`, stored as
+  SHA-256, shown once, revocable, with scopes), routes declare their scope with `@api_scope` (the
+  smoke test treats that as the access declaration), JSON errors as problem+json, no cookies and no
+  CSRF. The contract is `docs/api/openapi.yaml`, and a test keeps it in line with the routes.
+- **Idempotency for devices:** `client_event_id` per device; the same item again is `duplicate`, the same
+  id with other fields is `rejected: client_event_id_reused`. `held` (Striche inside an already settled
+  period) comes with the settlement (M6-5). Personal tokens with `drinks:settle` likewise.
+- **Tokens are managed by the Bierwart** (`drinks.devices.manage`, sensitive) and the admin.

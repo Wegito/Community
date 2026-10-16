@@ -1,0 +1,17 @@
+{% from 'macros/ui.html' import panel, muted %}
+{% call panel('Bierkönig im ' ~ widget.month_name, url_for('drinks.mine'), 'Rangliste') %}
+<ol role="list" class="space-y-2">
+{% for who, beers in widget.top %}
+<li class="flex items-center gap-3">
+<span class="flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold {{ ['bg-amber-300 text-amber-950', 'bg-slate-200 text-slate-800', 'bg-orange-200 text-orange-900'][loop.index0] }}">{{ loop.index }}</span>
+<span class="min-w-0 flex-1 truncate font-medium">{{ who.full_name }}{% if who.biername %} <span class="font-normal text-slate-500">({{ who.biername }})</span>{% endif %}</span>
+<span class="tabular-nums font-semibold">{{ beers }}</span>
+</li>
+{% endfor %}
+</ol>
+{% if widget.place and widget.place > widget.top|length %}
+<p class="{{ muted }}">Du: Platz {{ widget.place }} von {{ widget.of }} mit {{ widget.mine }} Bier.</p>
+{% elif not widget.place %}
+<p class="{{ muted }}">Du hast diesen Monat noch kein Bier auf dem Deckel.</p>
+{% endif %}
+{% endcall %}

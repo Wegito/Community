@@ -1,0 +1,39 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, checkbox, submit %}
+{% from 'macros/ui.html' import page_header, section_header, card, table, cell, back_link %}
+{% block title %}{{ product.name }}{% endblock %}
+{% block content %}
+{{ page_header(product.name) }}
+<div class="grid gap-6 lg:grid-cols-2">
+<section>
+{{ section_header('Getränk') }}
+{% call card() %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.name) }}
+{{ field(form.volume_ml, inputmode='numeric') }}
+{{ checkbox(form.counts_as_beer) }}
+{{ checkbox(form.archived) }}
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+</section>
+<section>
+{{ section_header('Preise') }}
+{% call card(class='space-y-4') %}
+<form method="post" class="grid gap-4 sm:grid-cols-2">
+{{ price_form.hidden_tag() }}
+{{ field(price_form.price, inputmode='decimal') }}
+{{ field(price_form.valid_from) }}
+<div class="sm:col-span-2">{{ submit(price_form.submit) }}</div>
+</form>
+{% call table(['Gilt ab', 'Preis']) %}
+{% for price in product.prices %}
+<tr><td class="{{ cell }}">{{ price.valid_from|d }}</td><td class="{{ cell }} tabular-nums">{{ price.price_cents|cents }}</td></tr>
+{% endfor %}
+{% endcall %}
+{% endcall %}
+</section>
+</div>
+{{ back_link('Getränke & Preise', url_for('drinks.catalog')) }}
+{% endblock %}

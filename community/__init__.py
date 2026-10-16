@@ -15,6 +15,7 @@ MODULES = [
     'community.modules.bookings',
     'community.modules.laundry',
     'community.modules.finance',
+    'community.modules.drinks',
     'community.modules.admin',
 ]
 
@@ -78,6 +79,10 @@ def create_app(config=None):
 
     for name in MODULES:
         app.register_blueprint(import_module(name).bp)
+
+    from community.core.platform.api import init_api
+
+    init_api(app)  # after the modules: they add their API routes first
 
     from community.core.errors import register_error_handlers
     from community.core.money import format_cents

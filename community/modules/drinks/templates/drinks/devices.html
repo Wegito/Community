@@ -1,0 +1,43 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% from 'finance/_checkboxes.html' import checkbox_list %}
+{% from 'macros/ui.html' import page_header, section_header, card, table, cell, empty_row, badge, alert, button, muted, back_link %}
+{% block title %}Geräte{% endblock %}
+{% block content %}
+{{ page_header('Geräte', 'Ein Gerät wie das Theken-Tablet trägt Striche über die Schnittstelle ein. Jedes Gerät hat ein eigenes Token, das man einzeln sperren kann.') }}
+{% if token %}
+{% call alert('warning', class='mb-6') %}
+<p class="font-semibold">Token für das neue Gerät – nur jetzt sichtbar:</p>
+<p class="mt-2 break-all rounded bg-white px-3 py-2 font-mono text-sm text-slate-900">{{ token }}</p>
+<p class="mt-2">Im Gerät als <code>Authorization: Bearer …</code> eintragen. Wer das Token kennt, kann Striche eintragen: nicht weitergeben, bei Verlust sperren.</p>
+{% endcall %}
+{% endif %}
+{% call table(['Gerät', 'Darf', 'Token', 'Zuletzt benutzt', none]) %}
+{% for client in clients %}
+<tr>
+<td class="{{ cell }}">{{ client.name }}{% if not client.is_active %} {{ badge('gesperrt', 'danger') }}{% endif %}</td>
+<td class="{{ cell }}">{{ client.scope_list|join(', ') }}</td>
+<td class="{{ cell }} font-mono">{{ client.token_hint }}</td>
+<td class="{{ cell }} whitespace-nowrap">{{ client.last_used_at|dt or 'nie' }}</td>
+<td class="{{ cell }} text-right">
+{% if client.is_active %}
+<form method="post" action="{{ url_for('drinks.revoke_device', client_id=client.id) }}">{{ button_form.hidden_tag() }}{{ button('Sperren', 'danger', 'sm') }}</form>
+{% endif %}
+</td>
+</tr>
+{% else %}
+{{ empty_row('Noch keine Geräte.', 5) }}
+{% endfor %}
+{% endcall %}
+{{ section_header('Neues Gerät') }}
+{% call card(class='max-w-xl') %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.name, placeholder='z. B. Theken-Tablet') }}
+{{ checkbox_list(form.scopes, '') }}
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+<p class="mt-6 {{ muted }}">Die Schnittstelle ist in <code>docs/api/openapi.yaml</code> beschrieben.</p>
+{{ back_link('Getränke & Preise', url_for('drinks.catalog')) }}
+{% endblock %}
