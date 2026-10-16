@@ -1,4 +1,4 @@
-from flask import abort, flash, redirect, render_template, url_for
+from flask import abort, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 from sqlalchemy import select
 
@@ -6,6 +6,7 @@ from community.core.authz import can, require_perm
 from community.core.authz.policies import can_complete_task
 from community.core.identity.models import Member, User
 from community.core.platform import audit
+from community.core.security import safe_next
 from community.extensions import db
 
 from . import bp
@@ -74,4 +75,4 @@ def toggle_done(cid):
         audit.record('chore.toggle_done', item, diff={'is_done': item.is_done})
         db.session.commit()
         flash('Als erledigt markiert' if item.is_done else 'Wieder offen', 'success')
-    return redirect(url_for('tasks.list'))
+    return redirect(safe_next(request.args.get('next')) or url_for('tasks.list'))

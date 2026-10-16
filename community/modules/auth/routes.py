@@ -91,7 +91,7 @@ def login():
         # A POST button on a page whose session had ended (e.g. "Abmelden"): its URL is no page.
         next_url = None
     if current_user.is_authenticated:
-        return redirect(next_url or url_for('announcements.index'))
+        return redirect(next_url or url_for('home.index'))
     form = LoginForm()
     if form.validate_on_submit():
         now = utcnow()
@@ -119,7 +119,7 @@ def login():
             login_user(user, remember=form.remember.data)
             audit.record('auth.login', user, actor=user)
             db.session.commit()
-            return redirect(next_url or url_for('announcements.index'))
+            return redirect(next_url or url_for('home.index'))
         audit.record(
             'auth.login_failed',
             entity_type='user',

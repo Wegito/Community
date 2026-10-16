@@ -1,0 +1,41 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import alert, link_class, muted, empty_state %}
+{% block title %}Start{% endblock %}
+{% block content %}
+{% set member = current_user.member %}
+<div class="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+<div class="min-w-0">
+<h1 class="text-2xl font-semibold tracking-tight">Hallo {{ member.first_name }}!</h1>
+<p class="{{ muted }}">
+{%- set parts = [] %}
+{%- if member.biername %}{% set _ = parts.append(member.biername) %}{% endif %}
+{%- if header.rank %}{% set _ = parts.append(header.rank.label) %}{% endif %}
+{%- for assignment in header.offices %}{% set _ = parts.append(assignment.office.label ~ (' (kommissarisch)' if assignment.is_acting else '')) %}{% endfor %}
+{{ parts|join(' · ') }}</p>
+</div>
+{% if header.semester %}<p class="text-sm font-medium text-slate-700">{{ header.semester.code }} · Woche {{ header.week }}</p>{% endif %}
+</div>
+
+{% if former %}
+{% call alert('info', class='mb-6') %}Du bist als ehemaliges Mitglied eingetragen und siehst hier nur noch
+<a class="{{ link_class }}" href="{{ url_for('members.profile') }}">dein Profil</a>.{% endcall %}
+{% elif not has_rights %}
+{% call alert('info', class='mb-6') %}Dein Konto hat noch keine Rechte (kein Rang, kein Amt).
+Bitte wende dich an den Senior oder einen Admin.{% endcall %}
+{% endif %}
+
+<div class="grid gap-6 lg:grid-cols-3">
+<div class="grid content-start gap-4 md:grid-cols-2 lg:col-span-2">
+{% for widget_template, widget in cards.main %}{% include widget_template %}{% endfor %}
+{% if not cards.main and has_rights and not former %}
+<div class="md:col-span-2">{{ empty_state('Gerade ist nichts Neues für dich da.') }}</div>
+{% endif %}
+</div>
+<div class="grid content-start gap-4">
+{% if cards.office %}<h2 class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Für deine Ämter</h2>{% endif %}
+{% for widget_template, widget in cards.office %}{% include widget_template %}{% endfor %}
+{% if cards.club %}<h2 class="mt-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">Im Bund</h2>{% endif %}
+{% for widget_template, widget in cards.club %}{% include widget_template %}{% endfor %}
+</div>
+</div>
+{% endblock %}

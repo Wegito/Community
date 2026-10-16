@@ -719,8 +719,9 @@ yet): 16 migrations, about 900 tests, CI green. Nothing is deployed yet (see "Ow
 | M1 Members & rights | ✅ done | Members without login, personal invitations (link, QR, email), ranks, Ämter, groups, semesters, permission system, audit log, jobs, mail, notifications, import, member lifecycle |
 | M4 Wäsche per QR | ✅ done except M4-5, M4-6 | QR form, prices, monthly statement and Excel, import of the old list |
 | M3 Kasse & Saldo | 🟡 about half | Ledger (M3-1), Saldo on the profile (M3-2), Kasse pages (M3-3 first part), Umlage with Kasse subsidy and monthly charges (M3-4), push-TAN confirmation by the Kassenprüfer (M3-8). Open: Sammelzahlung, Excel export, payment requests, closing (Bilanz, GuV, Kassenzählung, AH-Kontingent), opening balances |
+| M2 Profile & tasks | 🟡 started | Start page with cards from every module (M2-1): my Saldo, tasks, laundry, bookings, announcements, notifications; cards for the Ämter (Kasse, Gegenzeichnung, Putzplan, Wäsche, new members, system); news and numbers of the Bund |
 | M9 Other Verbindungen | 🟡 started | Club name, short name, Heimverein editable (M9-1) |
-| M2, M5, M6, M7 | ⬜ open | Planned below |
+| M5, M6, M7 | ⬜ open | Planned below |
 | M8 Operations | ⬜ open | Needs the owner: server, domain, backups |
 
 **Next:** Wave 1 in `docs/TASKS.md` (finish the Kasse, laundry onto the Kontokarten), then M8 so the app
@@ -824,7 +825,7 @@ M3-10c (AH-Kontingent).
 ### 8.5 M2 — Profile & tasks → **R1** (M2-1, M2-2, M2-6) and **R4 "Aufgaben & Putzplan"** (the rest)
 | ID | Title | Scope | Depends on | Size | Parallel-safe with |
 |---|---|---|---|---|---|
-| M2-1 | Profile shell `/me` | Header (name, Biername, rank, Ämter with term, groups); `WIDGETS` list (endpoint, permission, order); each widget is its own htmx partial, so a failing widget cannot break the page; settings page; `/me` is the landing page after login | M1-5, M1-11 | M | M2-8, M3-1, M4-1, M4-2, M5-1 |
+| M2-1 | Profile shell `/me` ✅ (as the start page `/`, cards from every module) | Header (name, Biername, rank, Ämter with term, groups); `WIDGETS` list (endpoint, permission, order); each widget is its own htmx partial, so a failing widget cannot break the page; settings page; `/me` is the landing page after login | M1-5, M1-11 | M | M2-8, M3-1, M4-1, M4-2, M5-1 |
 | M2-2 | Chore → Task | Migration to `task`; assignee exactly one of member, group or Amt; statuses; source; `can_edit_task`; "Meine Aufgaben" widget (mine, my groups, my Ämter, plus my Pflicht events once M5-3 exists) | M1-5, M2-1 | M | M3-*, M4-1 … M4-3 |
 | M2-3 | Consenior workspace | Create and assign tasks; semester task groups; verify done; overdue and unassigned view; Consenior tile | M2-2 | M | M3-*, M4-* |
 | M2-4 | Putzplan rotation + templates | `task_template`, `task_rotation`; generation via `jobs tick` | M2-3, M1-6 | M | M2-5, M2-6, M2-7 |

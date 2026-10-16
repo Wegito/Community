@@ -1,0 +1,9 @@
+{% from 'macros/ui.html' import panel, stat %}
+{% call panel('System', url_for('admin.jobs'), 'Jobs') %}
+<div class="grid grid-cols-2 gap-2">
+{{ stat(widget.failed_jobs, 'fehlgeschlagene Jobs', url_for('admin.jobs'), 'danger' if widget.failed_jobs else 'success') }}
+{{ stat(widget.pending_jobs, 'Jobs warten') }}
+{{ stat(widget.logins, 'Logins (' ~ widget.members ~ ' Mitglieder)') }}
+{{ stat(widget.active_week, 'diese Woche angemeldet') }}
+</div>
+{% endcall %}

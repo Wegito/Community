@@ -8,6 +8,7 @@ from community.extensions import csrf, db, login_manager, migrate
 # Blueprints in registration order. A new module is added here (roadmap §4.4).
 MODULES = [
     'community.modules.auth',
+    'community.modules.home',
     'community.modules.members',
     'community.modules.announcements',
     'community.modules.tasks',
@@ -81,11 +82,11 @@ def create_app(config=None):
     from community.core.errors import register_error_handlers
     from community.core.money import format_cents
     from community.core.security import init_security_headers
-    from community.core.time import format_date, format_datetime
+    from community.core.time import format_date, format_datetime, format_month
 
     register_error_handlers(app)
     init_security_headers(app)
-    app.jinja_env.filters.update(dt=format_datetime, d=format_date, cents=format_cents)
+    app.jinja_env.filters.update(dt=format_datetime, d=format_date, month=format_month, cents=format_cents)
 
     from community.core.assets import asset_url
     from community.core.authz import can, policies

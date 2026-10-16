@@ -204,3 +204,16 @@ An independent review (four reviewers, each finding checked by a second agent tr
   data. All demo logins share one password, printed by the command and in the README; that is
   acceptable only because the command never runs outside development.
 - The staging instance (the other half of M8-4) waits for the server (M8-2).
+
+## 2026-10-16 — M2-1 start page
+
+- **The start page is `/`, built only from cards** that modules register with `core.widgets.home_card`
+  (template, permission, order, area). A card returns None when it has nothing to say, so the page has
+  no empty boxes; a module adds its own cards without touching the start page. Areas: the member's own
+  things, "Für deine Ämter" (work waiting for an Amt, shown by permission code, never by Amt name) and
+  "Im Bund" (news and numbers).
+- **A failing card is left out and logged** instead of breaking the page; in tests it raises. Simpler
+  than one htmx request per card (the roadmap's first idea) and enough for the club's size.
+- **The old announcement list on `/` is gone**; the newest three announcements are a card, the full
+  list stays at `/announcements`.
+- **No birthdays** (owner): the fun part of the page will be the beer counter (M6), counts only.

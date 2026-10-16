@@ -171,7 +171,7 @@ def test_layout_for_anonymous_visitors(client):
 
 def test_layout_for_a_member_without_admin_rights(client, login):
     login(make_user(email='me@example.org', name='Max Muster'))  # Bursch
-    page = _page(client)
+    page = _page(client, '/notifications')  # a page without start page cards that link to the same pages
     for href in ('/announcements', '/chores', '/bookings', '/members', '/org/offices'):
         assert page.count(f'href="{href}"') == 2  # bar for wide screens and the phone menu
     assert 'Verwaltung' not in page

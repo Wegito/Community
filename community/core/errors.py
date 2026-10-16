@@ -11,8 +11,8 @@ def _back_to_form():
     """A refused POST goes back to its page when that page opens with GET, otherwise to the start page."""
     rule = request.url_rule
     if rule is not None and 'GET' in rule.methods:
-        return redirect(safe_next(request.full_path.rstrip('?')) or url_for('announcements.index'))
-    return redirect(url_for('announcements.index'))
+        return redirect(safe_next(request.full_path.rstrip('?')) or url_for('home.index'))
+    return redirect(url_for('home.index'))
 
 
 def register_error_handlers(app):

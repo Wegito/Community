@@ -8,4 +8,4 @@ from flask import Blueprint
 
 bp = Blueprint('members', __name__, template_folder='templates')
 
-from . import routes  # noqa: E402,F401
+from . import cards, routes  # noqa: E402,F401

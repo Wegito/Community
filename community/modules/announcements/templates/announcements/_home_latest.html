@@ -1,0 +1,12 @@
+{% from 'macros/ui.html' import panel %}
+{% call panel('Ankündigungen', url_for('announcements.list')) %}
+<ul role="list" class="space-y-3">
+{% for item in widget['items'] %}
+<li>
+<p class="font-medium">{{ item.title }}</p>
+<p class="text-xs text-slate-500">{{ item.created_at|dt }}</p>
+<p class="mt-1 whitespace-pre-line text-slate-700">{{ item.body|truncate(220) }}</p>
+</li>
+{% endfor %}
+</ul>
+{% endcall %}

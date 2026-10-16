@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from decimal import Decimal
 
 from flask import Response, abort, flash, redirect, render_template, request, url_for
@@ -9,17 +10,12 @@ from community.core.authz import can, require_perm
 from community.core.money import format_cents
 from community.core.platform import audit
 from community.core.platform.qr import QrToken, qr_handler, qr_svg, rotate, tokens_for
-from community.core.time import today_local, utcnow
+from community.core.time import format_month, today_local, utcnow
 from community.extensions import db
 
 from . import bp, services
 from .forms import ButtonForm, MachineStatusForm, PriceForm, UseForm, VoidForm
 from .models import LaundryMachine, LaundryPrice, LaundryUse, MachineStatus, PriceKind, PriceTier
-
-MONTH_NAMES = (
-    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
-    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
-)  # fmt: skip
 
 
 @qr_handler('laundry')
@@ -32,7 +28,7 @@ def month_context(year, month):
     return {
         'year': year,
         'month': month,
-        'month_label': f'{MONTH_NAMES[month - 1]} {year}',
+        'month_label': format_month(date(year, month, 1)),
         'month_key': f'{year:04d}-{month:02d}',
         'prev_key': f'{prev[0]:04d}-{prev[1]:02d}',
         'next_key': f'{nxt[0]:04d}-{nxt[1]:02d}',

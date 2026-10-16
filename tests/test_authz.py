@@ -145,20 +145,21 @@ NO_RIGHTS = 'Dein Konto hat noch keine Rechte'
 def test_start_page_for_a_member(client, login):
     login(make_user())
     page = client.get('/').get_data(as_text=True)
-    assert 'Neueste Ankündigungen' in page and NO_RIGHTS not in page
+    assert 'Hallo Max!' in page and 'Bursch' in page and NO_RIGHTS not in page
 
 
 def test_start_page_without_any_rights(client, login):
     login(make_user(perms=[]))
     page = client.get('/').get_data(as_text=True)
-    assert NO_RIGHTS in page and 'Neueste Ankündigungen' not in page
+    assert NO_RIGHTS in page and 'Der Bund in Zahlen' not in page
 
 
 def test_start_page_for_the_technical_admin(client, login):
     # custom.sysadmin has every right except the Kasse (owner, 2026-10-13).
     login(make_admin())
     page = client.get('/').get_data(as_text=True)
-    assert NO_RIGHTS not in page and 'Neueste Ankündigungen' in page and 'Verwaltung' in page
+    assert NO_RIGHTS not in page and 'Verwaltung' in page
+    assert 'Für deine Ämter' in page and 'fehlgeschlagene Jobs' in page and 'Kasse' not in page.split('</nav>')[-1]
 
 
 def test_start_page_for_a_former_member(client, login):

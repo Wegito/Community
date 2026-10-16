@@ -13,15 +13,11 @@ from sqlalchemy import select
 from community.core.identity.models import Member, MemberStatus
 from community.core.org.services import current_rank_entries, group_members
 from community.core.platform import audit
+from community.core.time import format_month
 from community.extensions import db
 
 from . import services as ledger
 from .models import FinRecurring, JournalKind
-
-MONTHS = (
-    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
-    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
-)  # fmt: skip
 
 
 class Subsidy(NamedTuple):
@@ -141,7 +137,7 @@ def post(
 
 
 def month_label(day):
-    return f'{MONTHS[day.month - 1]} {day.year}'
+    return format_month(day)
 
 
 def recurring_key(recurring, day):

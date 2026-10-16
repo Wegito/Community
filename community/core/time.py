@@ -47,3 +47,14 @@ def format_date(value: date | None, fmt='%d.%m.%Y'):
     if value is None:
         return ''
     return value.strftime(fmt)
+
+
+MONTH_NAMES = (
+    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+)  # fmt: skip
+
+
+def format_month(value: date | None):
+    """'Oktober 2026'; the `|month` filter."""
+    return f'{MONTH_NAMES[value.month - 1]} {value.year}' if value else ''

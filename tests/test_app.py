@@ -10,7 +10,7 @@ def test_app_registers_all_routes(app):
         'auth.login',
         'auth.join',
         'auth.logout',
-        'announcements.index',
+        'home.index',
         'announcements.list',
         'announcements.create',
         'tasks.list',
