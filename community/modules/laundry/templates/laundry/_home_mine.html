@@ -1,0 +1,9 @@
+{% from 'macros/ui.html' import panel, stat, muted %}
+{% call panel('Meine Wäsche', url_for('laundry.mine'), 'Alle Einträge') %}
+<div class="grid grid-cols-3 gap-2">
+{{ stat(widget.washes, 'Waschgänge') }}
+{{ stat(widget.dries, 'Trockner') }}
+{{ stat(widget.total_cents|cents, 'bisher') }}
+</div>
+<p class="{{ muted }}">{{ widget.month|month }} · zuletzt {{ widget.last.used_at|dt }}.</p>
+{% endcall %}

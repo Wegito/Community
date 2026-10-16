@@ -1,0 +1,36 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit, actions %}
+{% from 'macros/ui.html' import page_header, card, alert, link_button %}
+{% block title %}Austritt · {{ member.full_name }}{% endblock %}
+{% block content %}
+<div class="max-w-xl">
+{{ page_header('Austritt: ' ~ member.full_name) }}
+{% if is_self %}
+{% call alert('warning') %}Den eigenen Austritt kann man nicht selbst eintragen.{% endcall %}
+{% else %}
+{% call alert('warning', class='mb-6 space-y-2') %}
+<p>Danach hat {{ member.first_name }} nur noch die Rechte eines ehemaligen Mitglieds. Der Login bleibt bestehen (eigenes Profil, eigener Saldo).</p>
+<p>Zum Austrittsdatum enden:</p>
+<ul class="ml-6 list-disc">
+<li>Rang: {{ overview.rank_entry.rank.label if overview.rank_entry else '—' }}</li>
+<li>Ämter: {% for a in overview.offices %}{{ a.office.label }}{{ ', ' if not loop.last }}{% else %}—{% endfor %}</li>
+<li>Gruppen: {% for m in overview.groups %}{{ m.group.name }}{{ ', ' if not loop.last }}{% else %}—{% endfor %}</li>
+<li>direkt vergebene Rollen</li>
+</ul>
+<p>Der Kassenwart wird benachrichtigt, damit der Saldo abgerechnet wird.</p>
+{% endcall %}
+{% call card() %}
+<form method="post" class="space-y-4" novalidate>
+{{ form.hidden_tag() }}
+{{ field(form.ended_on) }}
+{{ field(form.reason) }}
+{{ field(form.note, rows=3) }}
+{% call actions() %}
+{{ submit(form.submit, 'danger') }}
+{{ link_button('Abbrechen', url_for('members.detail', public_id=member.public_id), 'ghost') }}
+{% endcall %}
+</form>
+{% endcall %}
+{% endif %}
+</div>
+{% endblock %}

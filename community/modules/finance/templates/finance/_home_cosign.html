@@ -1,0 +1,13 @@
+{% from 'macros/ui.html' import panel, link_class, muted %}
+{% call panel('Gegenzeichnung', url_for('finance.cosign_list')) %}
+{% if widget['items'] %}
+<ul role="list" class="space-y-2">
+{% for item in widget['items'] %}
+<li><a class="{{ link_class }}" href="{{ url_for('finance.cosign_request', request_id=item.id) }}">{{ item.title }}</a>
+<span class="block text-xs text-slate-500">von {{ item.requested_by.member.full_name }}, {{ item.requested_at|dt }}</span></li>
+{% endfor %}
+</ul>
+{% else %}
+<p class="{{ muted }}">Nichts wartet auf dich.</p>
+{% endif %}
+{% endcall %}

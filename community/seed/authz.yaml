@@ -1,0 +1,149 @@
+# Default grants: role key -> permission codes (roadmap §6.5).
+#
+# Applied only by `flask authz seed`, which adds missing grants and never removes any.
+# Office roles list only the grants they add on top of the Bursch rank.
+# Codes of modules that do not exist yet are skipped until the module declares them.
+# Points the club has not decided yet (marked "?" in the roadmap) are left out = not granted.
+# Patterns work too: '*' or 'tasks.*' grant every matching code, '!finance.*' takes matches away again.
+
+grants:
+  rank.spefux:
+    - announcements.view
+    - events.view
+    - events.rsvp_own
+    - tasks.view_own
+    - tasks.complete_own
+    - finance.saldo.view_own
+    - drinks.view_own
+    - fux.curriculum.view_own
+    - documents.view
+
+  rank.fux:
+    - members.directory.view
+    - announcements.view
+    - events.view
+    - events.rsvp_own
+    - tasks.view_own
+    - tasks.complete_own
+    - tasks.view_all
+    - bookings.create_own
+    - finance.saldo.view_own
+    - drinks.view_own
+    - fux.curriculum.view_own
+    - documents.view
+
+  rank.bursch:
+    - members.directory.view
+    - members.contact.view
+    - announcements.view
+    - events.view
+    - events.rsvp_own
+    - tasks.view_own
+    - tasks.complete_own
+    - tasks.view_all
+    - bookings.create_own
+    - finance.saldo.view_own
+    - drinks.view_own
+    - fux.progress.view_all
+    - documents.view
+
+  rank.alter_herr:
+    - members.directory.view
+    - members.contact.view
+    - announcements.view
+    - events.view
+    - events.rsvp_own
+    - tasks.view_own
+    - tasks.complete_own
+    - bookings.create_own
+    - finance.saldo.view_own
+    - drinks.view_own
+    - documents.view
+
+  office.senior:
+    - members.invite
+    - members.import
+    - members.edit_any
+    - members.rank.change
+    - members.exit.record
+    - offices.assign
+    - groups.manage
+    - org.semesters.manage
+    - audit.view
+    - announcements.create
+    - announcements.manage_any
+    - events.edit
+    - events.publish
+    - events.attendance.record
+    - tasks.manage
+    - fux.progress.view_all
+    - documents.manage
+
+  office.consenior:
+    - members.invite
+    - members.rank.change
+    - groups.manage
+    - announcements.create
+    - events.edit
+    - events.attendance.record
+    - tasks.manage
+    - bookings.manage_any
+    - laundry.view_all
+    - laundry.machines.manage
+    - laundry.settlement.submit
+
+  office.schriftwart:
+    - members.edit_any
+    - members.exit.record
+    - offices.assign
+    - announcements.manage_any
+    - events.edit
+    - documents.manage
+
+  office.kassenwart:
+    - finance.ledger.view_all
+    - finance.journal.post
+    - finance.journal.reverse
+    - finance.reports.view
+    - finance.payment_request.send
+    - finance.accounts.manage
+    - drinks.view_all
+    - laundry.view_all
+
+  # Reads the whole Kasse, books nothing (Q22). The only one who confirms ("push-TAN") bookings that
+  # credit the Kassenwart's own Kontokarte (owner, 2026-10-13).
+  office.kassenpruefer:
+    - finance.ledger.view_all
+    - finance.reports.view
+    - finance.journal.cosign
+
+  office.fuxmajor:
+    - members.contact.view
+    - members.invite
+    - events.attendance.record
+    - fux.progress.view_all
+    - fux.progress.signoff
+
+  office.bierwart:
+    - drinks.tally.record
+    - drinks.catalog.manage
+    - drinks.stock
+    - drinks.view_all
+    - drinks.settlement.submit
+    - drinks.devices.manage
+
+  group.hausbewohner:
+    - laundry.use.create_own
+    - laundry.view_own
+    - finance.saldo.view_own  # residents without rank pay for laundry too
+
+  # Technical admin: full control of the app, but not the Kasse (owner, 2026-10-13; roadmap §6.3
+  # rule 6). Only the Kassenwart and the Kassenprüfer see the Kasse. The admin assigns those Ämter,
+  # but nobody can assign an Amt to themselves (rule 1). Patterns: '*' = every code, '!x.*' = except.
+  custom.sysadmin:
+    - '*'
+    - '!finance.*'
+    - '!drinks.consumption.ingest'  # API devices only, never a person (§6.5)
+
+  system.former_member:
+    - finance.saldo.view_own

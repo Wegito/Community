@@ -1,0 +1,17 @@
+{# Open invitations of `member` with a revoke button each. Needs `invitations` and `button_form`. #}
+{% from 'macros/ui.html' import button, muted %}
+{% if invitations %}
+<ul role="list" class="divide-y divide-slate-100">
+{% for inv in invitations %}
+<li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 first:pt-0 last:pb-0">
+<span class="min-w-48 flex-1">{{ inv.channel_label }}{% if inv.channel == 'email' %} an {{ inv.email }}{% endif %}, gültig bis {{ inv.expires_at|dt }}{% if inv.created_by %} · von {{ inv.created_by.member.full_name }}{% endif %}</span>
+<form method="post" action="{{ url_for('members.revoke_invitation', invitation_id=inv.id) }}">
+{{ button_form.hidden_tag() }}
+{{ button('Widerrufen', 'danger', 'sm') }}
+</form>
+</li>
+{% endfor %}
+</ul>
+{% else %}
+<p class="{{ muted }}">Keine offene Einladung.</p>
+{% endif %}

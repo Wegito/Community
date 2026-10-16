@@ -1,0 +1,53 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, checkbox, submit %}
+{% from 'macros/ui.html' import page_header, section_header, card, link_button, post_button, badge, link_class, muted %}
+{% block title %}Mein Profil{% endblock %}
+{% block content %}
+{% call page_header(member.full_name, member.biername) %}
+{% if can('members.edit_any') %}{{ link_button('Alles bearbeiten', url_for('members.edit', public_id=member.public_id)) }}{% endif %}
+{% endcall %}
+{% if not member.is_active_member %}
+{% set former %}Ehemaliges Mitglied{% if member.ended_on %} seit {{ member.ended_on|d }}{% endif %}{% endset %}
+<p class="-mt-4 mb-6">{{ badge(former) }}</p>
+{% endif %}
+
+{% include 'members/_overview.html' %}
+
+{% for widget_template, widget in profile_cards(member) %}{% include widget_template %}{% endfor %}
+
+<div class="grid gap-x-8 lg:grid-cols-2">
+<section>
+{{ section_header('Meine Angaben') }}
+{% call card() %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.biername) }}
+{{ field(form.phone) }}
+{{ checkbox(form.show_phone) }}
+{{ field(form.address, rows=3) }}
+{{ checkbox(form.show_address) }}
+<p class="{{ muted }}">Mitglieder mit Kontaktrecht sehen deine E-Mail-Adresse{% if contact_email %} ({{ contact_email }}){% endif %}, Telefon und Adresse nur, wenn du sie freigibst.
+Namen und Kontakt-E-Mail kann nur die Mitgliederverwaltung ändern.</p>
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+</section>
+
+<section>
+{{ section_header('Anmeldung') }}
+{% call card(class='space-y-3') %}
+<p>Login-E-Mail: <strong class="break-all">{{ current_user.login_email }}</strong> · <a class="{{ link_class }}" href="{{ url_for('auth.change_email') }}">ändern</a></p>
+<p><a class="{{ link_class }}" href="{{ url_for('auth.change_password') }}">Passwort ändern</a></p>
+<div class="space-y-1">
+{{ post_button('Überall abmelden', url_for('members.logout_everywhere_own')) }}
+<p class="{{ muted }}">Beendet alle Anmeldungen auf allen Geräten, auch „Angemeldet bleiben“.</p>
+</div>
+{% endcall %}
+
+{{ section_header('Benachrichtigungen') }}
+{% call card() %}
+<p><a class="{{ link_class }}" href="{{ url_for('notifications.settings') }}">Benachrichtigungen einstellen</a></p>
+{% endcall %}
+</section>
+</div>
+{% endblock %}

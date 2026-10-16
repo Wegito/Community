@@ -1,0 +1,51 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% from 'macros/ui.html' import page_header, section_header, card, alert, stacked_list, row_class, empty_state %}
+{% block title %}Rang · {{ member.full_name }}{% endblock %}
+{% block content %}
+{% set subtitle %}Aktuell: <strong class="text-slate-900">{{ current.label if current else 'kein Rang' }}</strong>{% endset %}
+{{ page_header('Rang von ' ~ member.display_name, subtitle) }}
+{% if own %}
+{% call alert('warning') %}Den eigenen Rang kann man nicht selbst ändern.{% endcall %}
+{% elif not member.is_active_member %}
+{% call alert('warning') %}Ehemaliges Mitglied: einen neuen Rang gibt es erst nach der Wiederaufnahme.{% endcall %}
+{% else %}
+{% call card(class='max-w-xl') %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.rank_id) }}
+{{ field(form.valid_from) }}
+{{ field(form.convent_ref, placeholder='z. B. CC 12.10.2026, TOP 4') }}
+{{ field(form.note) }}
+{% if office_conflicts %}
+{% call alert('warning') %}
+<p class="mb-2">Hat Ämter. Falls der neue Rang ein Amt nicht halten darf:</p>
+<ul class="mb-2 ml-5 list-disc">{% for a in office_conflicts %}<li>{{ a.office.label }} ({{ 'ab' if a.valid_from > today else 'seit' }} {{ a.valid_from|d }})</li>{% endfor %}</ul>
+<fieldset class="space-y-1">
+<legend class="sr-only">Ämter</legend>
+<label class="flex items-center gap-2"><input type="radio" name="offices" value="close" class="size-4 accent-slate-900" checked> zum Vortag beenden</label>
+<label class="flex items-center gap-2"><input type="radio" name="offices" value="keep_acting" class="size-4 accent-slate-900"> kommissarisch weiterführen</label>
+</fieldset>
+{% endcall %}
+{% endif %}
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+{% endif %}
+{{ section_header('Verlauf') }}
+{% if history %}
+{% call stacked_list() %}
+{% for h in history %}
+<li class="{{ row_class }} text-sm">
+<div>
+<strong>{{ h.rank.label }}</strong> {{ h.valid_from|d }} – {{ h.valid_to|d if h.valid_to else 'heute' }}
+{% if h.convent_ref %} · {{ h.convent_ref }}{% endif %}{% if h.note %} · {{ h.note }}{% endif %}
+{% if h.changed_by %} · eingetragen von {{ h.changed_by.display_name }}{% endif %}
+</div>
+</li>
+{% endfor %}
+{% endcall %}
+{% else %}
+{{ empty_state('Noch kein Rang eingetragen.') }}
+{% endif %}
+{% endblock %}

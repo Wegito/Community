@@ -1,0 +1,31 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, link_button, table, cell, empty_row %}
+{% block title %}Wäsche-Abrechnung{% endblock %}
+{% block content %}
+{% call page_header('Wäsche-Abrechnung', 'Pro Person und Monat; stornierte Einträge zählen nicht.') %}
+{{ link_button('Alle Einträge', url_for('laundry.all_entries', monat=month_key)) }}
+{{ link_button('Excel', url_for('laundry.overview_xlsx', monat=month_key), 'primary') }}
+{% endcall %}
+{% include 'laundry/_month_nav.html' %}
+{% call table(['Name', 'Preisgruppe', 'Einträge', 'Wäschen', 'Trocknen', 'Betrag']) %}
+{% for r in rows %}
+<tr>
+<td class="{{ cell }}">{{ r.member.full_name }}</td>
+<td class="{{ cell }}">{% for t in r.tiers|sort %}{{ tier_labels[t] }}{{ ', ' if not loop.last }}{% endfor %}</td>
+<td class="{{ cell }}">{{ r.entries }}</td>
+<td class="{{ cell }}">{{ r.washes }}</td>
+<td class="{{ cell }}">{{ r.dries }}</td>
+<td class="{{ cell }} font-medium">{{ r.total_cents|cents }}</td>
+</tr>
+{% else %}
+{{ empty_row('Keine Einträge in diesem Monat.', 6) }}
+{% endfor %}
+{% if rows %}
+<tr class="bg-slate-50 font-semibold">
+<td class="{{ cell }}">Summe</td><td class="{{ cell }}"></td>
+<td class="{{ cell }}">{{ totals.entries }}</td><td class="{{ cell }}">{{ totals.washes }}</td>
+<td class="{{ cell }}">{{ totals.dries }}</td><td class="{{ cell }}">{{ totals.total_cents|cents }}</td>
+</tr>
+{% endif %}
+{% endcall %}
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% from 'macros/ui.html' import page_header, card, link_class, muted %}
+{% block title %}Willkommen{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-md">
+{% set intro %}Hallo {{ member.first_name }}{% if invitation.created_by %}, {{ invitation.created_by.member.full_name }} hat dich eingeladen{% else %}, du bist eingeladen{% endif %}.
+Lege hier dein Konto an, dann bist du gleich angemeldet.{% endset %}
+{{ page_header('Willkommen bei ' ~ club_name, intro) }}
+{% call card(class='mb-4') %}
+<p><span class="text-slate-600">Mitglied:</span> <strong>{{ member.full_name }}</strong>{% if member.biername %} ({{ member.biername }}){% endif %}</p>
+<p class="{{ muted }}">Der Link gilt bis {{ invitation.expires_at|dt }} und nur einmal.</p>
+{% endcall %}
+{% call card() %}
+<form method="post" class="space-y-4" novalidate>
+{{ form.hidden_tag() }}
+{{ field(form.login_email, autocomplete='username') }}
+{{ field(form.password, autocomplete='new-password', minlength=min_password_length) }}
+{{ field(form.confirm, autocomplete='new-password') }}
+<p class="{{ muted }}">Mindestens {{ min_password_length }} Zeichen; ein Satz aus mehreren Wörtern ist gut zu merken.</p>
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+<p class="mt-4 {{ muted }}">Du hast schon ein Konto? Dann <a class="{{ link_class }}" href="{{ url_for('auth.login') }}">hier einloggen</a>.</p>
+</div>
+{% endblock %}

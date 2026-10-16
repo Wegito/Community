@@ -1,0 +1,19 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, checkbox, submit %}
+{% from 'macros/ui.html' import page_header, card, back_link, muted %}
+{% block title %}Konto bearbeiten{% endblock %}
+{% block content %}
+{{ page_header(account|account_label, account.kind_label) }}
+{% call card(class='max-w-xl') %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.name) }}
+{% if account.key == 'heimverein' %}<p class="-mt-2 {{ muted }}">Angezeigt wird der Name aus Verwaltung → Verein, wenn dort einer eingetragen ist.</p>{% endif %}
+{{ checkbox(form.needs_cost_centre) }}
+{{ checkbox(form.archived) }}
+<p class="{{ muted }}">Archivierte Konten bleiben mit allen Buchungen erhalten, werden aber nicht mehr zum Buchen angeboten. Nur ein Konto ohne Bestand kann archiviert werden.</p>
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+{{ back_link('Konten', url_for('finance.accounts')) }}
+{% endblock %}

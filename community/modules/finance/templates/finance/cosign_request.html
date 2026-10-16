@@ -1,0 +1,50 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, section_header, card, table, cell, back_link, badge, link_class, muted, alert, post_button %}
+{% from 'macros/forms.html' import field, submit %}
+{% block title %}Gegenzeichnung: {{ item.title }}{% endblock %}
+{% block content %}
+{{ page_header(item.title, item.kind_label ~ ' vom ' ~ (item.booked_on|d) ~ (' · Beleg ' ~ item.beleg if item.beleg else '')) }}
+<p class="mb-4">{{ badge(item.status_label, {'open': 'warning', 'confirmed': 'success', 'rejected': 'danger'}[item.status]) }}
+{% if item.is_open %}<span class="ml-2 {{ muted }}">Noch nicht gebucht.</span>{% endif %}</p>
+{% if problem %}{% call alert('danger', class='mb-4') %}{{ problem }}{% endcall %}{% endif %}
+{% if item.reverses %}
+{% call alert('info', class='mb-4') %}Storno von <a class="{{ link_class }}" href="{{ url_for('finance.booking', journal_id=item.reverses.id) }}">{{ item.reverses.title }}</a>. Grund: {{ item.note }}{% endcall %}
+{% endif %}
+{% call table(['Soll', 'Haben', 'Kostenstelle', 'Betrag']) %}
+{% for line in lines %}
+<tr>
+<td class="{{ cell }}">{{ line.debit|account_label }}</td>
+<td class="{{ cell }}">{{ line.credit|account_label }}</td>
+<td class="{{ cell }}">{{ line.category.name if line.category else '' }}{% if line.memo %}<div class="{{ muted }}">{{ line.memo }}</div>{% endif %}</td>
+<td class="{{ cell }} text-right tabular-nums">{{ line.amount_cents|cents }}</td>
+</tr>
+{% endfor %}
+{% endcall %}
+<dl class="mt-4 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+<dt class="text-slate-600">Summe</dt><dd class="tabular-nums">{{ total|cents }}</dd>
+<dt class="text-slate-600">Vorgelegt</dt><dd>{{ item.requested_at|dt }} von {{ item.requested_by.member.full_name }}</dd>
+{% if item.note and not item.reverses %}<dt class="text-slate-600">Notiz</dt><dd class="whitespace-pre-line">{{ item.note }}</dd>{% endif %}
+{% if item.decided_by %}<dt class="text-slate-600">Entschieden</dt><dd>{{ item.decided_at|dt }} von {{ item.decided_by.member.full_name }}</dd>{% endif %}
+{% if item.reject_reason %}<dt class="text-slate-600">Grund der Ablehnung</dt><dd>{{ item.reject_reason }}</dd>{% endif %}
+{% if item.journal %}<dt class="text-slate-600">Buchung</dt><dd><a class="{{ link_class }}" href="{{ url_for('finance.booking', journal_id=item.journal.id) }}">{{ item.journal.title }}</a></dd>{% endif %}
+</dl>
+{% if may_decide %}
+{{ section_header('Entscheiden') }}
+<div class="grid gap-6 lg:grid-cols-2">
+{% call card() %}
+<p class="mb-3 {{ muted }}">Bestätigen bucht genau diese Beträge, mit dir als Gegenzeichner.</p>
+{% if not problem %}{{ post_button('Bestätigen und buchen', url_for('finance.cosign_confirm', request_id=item.id), 'primary', 'md') }}{% endif %}
+{% endcall %}
+{% call card() %}
+<form method="post" action="{{ url_for('finance.cosign_reject', request_id=item.id) }}" class="space-y-4">
+{{ reject_form.hidden_tag() }}
+{{ field(reject_form.reason) }}
+{{ submit(reject_form.submit, 'danger') }}
+</form>
+{% endcall %}
+</div>
+{% elif item.is_open %}
+<p class="mt-6 {{ muted }}">Bestätigen oder ablehnen kann nur ein Kassenprüfer, nicht wer die Buchung vorgelegt hat.</p>
+{% endif %}
+{{ back_link('Gegenzeichnung', url_for('finance.cosign_list')) }}
+{% endblock %}

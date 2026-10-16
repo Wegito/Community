@@ -1,0 +1,10 @@
+{% from 'macros/ui.html' import panel, stat, link_class %}
+{% call panel('Wäsche', url_for('laundry.overview'), 'Abrechnung') %}
+<div class="grid grid-cols-2 gap-2">
+{{ stat(widget.totals.entries, 'Einträge im ' ~ (widget.month|month)) }}
+{{ stat(widget.totals.total_cents|cents, widget.people ~ (' Person' if widget.people == 1 else ' Personen')) }}
+</div>
+{% if widget.defect %}
+<p class="rounded-md bg-red-50 px-3 py-2 text-red-900">Defekt: {% for machine in widget.defect %}{{ machine.name }}{{ ', ' if not loop.last }}{% endfor %} · <a class="{{ link_class }}" href="{{ url_for('laundry.settings') }}">verwalten</a></p>
+{% endif %}
+{% endcall %}

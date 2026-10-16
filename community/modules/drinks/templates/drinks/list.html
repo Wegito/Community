@@ -1,0 +1,35 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, table, cell, empty_row, badge, link_button, muted %}
+{% block title %}Alle Striche{% endblock %}
+{% block content %}
+{% call page_header('Alle Striche', 'Die letzten 300 Einträge. Falsche Striche werden nicht gelöscht, sondern mit einer Gegenbuchung korrigiert.') %}
+{% if can('drinks.tally.record') %}{{ link_button('Strichliste', url_for('drinks.sheet'), 'primary') }}{% endif %}
+{% endcall %}
+{% call table(['Wann', 'Wer', 'Was', 'Anzahl', 'Betrag', 'Quelle', none]) %}
+{% for row in rows %}
+<tr>
+<td class="{{ cell }} whitespace-nowrap">{{ row.occurred_at|dt }}</td>
+<td class="{{ cell }}">{{ row.member.full_name }}</td>
+<td class="{{ cell }}">{{ row.product.name }}{% if row.corrects_id %}<div class="{{ muted }}">Korrektur: {{ row.note }}</div>{% endif %}</td>
+<td class="{{ cell }} text-right tabular-nums">{{ row.quantity }}</td>
+<td class="{{ cell }} text-right tabular-nums">{{ row.total_cents|cents }}</td>
+<td class="{{ cell }}">{{ {'sheet': 'Strichliste', 'api': 'Tablet'}.get(row.source, row.source) }}</td>
+<td class="{{ cell }}">
+{% if row.corrected_by %}{{ badge('korrigiert', 'neutral') }}
+{% elif row.quantity > 0 and can('drinks.tally.record') %}
+<details>
+<summary class="cursor-pointer text-sm font-medium text-slate-700 underline decoration-slate-400 underline-offset-2">Korrigieren</summary>
+<form method="post" action="{{ url_for('drinks.correct', row_id=row.id) }}" class="mt-2 flex flex-wrap gap-2">
+{{ form.hidden_tag() }}
+<input name="reason" required maxlength="200" placeholder="Grund" aria-label="Grund" class="w-40 rounded-md border border-slate-300 px-2 py-1 text-sm" />
+<button type="submit" class="rounded-md border border-red-300 px-2 py-1 text-sm text-red-700 hover:bg-red-50">Korrigieren</button>
+</form>
+</details>
+{% endif %}
+</td>
+</tr>
+{% else %}
+{{ empty_row('Noch keine Striche.', 7) }}
+{% endfor %}
+{% endcall %}
+{% endblock %}

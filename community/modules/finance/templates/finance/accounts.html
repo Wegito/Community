@@ -1,0 +1,63 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, checkbox, submit %}
+{% from 'macros/ui.html' import page_header, section_header, card, table, cell, link_class, muted, badge, back_link %}
+{% block title %}Konten{% endblock %}
+{% block content %}
+{{ page_header('Konten und Kostenstellen', 'Bestand je Konto: Soll minus Haben, wie im Excel-Journal.') }}
+{% set manage = can('finance.accounts.manage') %}
+{% call table(['Konto', 'Art', 'Soll', 'Haben', 'Bestand', none]) %}
+{% for account, debit, credit in balances %}
+<tr{% if account.archived_at %} class="text-slate-500"{% endif %}>
+<td class="{{ cell }}"><a class="{{ link_class }}" href="{{ url_for('finance.journal', konto=account.id) }}">{{ account|account_label }}</a>{% if account.needs_cost_centre %} <span class="{{ muted }}">· mit Kostenstellen</span>{% endif %}{% if account.archived_at %} {{ badge('archiviert') }}{% endif %}</td>
+<td class="{{ cell }}">{{ kind_labels[account.kind] }}</td>
+<td class="{{ cell }} text-right tabular-nums">{{ debit|cents }}</td>
+<td class="{{ cell }} text-right tabular-nums">{{ credit|cents }}</td>
+<td class="{{ cell }} text-right font-medium tabular-nums">{{ (debit - credit)|cents }}</td>
+<td class="{{ cell }} text-right">{% if manage %}<a class="{{ link_class }}" href="{{ url_for('finance.edit_account', account_id=account.id) }}">Bearbeiten</a>{% endif %}</td>
+</tr>
+{% endfor %}
+{% endcall %}
+
+<div class="mt-8 grid gap-x-8 lg:grid-cols-2">
+<section>
+{{ section_header('Kostenstellen') }}
+<p class="mb-3 {{ muted }}">Ergebnis auf „Verschiedenes“: Einnahmen minus Ausgaben je Kostenstelle.</p>
+{% call table(['Kostenstelle', 'Ergebnis', none]) %}
+{% for c in categories %}
+<tr{% if c.archived_at %} class="text-slate-500"{% endif %}>
+<td class="{{ cell }}"><a class="{{ link_class }}" href="{{ url_for('finance.journal', kostenstelle=c.id) }}">{{ c.name }}</a>{% if c.archived_at %} {{ badge('archiviert') }}{% endif %}</td>
+<td class="{{ cell }} text-right tabular-nums">{{ category_totals.get(c.id, 0)|cents }}</td>
+<td class="{{ cell }} text-right">{% if manage %}<a class="{{ link_class }}" href="{{ url_for('finance.edit_category', category_id=c.id) }}">Bearbeiten</a>{% endif %}</td>
+</tr>
+{% endfor %}
+{% endcall %}
+</section>
+{% if manage %}
+<section class="space-y-6">
+<div>
+{{ section_header('Neues Konto') }}
+{% call card() %}
+<form method="post" class="space-y-4">
+{{ account_form.hidden_tag() }}
+{{ field(account_form.name, placeholder='z. B. Getränkekasse') }}
+{{ field(account_form.kind) }}
+{{ checkbox(account_form.needs_cost_centre) }}
+{{ submit(account_form.submit) }}
+</form>
+{% endcall %}
+</div>
+<div>
+{{ section_header('Neue Kostenstelle') }}
+{% call card() %}
+<form method="post" class="space-y-4">
+{{ category_form.hidden_tag() }}
+{{ field(category_form.name, placeholder='z. B. Weihnachtsfeier') }}
+{{ submit(category_form.submit) }}
+</form>
+{% endcall %}
+</div>
+</section>
+{% endif %}
+</div>
+{{ back_link('Kasse', url_for('finance.overview')) }}
+{% endblock %}

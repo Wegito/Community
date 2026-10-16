@@ -1,0 +1,65 @@
+"""Time helpers: store UTC, show Europe/Berlin."""
+
+from datetime import UTC, date, datetime
+from zoneinfo import ZoneInfo
+
+LOCAL_TZ = ZoneInfo('Europe/Berlin')
+
+
+def utcnow() -> datetime:
+    """Current time as a timezone-aware UTC datetime."""
+    return datetime.now(UTC)
+
+
+def today_local() -> date:
+    """Today's date in Berlin (dates like valid_from/valid_to are club dates, not UTC)."""
+    return datetime.now(LOCAL_TZ).date()
+
+
+def to_local(value: datetime) -> datetime:
+    """Convert an aware datetime to Berlin time. Naive values are treated as UTC."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(LOCAL_TZ)
+
+
+def local_to_utc(value: datetime) -> datetime:
+    """Interpret a naive datetime entered in a form as Berlin time and convert it to UTC."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=LOCAL_TZ)
+    return value.astimezone(UTC)
+
+
+def exists_locally(value: datetime) -> bool:
+    """False for a naive Berlin wall-clock time that is skipped when the clocks go forward."""
+    return to_local(local_to_utc(value)).replace(tzinfo=None) == value
+
+
+def format_datetime(value, fmt='%d.%m.%Y %H:%M'):
+    """Jinja filter `dt`: Berlin time, German format. Empty for None."""
+    if value is None:
+        return ''
+    return to_local(value).strftime(fmt)
+
+
+def format_date(value: date | None, fmt='%d.%m.%Y'):
+    """Jinja filter `d`: German date format. Empty for None."""
+    if value is None:
+        return ''
+    return value.strftime(fmt)
+
+
+MONTH_NAMES = (
+    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+)  # fmt: skip
+
+
+def format_month(value: date | None):
+    """'Oktober 2026'; the `|month` filter."""
+    return f'{MONTH_NAMES[value.month - 1]} {value.year}' if value else ''
+
+
+def local_day_start(day: date) -> datetime:
+    """UTC time of midnight in Berlin at the start of `day` (for "from day A to day B" queries)."""
+    return local_to_utc(datetime(day.year, day.month, day.day, tzinfo=LOCAL_TZ))

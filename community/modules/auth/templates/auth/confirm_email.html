@@ -1,0 +1,19 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, card, btn_class %}
+{% block title %}E-Mail-Adresse bestätigen{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-md">
+{{ page_header('Neue Login-E-Mail-Adresse bestätigen') }}
+{% call card(class='mb-4') %}
+<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+<dt class="text-slate-600">Konto</dt><dd class="font-medium">{{ user.member.full_name }}</dd>
+<dt class="text-slate-600">Neue Login-E-Mail</dt><dd class="font-medium break-all">{{ new_email }}</dd>
+</dl>
+{% endcall %}
+<p class="mb-6">Nach der Bestätigung meldest du dich mit der neuen Adresse an. Die bisherige Adresse bekommt eine Nachricht über die Änderung.</p>
+<form method="post">
+{{ form.hidden_tag() }}
+{{ form.submit(class=btn_class('primary')) }}
+</form>
+</div>
+{% endblock %}

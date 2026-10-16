@@ -1,0 +1,10 @@
+{#- Default mail for notify(): the title and, if given, the link. -#}
+{% extends 'mail/base.txt' %}
+{% block subject %}{{ title }}{% endblock %}
+{% block body -%}
+{{ title }}
+{%- if link_url %}
+
+Mehr dazu: {{ link_url }}
+{%- endif %}
+{%- endblock %}

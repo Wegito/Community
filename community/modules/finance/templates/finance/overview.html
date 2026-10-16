@@ -1,0 +1,56 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, section_header, card, link_button, table, cell, empty_row, link_class, muted, alert %}
+{% from 'finance/_macros.html' import saldo_amount %}
+{% block title %}Kasse{% endblock %}
+{% block content %}
+{% call page_header('Kasse') %}
+{% if can('finance.journal.post') %}{{ link_button('Neue Buchung', url_for('finance.new_booking'), 'primary') }}{{ link_button('Umlage', url_for('finance.umlage')) }}{{ link_button('Monatlich', url_for('finance.recurring_list')) }}{% endif %}
+{{ link_button('Kassenbuch', url_for('finance.journal')) }}
+{{ link_button('Konten', url_for('finance.accounts')) }}
+{{ link_button('Gegenzeichnung', url_for('finance.cosign_list')) }}
+{% endcall %}
+{% if open_requests %}
+{% call alert('warning', class='mb-6') %}<a class="{{ link_class }}" href="{{ url_for('finance.cosign_list') }}">{{ open_requests }} {{ 'Buchung wartet' if open_requests == 1 else 'Buchungen warten' }} auf Gegenzeichnung</a>{% endcall %}
+{% endif %}
+
+<div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+{% for account, balance in money %}
+{% call card() %}<p class="{{ muted }}">{{ account|account_label }}</p><p class="mt-1 text-xl font-semibold tabular-nums">{{ balance|cents }}</p>{% endcall %}
+{% endfor %}
+{% call card() %}<p class="{{ muted }}">Offen bei Mitgliedern</p><p class="mt-1 text-xl">{{ saldo_amount(owed) }}</p>{% endcall %}
+{% call card() %}<p class="{{ muted }}">Guthaben von Mitgliedern</p><p class="mt-1 text-xl">{{ saldo_amount(credit) }}</p>{% endcall %}
+</div>
+
+<div class="grid gap-x-8 lg:grid-cols-3">
+<section class="lg:col-span-2">
+{{ section_header('Kontokarten') }}
+<p class="mb-3 text-sm">
+{% if only_debts %}Nur offene · <a class="{{ link_class }}" href="{{ url_for('finance.overview') }}">alle zeigen</a>
+{% else %}Alle · <a class="{{ link_class }}" href="{{ url_for('finance.overview', nur='schulden') }}">nur offene zeigen</a>{% endif %}
+</p>
+{% call table(['Name', 'Saldo', none]) %}
+{% for account, cents in rows %}
+<tr>
+<td class="{{ cell }}"><a class="{{ link_class }}" href="{{ url_for('finance.card', public_id=account.member.public_id) }}">{{ account.member.full_name }}</a>{% if not account.member.is_active_member %} <span class="{{ muted }}">(ehemalig)</span>{% endif %}</td>
+<td class="{{ cell }} text-right">{{ saldo_amount(cents) }}</td>
+<td class="{{ cell }} text-right whitespace-nowrap">{% if can('finance.journal.post') %}<a class="{{ link_class }}" href="{{ url_for('finance.new_booking', vorlage='zahlung', mitglied=account.member.public_id) }}">Zahlung</a>{% endif %}</td>
+</tr>
+{% else %}
+{{ empty_row('Noch keine Kontokarten. Sie entstehen mit der ersten Buchung für ein Mitglied.', 3) }}
+{% endfor %}
+{% endcall %}
+</section>
+<section>
+{{ section_header('Letzte Buchungen') }}
+{% call card(class='p-0') %}
+<ul role="list" class="divide-y divide-slate-100 text-sm">
+{% for item in recent %}
+<li class="flex justify-between gap-3 px-4 py-2"><a class="{{ link_class }} min-w-0 truncate" href="{{ url_for('finance.booking', journal_id=item.id) }}">{{ item.title }}</a><span class="whitespace-nowrap tabular-nums">{{ item.total_cents|cents }}</span></li>
+{% else %}
+<li class="px-4 py-3 {{ muted }}">Noch keine Buchungen.</li>
+{% endfor %}
+</ul>
+{% endcall %}
+</section>
+</div>
+{% endblock %}

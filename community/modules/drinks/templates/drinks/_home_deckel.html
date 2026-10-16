@@ -1,0 +1,9 @@
+{% from 'macros/ui.html' import panel, stat, muted %}
+{% call panel('Mein Deckel', url_for('drinks.mine'), 'Alle Striche') %}
+<div class="grid grid-cols-3 gap-2">
+{{ stat(widget.month.beers, 'Bier im ' ~ widget.month_name) }}
+{{ stat(widget.month.drinks, 'Getränke') }}
+{{ stat(widget.month.total_cents|cents, 'vorläufig') }}
+</div>
+<p class="{{ muted }}">Dieses Semester: {{ widget.semester.beers }} Bier. Abgerechnet wird über die Kontokarte.</p>
+{% endcall %}

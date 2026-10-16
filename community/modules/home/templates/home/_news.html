@@ -1,0 +1,9 @@
+{% from 'macros/ui.html' import panel, link_class %}
+{% call panel('Was es Neues gibt') %}
+<ul role="list" class="space-y-2">
+{% for item in widget['items'] %}
+<li><a class="{{ link_class }}" href="{{ url_for('members.detail', public_id=item.member.public_id) }}">{{ item.text }}</a>
+<span class="block text-xs text-slate-500">{{ item.day|d }}</span></li>
+{% endfor %}
+</ul>
+{% endcall %}

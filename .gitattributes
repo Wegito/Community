@@ -1,0 +1,3 @@
+# Built and vendored files: collapsed in GitHub diffs, not counted as source.
+community/static/app.css linguist-generated=true
+community/static/vendor/** linguist-vendored=true

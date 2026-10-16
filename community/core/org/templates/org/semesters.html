@@ -1,0 +1,41 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit, inline_input_class %}
+{% from 'macros/ui.html' import page_header, section_header, card, button, link_button, empty_state, stacked_list, row_class, muted %}
+{% block title %}Semester{% endblock %}
+{% block content %}
+{% set subtitle %}Aktuell: <strong class="text-slate-900">{{ current.code if current else 'kein Semester für heute angelegt' }}</strong>{% endset %}
+{{ page_header('Semester', subtitle) }}
+{% if items %}
+{% call stacked_list() %}
+{% for s in items %}
+<li class="{{ row_class }}">
+<div class="min-w-48 flex-1">
+<div class="font-medium">{{ s.code }}</div>
+<div class="{{ muted }}">{{ s.starts_on|d }} – {{ s.ends_on|d }} · {{ status_labels[s.status] }}</div>
+</div>
+<form method="post" action="{{ url_for('org.semester_status', semester_id=s.id) }}" class="flex items-center gap-2">
+{{ status_form.hidden_tag() }}
+<select name="status" class="{{ inline_input_class }}" aria-label="Status von {{ s.code }}">
+{% for value, label in status_labels.items() %}<option value="{{ value }}" {{ 'selected' if value == s.status }}>{{ label }}</option>{% endfor %}
+</select>
+{{ button('Ändern', 'secondary', 'sm') }}
+</form>
+{{ link_button('Bearbeiten', url_for('org.edit_semester', semester_id=s.id), 'secondary', 'sm') }}
+</li>
+{% endfor %}
+{% endcall %}
+{% else %}
+{{ empty_state('Noch keine Semester.') }}
+{% endif %}
+{{ section_header('Neues Semester') }}
+{% call card(class='max-w-xl') %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.code) }}
+{{ field(form.kind) }}
+{{ field(form.starts_on) }}
+{{ field(form.ends_on) }}
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+{% endblock %}

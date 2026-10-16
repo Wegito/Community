@@ -1,0 +1,21 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit, actions %}
+{% from 'macros/ui.html' import page_header, card, link_button %}
+{% block title %}Login-E-Mail ändern{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-md">
+{% set intro %}Bisher: <strong class="text-slate-900">{{ current_user.login_email }}</strong>. Wir schicken einen Bestätigungslink an die neue Adresse; erst wenn du sie dort bestätigst, gilt sie. Die bisherige Adresse bekommt danach eine Nachricht über die Änderung.{% endset %}
+{{ page_header('Login-E-Mail-Adresse ändern', intro) }}
+{% call card() %}
+<form method="post" class="space-y-4" novalidate>
+{{ form.hidden_tag() }}
+{{ field(form.login_email, autocomplete='email') }}
+{{ field(form.password, autocomplete='current-password') }}
+{% call actions() %}
+{{ submit(form.submit) }}
+{{ link_button('Abbrechen', url_for('members.profile'), 'ghost') }}
+{% endcall %}
+</form>
+{% endcall %}
+</div>
+{% endblock %}

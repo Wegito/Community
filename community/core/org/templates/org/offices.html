@@ -1,0 +1,19 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, link_button, stacked_list, row_class, link_class, muted %}
+{% block title %}Ämter{% endblock %}
+{% block content %}
+{{ page_header('Ämter') }}
+{% call stacked_list() %}
+{% for office, holders in rows %}
+<li class="{{ row_class }}">
+<div class="min-w-48 flex-1">
+<a class="{{ link_class }}" href="{{ url_for('org.office', key=office.key) }}">{{ office.label }}</a>
+<div class="{{ muted }}">
+{% for a in holders %}{{ a.member.display_name }}{% if a.is_acting %} (kommissarisch){% endif %}{{ ', ' if not loop.last }}{% else %}unbesetzt{% endfor %}
+</div>
+</div>
+{% if can('offices.assign') %}{{ link_button('Besetzen', url_for('org.assign_office', key=office.key), 'secondary', 'sm') }}{% endif %}
+</li>
+{% endfor %}
+{% endcall %}
+{% endblock %}

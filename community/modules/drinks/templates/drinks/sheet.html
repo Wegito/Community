@@ -1,0 +1,39 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% from 'macros/ui.html' import page_header, alert, cell, link_button, muted, empty_state %}
+{% block title %}Strichliste{% endblock %}
+{% block content %}
+{% call page_header('Strichliste', 'Wie die Liste am Kühlschrank: pro Person die Anzahl eintragen, leere Felder zählen nicht.') %}
+{{ link_button('Alle Striche', url_for('drinks.all_entries')) }}
+{% endcall %}
+{% if errors %}{% call alert('danger', class='mb-4') %}<ul class="list-disc pl-5">{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endcall %}{% endif %}
+{% if not products %}
+{% call empty_state('Es gibt noch keine Getränke.') %}{% if can('drinks.catalog.manage') %}{{ link_button('Getränke anlegen', url_for('drinks.catalog'), 'primary') }}{% endif %}{% endcall %}
+{% else %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+<div class="max-w-xs">{{ field(form.day) }}</div>
+<div class="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+<table class="w-full text-left text-sm">
+<thead class="border-b border-slate-200 bg-slate-50 text-slate-600">
+<tr><th scope="col" class="sticky left-0 bg-slate-50 px-3 py-2 font-medium">Name</th>
+{% for product in products %}<th scope="col" class="px-2 py-2 text-center font-medium whitespace-nowrap">{{ product.name }}</th>{% endfor %}</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+{% for member in members %}
+<tr>
+<th scope="row" class="sticky left-0 bg-white px-3 py-1.5 font-normal whitespace-nowrap">{{ member.full_name }}</th>
+{% for product in products %}
+{% set name = 'q-%d-%d'|format(member.id, product.id) %}
+<td class="px-2 py-1.5 text-center"><input type="number" inputmode="numeric" min="0" max="50" name="{{ name }}" value="{{ request.form.get(name, '') }}" aria-label="{{ member.full_name }}: {{ product.name }}" class="w-16 rounded-md border border-slate-300 px-2 py-1 text-center tabular-nums focus:border-slate-500 focus:outline-none" /></td>
+{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+<p class="{{ muted }}">Doppelt absenden schadet nicht: dieselbe Liste wird nur einmal gespeichert.</p>
+{{ submit(form.submit) }}
+</form>
+{% endif %}
+{% endblock %}

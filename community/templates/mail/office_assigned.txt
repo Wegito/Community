@@ -1,0 +1,14 @@
+{% extends 'mail/base.txt' %}
+{% block subject %}Neues Amt: {{ office_label }}{% endblock %}
+{% block body -%}
+{{ title }}
+{%- if description %}
+
+Die Aufgaben des Amts (Übergabe-Notiz):
+{{ description }}
+{%- endif %}
+{%- if link_url %}
+
+Zum Amt: {{ link_url }}
+{%- endif %}
+{%- endblock %}

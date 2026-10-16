@@ -1,0 +1,31 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, link_button, button, stacked_list, row_class, muted, badge, empty_state, card %}
+{% block title %}Meine Wäsche{% endblock %}
+{% block content %}
+{% call page_header('Meine Wäsche') %}
+{% if may_open('laundry.new') %}{{ link_button('Wäsche eintragen', url_for('laundry.new'), 'primary') }}{% endif %}
+{% endcall %}
+{% include 'laundry/_month_nav.html' %}
+{% call card(class='mb-4') %}<p>Summe {{ month_label }}: <strong>{{ total|cents }}</strong></p>{% endcall %}
+{% if uses %}
+{% call stacked_list() %}
+{% for u in uses %}
+<li class="{{ row_class }}">
+<div class="min-w-48 flex-1{{ ' line-through opacity-60' if u.is_void }}">
+<div class="font-medium">{{ describe(u) }}</div>
+<div class="{{ muted }}">{{ u.used_at|dt }}{% if u.container %} · {{ u.container }}{% endif %} · {{ u.total_cents|cents }}</div>
+</div>
+{% if u.is_void %}{{ badge('storniert') }}{% endif %}
+{% if u.id in undoable %}
+<form method="post" action="{{ url_for('laundry.undo', use_id=u.id) }}">
+{{ button_form.hidden_tag() }}
+{{ button('Rückgängig', 'danger', 'sm') }}
+</form>
+{% endif %}
+</li>
+{% endfor %}
+{% endcall %}
+{% else %}
+{{ empty_state('In diesem Monat nichts eingetragen.') }}
+{% endif %}
+{% endblock %}

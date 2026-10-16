@@ -1,0 +1,19 @@
+{% from 'macros/ui.html' import panel, button, muted %}
+{% call panel('Meine Aufgaben', url_for('tasks.list'), 'Putzplan') %}
+<ul role="list" class="divide-y divide-slate-100">
+{% for item in widget['items'] %}
+<li class="flex items-center justify-between gap-3 py-2">
+<div class="min-w-0">
+<p class="font-medium">{{ item.title }}</p>
+{% if item.due_date %}<p class="text-xs {{ 'font-medium text-red-700' if item.due_date < widget.today else 'text-slate-500' }}">
+{{- 'Überfällig seit' if item.due_date < widget.today else 'Fällig' }} {{ item.due_date|d }}</p>{% endif %}
+</div>
+<form method="post" action="{{ url_for('tasks.toggle_done', cid=item.id, next=url_for('home.index')) }}">
+{{ widget.form.hidden_tag() }}
+{{ button('Erledigt', 'secondary', 'sm') }}
+</form>
+</li>
+{% endfor %}
+</ul>
+{% if widget.more %}<p class="{{ muted }}">… und weitere im Putzplan.</p>{% endif %}
+{% endcall %}

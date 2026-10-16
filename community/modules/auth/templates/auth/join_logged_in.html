@@ -1,0 +1,10 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, alert, post_button %}
+{% block title %}Einladung{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-xl">
+{{ page_header('Einladung') }}
+{% call alert('warning', class='mb-4') %}Du bist schon als {{ current_user.member.full_name }} angemeldet. Eine Einladung legt ein neues Konto an: bitte zuerst abmelden und den Link dann noch einmal öffnen.{% endcall %}
+{{ post_button('Abmelden', url_for('auth.logout'), 'primary', 'md') }}
+</div>
+{% endblock %}

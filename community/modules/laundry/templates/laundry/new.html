@@ -1,0 +1,25 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, radios, checkbox, submit, actions %}
+{% from 'macros/ui.html' import page_header, card, alert, link_class, muted %}
+{% block title %}Wäsche eintragen{% endblock %}
+{% block content %}
+{{ page_header('Wäsche eintragen', 'Eingetragen als ' ~ current_user.member.full_name ~ ' · ' ~ tier_label) }}
+{% for m in defects %}
+{% call alert('warning', class='mb-4') %}{{ m.name }} ist als defekt gemeldet.{% endcall %}
+{% endfor %}
+{% call card() %}
+<form method="post" class="space-y-5">
+{{ form.hidden_tag() }}
+{{ radios(form.washes) }}
+{{ checkbox(form.dried) }}
+{{ field(form.dry_program) }}
+{{ field(form.container, placeholder='z. B. blaue Wanne') }}
+<p class="{{ muted }}">
+Preis: Waschen {{ wash_price|cents if wash_price is not none else '—' }} je Maschine,
+Trocknen {{ dry_price|cents if dry_price is not none else '—' }}.
+</p>
+{% call actions() %}{{ submit(form.submit) }}{% endcall %}
+</form>
+{% endcall %}
+<p class="mt-6 {{ muted }}">Nicht du? <a class="{{ link_class }}" href="{{ url_for('laundry.mine') }}">Meine Wäsche</a> · zum Abmelden das Menü oben nutzen.</p>
+{% endblock %}

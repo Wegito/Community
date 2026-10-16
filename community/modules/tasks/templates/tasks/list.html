@@ -1,0 +1,34 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, link_button, button, badge, empty_state, stacked_list, row_class, muted %}
+{% block title %}Putzplan{% endblock %}
+{% block content %}
+{% call page_header('Putzplan / Aufgaben') %}
+{% if can('tasks.manage') %}{{ link_button('Neue Aufgabe', url_for('tasks.create'), 'primary') }}{% endif %}
+{% endcall %}
+{% if items %}
+{% call stacked_list() %}
+{% for c in items %}
+<li class="{{ row_class }}">
+<div class="min-w-48 flex-1">
+<div class="font-medium{{ ' text-slate-500 line-through' if c.is_done else '' }}">{{ c.title }}</div>
+<div class="{{ muted }}">
+Zuständig: {{ c.assigned_to.display_name if c.assigned_to else '—' }} · Fällig: {{ c.due_date|d or '—' }}
+{% if c.is_done %} {{ badge('erledigt', 'success') }}{% endif %}
+</div>
+</div>
+<div class="flex items-center gap-2">
+{% if policies.can_complete_task(current_user, c) %}
+<form method="post" action="{{ url_for('tasks.toggle_done', cid=c.id) }}">
+{{ toggle_form.hidden_tag() }}
+{{ button('Wieder öffnen' if c.is_done else 'Erledigt', 'secondary', 'sm') }}
+</form>
+{% endif %}
+{% if can('tasks.manage') %}{{ link_button('Bearbeiten', url_for('tasks.edit', cid=c.id), 'ghost', 'sm') }}{% endif %}
+</div>
+</li>
+{% endfor %}
+{% endcall %}
+{% else %}
+{{ empty_state('Noch keine Aufgaben.') }}
+{% endif %}
+{% endblock %}

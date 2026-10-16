@@ -1,0 +1,20 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, checkbox, submit %}
+{% from 'macros/ui.html' import page_header, card, link_class, muted %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-md">
+{{ page_header('Login') }}
+{% call card() %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.email, autocomplete='username') }}
+{{ field(form.password, autocomplete='current-password') }}
+{{ checkbox(form.remember) }}
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+<p class="mt-4"><a class="{{ link_class }}" href="{{ url_for('auth.forgot_password') }}">Passwort vergessen?</a></p>
+<p class="mt-2 {{ muted }}">Kein Konto? Du bekommst einen Einladungslink vom Senior/Fuxmajor.</p>
+</div>
+{% endblock %}

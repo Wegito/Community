@@ -1,0 +1,31 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, radios, submit, actions %}
+{% from 'macros/ui.html' import page_header, card, alert, link_button, muted %}
+{% block title %}Neues Mitglied{% endblock %}
+{% block content %}
+<div class="max-w-xl">
+{{ page_header('Neues Mitglied', 'Das Mitglied wird ohne Login angelegt und bekommt einen persönlichen Einladungslink. Damit legt es selbst E-Mail-Adresse und Passwort fest.') }}
+{% call card() %}
+<form method="post" class="space-y-4" novalidate>
+{{ form.hidden_tag() }}
+{{ field(form.first_name, autocomplete='off') }}
+{{ field(form.last_name, autocomplete='off') }}
+{{ field(form.biername, autocomplete='off') }}
+{{ field(form.email, autocomplete='off') }}
+<p class="-mt-2 {{ muted }}">Optional; nötig für die Einladung per E-Mail.</p>
+{{ field(form.joined_on) }}
+{% if ranks %}
+{{ field(form.rank_id) }}
+{% if ranks|length == 1 %}<p class="-mt-2 {{ muted }}">Andere Ränge vergibt, wer Ränge ändern darf.</p>{% endif %}
+{% else %}
+{% call alert('warning') %}Es gibt keinen Rang, den du vergeben darfst.{% endcall %}
+{% endif %}
+{{ radios(form.delivery) }}
+{% call actions() %}
+{{ submit(form.submit) }}
+{{ link_button('Abbrechen', url_for('members.directory'), 'ghost') }}
+{% endcall %}
+</form>
+{% endcall %}
+</div>
+{% endblock %}

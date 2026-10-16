@@ -1,0 +1,14 @@
+{#- Confirmation link for a new login email (auth.services.request_email_change). Sent to the NEW address. -#}
+{% extends 'mail/base.txt' %}
+{% block subject %}Neue Login-E-Mail-Adresse bestätigen{% endblock %}
+{% block body -%}
+Du möchtest dich bei {{ club_name }} künftig mit {{ new_email }} anmelden.
+Bitte bestätige die Adresse mit diesem Link:
+
+{{ confirm_url }}
+
+Der Link gilt {{ hours }} Stunden und nur einmal. Bis du die Adresse dort bestätigst, bleibt deine bisherige
+Login-E-Mail-Adresse gültig.
+
+Hast du das nicht angefordert? Dann ignoriere diese E-Mail.
+{%- endblock %}

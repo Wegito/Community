@@ -1,0 +1,25 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% from 'macros/ui.html' import page_header, section_header, card, post_button, back_link, muted %}
+{% block title %}{{ semester.code }} bearbeiten{% endblock %}
+{% block content %}
+{{ page_header(semester.code ~ ' bearbeiten', 'Kürzel, Art und Daten korrigieren; Semester dürfen sich nicht überschneiden.') }}
+{% call card(class='max-w-xl') %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.code) }}
+{{ field(form.kind) }}
+{{ field(form.starts_on) }}
+{{ field(form.ends_on) }}
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+{{ section_header('Löschen') }}
+{% if in_use %}
+<p class="{{ muted }}">Bei diesem Semester sind Ämter, Gruppen oder Buchungen eingetragen, deshalb kann es nicht gelöscht werden.</p>
+{% else %}
+<p class="mb-3 {{ muted }}">Bei diesem Semester ist nichts eingetragen; es kann gelöscht werden, z. B. wenn es versehentlich angelegt wurde.</p>
+{{ post_button(semester.code ~ ' löschen', url_for('org.delete_semester', semester_id=semester.id), 'danger', 'md') }}
+{% endif %}
+{{ back_link('Alle Semester', url_for('org.semesters')) }}
+{% endblock %}

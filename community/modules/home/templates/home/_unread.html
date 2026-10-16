@@ -1,0 +1,15 @@
+{% from 'macros/ui.html' import panel, link_class %}
+{% call panel('Neu für dich', url_for('notifications.index')) %}
+<ul role="list" class="space-y-2">
+{% for item in widget['items'] %}
+<li>
+{# Opening marks it as read, like on the notifications page. #}
+<form method="post" action="{{ url_for('notifications.open_notification', notification_id=item.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+<button type="submit" class="text-left {{ link_class }}">{{ item.title }}</button>
+</form>
+<span class="block text-xs text-slate-500">{{ item.created_at|dt }}</span>
+</li>
+{% endfor %}
+</ul>
+{% endcall %}

@@ -1,0 +1,21 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% from 'macros/ui.html' import page_header, card %}
+{% block title %}Ränge{% endblock %}
+{% block content %}
+{{ page_header('Ränge', 'Bezeichnungen und Kürzel sind frei wählbar. Die Rechte hängen am Rang, nicht am Namen.') }}
+<div class="space-y-3">
+{% for rank in rows %}
+{% set f = forms[rank.id] %}
+{% call card() %}
+<form method="post" class="grid grid-cols-1 items-end gap-3 md:grid-cols-3">
+{{ f.hidden_tag() }}
+<input type="hidden" name="rank_id" value="{{ rank.id }}" />
+{{ field(f.label) }}
+{{ field(f.abbreviation) }}
+<div class="flex items-center gap-3">{{ submit(f.submit) }} <span class="font-mono text-xs text-slate-500">{{ rank.key }}</span></div>
+</form>
+{% endcall %}
+{% endfor %}
+</div>
+{% endblock %}

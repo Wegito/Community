@@ -1,0 +1,34 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, link_button, button, badge, empty_state, stacked_list, row_class, muted %}
+{% block title %}Benachrichtigungen{% endblock %}
+{% block content %}
+{% call page_header('Benachrichtigungen') %}
+{{ link_button('Einstellungen', url_for('notifications.settings'), 'ghost') }}
+{% if unread %}
+<form method="post" action="{{ url_for('notifications.read_all') }}">
+{{ form.hidden_tag() }}
+{{ button('Alle als gelesen markieren', 'secondary') }}
+</form>
+{% endif %}
+{% endcall %}
+{% if items %}
+{% call stacked_list() %}
+{% for n in items %}
+<li class="{{ row_class }} {{ '' if n.read_at else 'bg-blue-50' }}">
+<div class="min-w-48 flex-1">
+<div class="{{ 'text-slate-600' if n.read_at else 'font-medium' }}">{{ n.title }}</div>
+<div class="{{ muted }}">{{ n.created_at|dt }}{% if not n.read_at %} {{ badge('neu', 'info') }}{% endif %}</div>
+</div>
+{% if n.link or not n.read_at %}
+<form method="post" action="{{ url_for('notifications.open_notification', notification_id=n.id) }}">
+{{ form.hidden_tag() }}
+{{ button('Öffnen' if n.link else 'Gelesen', 'secondary', 'sm') }}
+</form>
+{% endif %}
+</li>
+{% endfor %}
+{% endcall %}
+{% else %}
+{{ empty_state('Keine Benachrichtigungen.') }}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit, inline_input_class %}
+{% from 'macros/ui.html' import page_header, section_header, card, button, link_button, post_button, empty_state, stacked_list, row_class, muted %}
+{% block title %}{{ office.label }}{% endblock %}
+{% block content %}
+{% set subtitle %}Können übernehmen: {{ office.eligible_ranks|map(attribute='label')|join(', ') or 'niemand' }}{% if office.max_holders > 1 %} · bis zu {{ office.max_holders }} Personen{% endif %}{% endset %}
+{{ page_header(office.label, subtitle) }}
+
+{{ section_header('Aufgaben') }}
+{% if can('offices.assign') %}
+{% call card() %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.description_md, rows=8) }}
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+{% else %}
+{% call card(class='whitespace-pre-line') %}{{ office.description_md or '—' }}{% endcall %}
+{% endif %}
+
+{% call section_header('Aktuell') %}
+{% if can('offices.assign') %}{{ link_button('Besetzen', url_for('org.assign_office', key=office.key), 'secondary', 'sm') }}{% endif %}
+{% endcall %}
+{% if holders %}
+{% call stacked_list() %}
+{% for a in holders %}
+<li class="{{ row_class }}">
+<div class="min-w-48 flex-1">
+<div class="font-medium">{{ a.member.display_name }}{% if a.is_acting %} (kommissarisch){% endif %}</div>
+<div class="{{ muted }}">{{ 'ab' if a.valid_from > today else 'seit' }} {{ a.valid_from|d }}{% if a.valid_to %} bis {{ a.valid_to|d }}{% endif %}{% if a.semester %} · {{ a.semester.code }}{% endif %}{% if a.convent_ref %} · {{ a.convent_ref }}{% endif %}</div>
+</div>
+{% if can('offices.assign') %}
+<form method="post" action="{{ url_for('org.end_office', assignment_id=a.id) }}" class="flex w-full flex-wrap items-end gap-2 sm:w-auto">
+{{ end_form.hidden_tag() }}
+<label class="text-sm"><span class="mb-1 block font-medium">Letzter Tag</span><input type="date" name="valid_to" class="{{ inline_input_class }}" required></label>
+<label class="text-sm"><span class="mb-1 block font-medium">Grund</span><input name="reason" placeholder="optional" class="{{ inline_input_class }}"></label>
+{{ button('Beenden', 'danger', 'sm') }}
+</form>
+{% if a.valid_from >= today %}{{ post_button('Austragen', url_for('org.cancel_office', assignment_id=a.id), 'danger', 'sm') }}{% endif %}
+{% endif %}
+</li>
+{% endfor %}
+{% endcall %}
+{% else %}
+{{ empty_state('Unbesetzt.') }}
+{% endif %}
+
+{{ section_header('Bisherige Inhaber') }}
+{% if history %}
+<ul role="list" class="space-y-1 text-sm">
+{% for a in history %}
+<li>{{ a.member.display_name }}: {{ a.valid_from|d }} – {{ a.valid_to|d if a.valid_to else 'heute' }}{% if a.is_acting %} (kommissarisch){% endif %}{% if a.end_reason %} · {{ a.end_reason }}{% endif %}</li>
+{% endfor %}
+</ul>
+{% else %}
+<p class="{{ muted }}">Noch niemand.</p>
+{% endif %}
+{% endblock %}

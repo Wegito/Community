@@ -1,0 +1,7 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, link_button %}
+{% block title %}Kein Zugriff{% endblock %}
+{% block content %}
+{{ page_header('Kein Zugriff', 'Dafür fehlen dir die Rechte.') }}
+{{ link_button('Zur Startseite', url_for('home.index')) }}
+{% endblock %}

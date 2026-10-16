@@ -1,0 +1,30 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+
+# Local databases and instance data
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+instance/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# IDEs
+.idea/
+.vscode/
+
+# Downloaded build tools (tools/build-css.sh)
+tools/bin/

@@ -1,0 +1,143 @@
+openapi: 3.1.0
+info:
+  title: Community API (Getränke)
+  version: "1.0"
+  description: |
+    API for devices such as the bar tablet (roadmap §7.3). Members count their own drinks on the
+    tablet; the tablet sends the Striche here, and Community prices them and shows them on every
+    member's Deckel.
+
+    - **Auth:** `Authorization: Bearer cmt_…`. The Bierwart creates a token per device under
+      Getränke → Geräte; it is shown once and can be revoked. Each token has scopes.
+    - **Idempotency:** `client_event_id` is unique per device. Sending the same item again (after a
+      timeout, an offline queue) answers `duplicate` and stores nothing. The same id with different
+      fields answers `rejected: client_event_id_reused`.
+    - **Prices** belong to Community: the price valid on the day of `occurred_at` is used; the tablet
+      never sends amounts.
+    - **Corrections:** a negative `quantity` with `corrects_client_event_id`; nothing is edited.
+    - **Errors:** `application/problem+json` (401 no or invalid token, 403 missing scope, 422 bad body).
+    - Only additive changes inside v1.
+servers:
+  - url: /api/v1
+security:
+  - bearer: []
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+  schemas:
+    Problem:
+      type: object
+      properties:
+        type: {type: string}
+        title: {type: string}
+        status: {type: integer}
+        detail: {type: string}
+    Product:
+      type: object
+      required: [id, name, price_cents, counts_as_beer]
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        price_cents: {type: integer, description: Price today in euro cents}
+        counts_as_beer: {type: boolean}
+        volume_ml: {type: [integer, "null"]}
+    Member:
+      type: object
+      required: [id, name]
+      properties:
+        id: {type: string, description: The member's public id (use it as member_id)}
+        name: {type: string}
+        biername: {type: [string, "null"]}
+    Consumption:
+      type: object
+      required: [client_event_id, member_id, product_id, quantity, occurred_at]
+      properties:
+        client_event_id: {type: string, minLength: 1, maxLength: 64, description: Unique per device}
+        member_id: {type: string}
+        product_id: {type: integer}
+        quantity: {type: integer, minimum: -50, maximum: 50, description: "Not 0; negative only as a correction"}
+        occurred_at: {type: string, format: date-time, description: "ISO 8601 with offset, e.g. 2026-10-11T21:14:00+02:00; at most 5 minutes in the future"}
+        corrects_client_event_id: {type: [string, "null"], description: The event this negative quantity cancels}
+    Result:
+      type: object
+      required: [client_event_id, status]
+      properties:
+        client_event_id: {type: [string, "null"]}
+        status: {type: string, enum: [accepted, duplicate, rejected]}
+        reason:
+          type: string
+          enum:
+            - invalid_item
+            - invalid_client_event_id
+            - unknown_member
+            - inactive_member
+            - unknown_product
+            - inactive_product
+            - invalid_quantity
+            - invalid_occurred_at
+            - occurred_at_in_future
+            - invalid_correction
+            - already_corrected
+            - client_event_id_reused
+            - no_price
+  responses:
+    Problem:
+      description: Error
+      content:
+        application/problem+json:
+          schema: {$ref: "#/components/schemas/Problem"}
+paths:
+  /products:
+    get:
+      summary: Active products with today's price (scope products:read)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/Product"}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /members:
+    get:
+      summary: Active members, names only (scope members:read)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: {type: array, items: {$ref: "#/components/schemas/Member"}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /drinks/consumptions:
+    post:
+      summary: Send Striche, up to 500 per request (scope drinks:write)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items: {type: array, minItems: 1, maxItems: 500, items: {$ref: "#/components/schemas/Consumption"}}
+      responses:
+        "200":
+          description: One result per item, in the same order. Rejected items do not stop the others.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results: {type: array, items: {$ref: "#/components/schemas/Result"}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}

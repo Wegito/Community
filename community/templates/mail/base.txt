@@ -1,0 +1,15 @@
+{#- Layout for every mail: greeting, the child's body block, signature and footer.
+    Children also define a subject block; core/platform/mail.py renders it separately.
+    Mails are plain text: nothing is HTML-escaped. -#}
+Hallo{% if name %} {{ name }}{% endif %},
+
+{% block body %}{% endblock %}
+
+Viele Grüße
+{{ club_name }}
+
+---
+Diese E-Mail wurde automatisch von {{ club_name }} verschickt.
+{%- if settings_url %}
+Welche Nachrichten du bekommst, stellst du hier ein: {{ settings_url }}
+{%- endif %}

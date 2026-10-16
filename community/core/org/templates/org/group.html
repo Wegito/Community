@@ -1,0 +1,34 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, checkbox, submit %}
+{% from 'macros/ui.html' import page_header, section_header, card, button, empty_state, stacked_list, row_class, back_link, muted %}
+{% block title %}{{ group.name }}{% endblock %}
+{% block content %}
+{% set subtitle %}{{ kind_labels[group.kind] }}{% if group.role %} · Mitglieder bekommen die Rechte der Rolle „{{ group.role.label }}“{% endif %}{% endset %}
+{{ page_header(group.name, subtitle) }}
+{% if memberships %}
+{% call stacked_list() %}
+{% for m in memberships %}
+<li class="{{ row_class }}">
+<div class="min-w-48 flex-1">{{ m.member.display_name }}{% if m.is_lead %} (Leitung){% endif %} <span class="{{ muted }}">{{ 'ab' if m.valid_from > today else 'seit' }} {{ m.valid_from|d }}</span></div>
+<form method="post" action="{{ url_for('org.end_membership', membership_id=m.id) }}">
+{{ button_form.hidden_tag() }}
+{{ button('Entfernen', 'danger', 'sm') }}
+</form>
+</li>
+{% endfor %}
+{% endcall %}
+{% else %}
+{{ empty_state('Noch niemand.') }}
+{% endif %}
+{{ section_header('Mitglied hinzufügen') }}
+{% call card(class='max-w-xl') %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.member_id) }}
+{{ field(form.valid_from) }}
+{{ checkbox(form.is_lead) }}
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+{{ back_link('Alle Gruppen', url_for('org.groups')) }}
+{% endblock %}

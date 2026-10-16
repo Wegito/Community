@@ -1,0 +1,158 @@
+{# Shared look: page and section headers, buttons, badges, notices, cards, lists and tables.
+   Tailwind reads class names from the templates only (static/src/app.css), so keep them here
+   or in a template, never in Python. Strings below are for elements written by hand. #}
+
+{# <a class="{{ link_class }}">: a text link inside a sentence or list. #}
+{% set link_class = 'font-medium underline decoration-slate-400 underline-offset-2 hover:decoration-slate-900' %}
+{# Small secondary text under a title or next to a value. #}
+{% set muted = 'text-sm text-slate-600' %}
+{# One <li> of a stacked_list(). #}
+{% set row_class = 'flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3' %}
+{# One <td> of a table(). #}
+{% set cell = 'px-3 py-2 align-top' %}
+
+{% set _button_sizes = {
+  'md': 'min-h-10 px-4 py-2',
+  'sm': 'min-h-8 px-3 py-1',
+} %}
+{% set _button_variants = {
+  'primary': 'bg-slate-900 text-white shadow-sm hover:bg-slate-700',
+  'secondary': 'border border-slate-300 bg-white text-slate-900 shadow-sm hover:bg-slate-50',
+  'danger': 'border border-red-300 bg-white text-red-700 shadow-sm hover:bg-red-50',
+  'ghost': 'text-slate-700 underline decoration-slate-400 underline-offset-2 hover:text-slate-900',
+} %}
+{% set _tones = {
+  'neutral': 'bg-slate-100 text-slate-700 ring-slate-500/20',
+  'success': 'bg-green-50 text-green-800 ring-green-600/20',
+  'warning': 'bg-amber-50 text-amber-800 ring-amber-600/30',
+  'danger': 'bg-red-50 text-red-700 ring-red-600/20',
+  'info': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+} %}
+{% set _alert_tones = {
+  'success': 'border-green-200 bg-green-50 text-green-900',
+  'danger': 'border-red-200 bg-red-50 text-red-900',
+  'warning': 'border-amber-200 bg-amber-50 text-amber-900',
+  'info': 'border-blue-200 bg-blue-50 text-blue-900',
+} %}
+
+{# Title row of a page; actions (buttons, links) go in a call block:
+   {% call page_header('Mitglieder') %}{{ link_button('Neu', url) }}{% endcall %} #}
+{% macro page_header(title, subtitle=none) -%}
+<div class="mb-6">
+<div class="flex flex-wrap items-center justify-between gap-3">
+<h1 class="text-2xl font-semibold tracking-tight text-balance break-words">{{ title }}</h1>
+{% if caller %}<div class="flex flex-wrap items-center gap-2">{{ caller() }}</div>{% endif %}
+</div>
+{% if subtitle %}<p class="mt-1 max-w-3xl text-slate-600">{{ subtitle }}</p>{% endif %}
+</div>
+{%- endmacro %}
+
+{# Heading of a section within a page, with optional actions in a call block. #}
+{% macro section_header(title) -%}
+<div class="mt-8 mb-3 flex flex-wrap items-center justify-between gap-3">
+<h2 class="text-lg font-semibold">{{ title }}</h2>
+{% if caller %}<div class="flex flex-wrap items-center gap-2">{{ caller() }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{# Classes of a button; variant: primary, secondary, danger, ghost; size: md, sm. #}
+{% macro btn_class(variant='secondary', size='md') -%}
+inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-50 {{ _button_sizes[size] }} {{ _button_variants[variant] }}
+{%- endmacro %}
+
+{# <button>; further attributes as keywords, e.g. button('Ändern', name='status', value='x'). #}
+{% macro button(label, variant='primary', size='md', type='submit') -%}
+<button type="{{ type }}" class="{{ btn_class(variant, size) }}"{{ kwargs|xmlattr }}>{{ label }}</button>
+{%- endmacro %}
+
+{# A link that looks like a button. #}
+{% macro link_button(label, href, variant='secondary', size='md') -%}
+<a href="{{ href }}" class="{{ btn_class(variant, size) }}"{{ kwargs|xmlattr }}>{{ label }}</a>
+{%- endmacro %}
+
+{# A button in its own small POST form (CSRF token included), e.g. "Widerrufen". #}
+{% macro post_button(label, action, variant='secondary', size='sm') -%}
+<form method="post" action="{{ action }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+{{ button(label, variant, size) }}
+</form>
+{%- endmacro %}
+
+{# Back link below a page. #}
+{% macro back_link(label, href) -%}
+<p class="mt-8"><a class="{{ link_class }}" href="{{ href }}">← {{ label }}</a></p>
+{%- endmacro %}
+
+{# Small label; tone: neutral, success, warning, danger, info. #}
+{% macro badge(text, tone='neutral') -%}
+<span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ _tones[tone] }}"{{ kwargs|xmlattr }}>{{ text }}</span>
+{%- endmacro %}
+
+{# Notice box; the text goes in a call block. tone: success, danger, warning, info. #}
+{% macro alert(tone='warning', class='', role=none) -%}
+<div class="rounded-md border px-4 py-3 {{ _alert_tones.get(tone, _alert_tones['warning']) }} {{ class }}"{% if role %} role="{{ role }}"{% endif %}>{{ caller() }}</div>
+{%- endmacro %}
+
+{# White box; the content goes in a call block. #}
+{% macro card(class='') -%}
+<div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm {{ class }}">{{ caller() }}</div>
+{%- endmacro %}
+
+{# "Nothing here yet"; an optional call block adds an action below the text. #}
+{% macro empty_state(text) -%}
+<div class="rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-600">
+<p>{{ text }}</p>
+{% if caller %}<div class="mt-3">{{ caller() }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{# A list of rows in one box; each row is <li class="{{ row_class }}">. #}
+{% macro stacked_list(class='') -%}
+<ul role="list" class="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm {{ class }}">{{ caller() }}</ul>
+{%- endmacro %}
+
+{# A table that scrolls sideways on small screens. headers: column titles (none = no visible
+   title, e.g. for a column of buttons); rows go in a call block, cells as <td class="{{ cell }}">. #}
+{% macro table(headers, class='') -%}
+<div class="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm {{ class }}">
+<table class="w-full text-left text-sm">
+<thead class="border-b border-slate-200 bg-slate-50 text-slate-600">
+<tr>{% for header in headers %}<th scope="col" class="px-3 py-2 font-medium whitespace-nowrap">{% if header is none %}<span class="sr-only">Aktionen</span>{% else %}{{ header }}{% endif %}</th>{% endfor %}</tr>
+</thead>
+<tbody class="divide-y divide-slate-100">
+{{ caller() }}
+</tbody>
+</table>
+</div>
+{%- endmacro %}
+
+{# The only row of a table() without data. #}
+{% macro empty_row(text, colspan) -%}
+<tr><td colspan="{{ colspan }}" class="px-3 py-6 text-center text-slate-600">{{ text }}</td></tr>
+{%- endmacro %}
+
+{# A card of the start page: a title (with an optional link to the full page) and the content in a
+   call block. #}
+{% macro panel(title, href=none, more='Alle ansehen') -%}
+<section class="flex flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+<div class="mb-3 flex items-baseline justify-between gap-3">
+<h2 class="text-base font-semibold">{{ title }}</h2>
+{% if href %}<a class="shrink-0 text-sm {{ link_class }}" href="{{ href }}">{{ more }}</a>{% endif %}
+</div>
+<div class="flex-1 space-y-3 text-sm">{{ caller() }}</div>
+</section>
+{%- endmacro %}
+
+{# A number with a label, e.g. "3 / offene Einladungen"; a link when href is given.
+   tone: neutral, warning (something to do), danger (overdue), success. #}
+{% set _stat_tones = {
+  'neutral': 'text-slate-900',
+  'success': 'text-green-700',
+  'warning': 'text-amber-700',
+  'danger': 'text-red-700',
+} %}
+{% macro stat(value, label, href=none, tone='neutral') -%}
+{% set body %}<span class="block text-2xl font-semibold tabular-nums {{ _stat_tones.get(tone, _stat_tones['neutral']) }}">{{ value }}</span><span class="block text-xs text-slate-600">{{ label }}</span>{% endset %}
+{% if href %}<a href="{{ href }}" class="block rounded-md bg-slate-50 px-3 py-2 hover:bg-slate-100">{{ body }}</a>
+{% else %}<div class="rounded-md bg-slate-50 px-3 py-2">{{ body }}</div>{% endif %}
+{%- endmacro %}

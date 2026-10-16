@@ -1,0 +1,11 @@
+{% from 'macros/ui.html' import panel, stat, link_class %}
+{% call panel('Kasse', url_for('finance.overview'), 'Zur Kasse') %}
+<div class="grid grid-cols-2 gap-2">
+{{ stat(widget.owed|cents, widget.owing ~ (' Mitglied schuldet' if widget.owing == 1 else ' Mitglieder schulden'), url_for('finance.overview', nur='schulden'), 'danger' if widget.owed else 'success') }}
+{{ stat(widget.waiting, 'warten auf Gegenzeichnung', url_for('finance.cosign_list'), 'warning' if widget.waiting else 'neutral') }}
+</div>
+{% if widget.unbooked %}
+<p>Noch nicht gebucht für {{ widget.month }}:
+{% for item in widget.unbooked %}<a class="{{ link_class }}" href="{{ url_for('finance.recurring', recurring_id=item.id) }}">{{ item.title }}</a>{{ ', ' if not loop.last }}{% endfor %}</p>
+{% endif %}
+{% endcall %}

@@ -1,0 +1,31 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, alert, table, cell, button %}
+{% block title %}Benachrichtigungen einstellen{% endblock %}
+{% block content %}
+{{ page_header('Benachrichtigungen einstellen', 'Wichtige Nachrichten (z. B. Passwort zurücksetzen) kommen immer an.') }}
+{% if not has_address %}
+{% call alert('warning', class='mb-4') %}Für dich ist keine E-Mail-Adresse hinterlegt, deshalb kommen keine E-Mails an.{% endcall %}
+{% endif %}
+<form method="post">
+{{ form.hidden_tag() }}
+{% set headers = namespace(items=['Art']) %}
+{% for channel in channels %}{% set headers.items = headers.items + [channel_labels[channel]] %}{% endfor %}
+{% call table(headers.items, class='mb-4') %}
+{% for kind, state in rows %}
+<tr>
+<td class="{{ cell }}">{{ kind.label }}{% if kind.mandatory %} <span class="text-slate-500">(immer)</span>{% endif %}</td>
+{% for channel in channels %}
+<td class="{{ cell }}">
+{% if state[channel] is none %}
+<span class="text-slate-400">—</span>
+{% else %}
+<input type="checkbox" name="on" value="{{ kind.key }}:{{ channel }}" class="size-4 accent-slate-900" aria-label="{{ kind.label }}: {{ channel_labels[channel] }}"{% if state[channel] %} checked{% endif %}{% if kind.mandatory %} disabled{% endif %}>
+{% endif %}
+</td>
+{% endfor %}
+</tr>
+{% endfor %}
+{% endcall %}
+{{ button('Speichern') }}
+</form>
+{% endblock %}

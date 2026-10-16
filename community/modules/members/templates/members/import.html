@@ -1,0 +1,31 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit, actions %}
+{% from 'macros/ui.html' import page_header, card, link_button, link_class %}
+{% block title %}Mitglieder importieren{% endblock %}
+{% block content %}
+<div class="max-w-2xl">
+{{ page_header('Mitglieder importieren') }}
+<div class="mb-6 space-y-3">
+<p>Eine Liste als CSV- oder Excel-Datei (.xlsx) hochladen. Zuerst kommt eine Vorschau mit allen Fehlern; importiert wird erst nach dem Bestätigen. Die Mitglieder werden ohne Login angelegt.</p>
+<p>Die erste Zeile enthält die Spaltennamen: <span class="font-mono text-sm">{{ columns|join(', ') }}</span>. Nur <span class="font-mono text-sm">Vorname</span> ist Pflicht, andere Spalten werden ignoriert. Englische Namen (<span class="font-mono text-sm">first_name</span>, <span class="font-mono text-sm">email</span>, …) gehen auch.</p>
+<ul class="list-disc space-y-1 pl-5 text-sm">
+<li>Rang: Name, Kürzel oder Schlüssel eines Rangs (z. B. „Fux“, „AH“). Leer = ohne Rang.</li>
+<li>Eintritt: TT.MM.JJJJ oder JJJJ-MM-TT, in Excel auch als Datumszelle. Der Rang beginnt an diesem Tag, sonst heute.</li>
+<li>E-Mail: darf noch keinem Mitglied gehören und nur einmal in der Datei stehen.</li>
+<li>CSV: UTF-8, getrennt mit Semikolon oder Komma. Excel: das erste Tabellenblatt.</li>
+<li>Höchstens {{ max_rows }} Mitglieder und {{ config['MAX_CONTENT_LENGTH'] // 1048576 }} MB je Datei.</li>
+</ul>
+<p><a class="{{ link_class }}" href="{{ url_for('members.import_template') }}">Vorlage herunterladen (CSV)</a></p>
+</div>
+{% call card() %}
+<form method="post" enctype="multipart/form-data" class="space-y-4" novalidate>
+{{ form.hidden_tag() }}
+{{ field(form.file, accept='.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') }}
+{% call actions() %}
+{{ submit(form.submit) }}
+{{ link_button('Abbrechen', url_for('members.directory'), 'ghost') }}
+{% endcall %}
+</form>
+{% endcall %}
+</div>
+{% endblock %}

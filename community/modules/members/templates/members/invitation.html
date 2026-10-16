@@ -1,0 +1,52 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import input_class %}
+{% from 'macros/ui.html' import page_header, card, alert, button, link_button, btn_class, muted %}
+{% block title %}Einladung · {{ member.full_name }}{% endblock %}
+{% block content %}
+{% set state = invitation.state() %}
+{% set status %}{{ invitation.channel_label }}{% if invitation.channel == 'email' %} an {{ invitation.email }}{% endif %} · {{ invitation.state_label }}{% if state == 'open' %}, gültig bis {{ invitation.expires_at|dt }}{% endif %}{% endset %}
+{{ page_header('Einladung für ' ~ member.full_name, status) }}
+
+{% if qr %}
+<div class="mb-4 inline-block rounded-lg border border-slate-200 bg-white p-4 shadow-sm" data-qr>
+<div class="[&>svg]:h-72 [&>svg]:w-72 [&>svg]:max-w-full">{{ qr }}</div>
+<p class="mt-2 max-w-72 {{ muted }}">{{ member.first_name }} scannt den Code mit der Handykamera und legt das Konto an.</p>
+</div>
+{% endif %}
+
+{% if link %}
+{% call card(class='mb-4 space-y-2') %}
+<label for="invite-link" class="block text-sm font-medium">{% if qr %}Oder den Link schicken{% else %}Diesen Link an {{ member.first_name }} schicken (z. B. per Messenger){% endif %}</label>
+<div class="flex gap-2">
+<input id="invite-link" type="text" readonly value="{{ link }}" class="{{ input_class }} font-mono" onfocus="this.select()">
+<button type="button" class="{{ btn_class('secondary') }}" data-copy="invite-link">Kopieren</button>
+</div>
+<p class="{{ muted }}">Der Link gilt nur einmal. Er wird nur hier angezeigt, solange du angemeldet bist; danach eine neue Einladung erstellen.</p>
+{% endcall %}
+<script>
+document.querySelectorAll('[data-copy]').forEach(function (button) {
+  button.addEventListener('click', function () {
+    var input = document.getElementById(button.dataset.copy);
+    input.select();
+    var done = function () { button.textContent = 'Kopiert'; };
+    if (navigator.clipboard) { navigator.clipboard.writeText(input.value).then(done); } else { document.execCommand('copy'); done(); }
+  });
+});
+</script>
+{% elif state == 'open' and invitation.channel != 'email' %}
+{% call alert('warning', class='mb-4') %}Der Link wird nur direkt nach dem Erstellen angezeigt. Wenn er verloren ging: neue Einladung erstellen (die alte wird dann ungültig).{% endcall %}
+{% endif %}
+
+<div class="flex flex-wrap items-center gap-3">
+{% if state == 'open' %}
+<form method="post" action="{{ url_for('members.revoke_invitation', invitation_id=invitation.id) }}">
+{{ button_form.hidden_tag() }}
+{{ button('Widerrufen', 'danger') }}
+</form>
+{% endif %}
+{% if state != 'accepted' and member.is_active_member and not member.user %}
+{{ link_button('Neue Einladung', url_for('members.invite', public_id=member.public_id)) }}
+{% endif %}
+{{ link_button('Zu ' ~ member.full_name, url_for('members.detail', public_id=member.public_id), 'ghost') }}
+</div>
+{% endblock %}

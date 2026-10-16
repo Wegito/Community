@@ -1,0 +1,16 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, checkbox, submit %}
+{% from 'macros/ui.html' import page_header, card, back_link %}
+{% block title %}Kostenstelle bearbeiten{% endblock %}
+{% block content %}
+{{ page_header(category.name, 'Kostenstelle') }}
+{% call card(class='max-w-xl') %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.name) }}
+{{ checkbox(form.archived) }}
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+{{ back_link('Konten', url_for('finance.accounts')) }}
+{% endblock %}

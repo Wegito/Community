@@ -1,0 +1,17 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, alert, link_class %}
+{% set heading = 'Passwort zurücksetzen' if kind == 'reset' else 'E-Mail-Adresse bestätigen' %}
+{% block title %}{{ heading }}{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-xl">
+{{ page_header(heading) }}
+{% call alert('warning', class='mb-4') %}{{ message }}{% endcall %}
+{% if kind == 'reset' %}
+<p class="mb-2">Ein Link zum Zurücksetzen gilt nur einmal und nur kurze Zeit. Er gilt auch nicht mehr, wenn das Passwort inzwischen geändert wurde.</p>
+<p><a class="{{ link_class }}" href="{{ url_for('auth.forgot_password') }}">Neuen Link anfordern</a> · <a class="{{ link_class }}" href="{{ url_for('auth.login') }}">Zum Login</a></p>
+{% else %}
+<p class="mb-2">Ein Bestätigungslink gilt nur einmal und nur 24 Stunden. Er gilt auch nicht mehr, wenn das Passwort oder die Login-E-Mail-Adresse inzwischen geändert wurde.</p>
+<p>Ändere die Adresse in deinem <a class="{{ link_class }}" href="{{ url_for('auth.change_email') }}">Profil</a> einfach noch einmal.</p>
+{% endif %}
+</div>
+{% endblock %}

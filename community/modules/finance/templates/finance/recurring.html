@@ -1,0 +1,46 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% from 'macros/ui.html' import page_header, section_header, card, table, cell, empty_row, link_class, muted, link_button, button, alert, back_link %}
+{% from 'finance/_checkboxes.html' import checkbox_list %}
+{% block title %}{{ item.title }}{% endblock %}
+{% block content %}
+{{ page_header(item.title, (item.amount_cents|cents) ~ ' pro Person und Monat') }}
+<div class="mb-4 flex items-center gap-3">
+{{ link_button('←', url_for('finance.recurring', recurring_id=item.id, monat=previous.strftime('%Y-%m')), 'secondary', 'sm') }}
+<span class="font-medium">{{ month_label }}</span>
+{{ link_button('→', url_for('finance.recurring', recurring_id=item.id, monat=following.strftime('%Y-%m')), 'secondary', 'sm') }}
+</div>
+{% if posted %}
+{% call alert('success', class='mb-6') %}{{ month_label }} ist gebucht: <a class="{{ link_class }}" href="{{ url_for('finance.booking', journal_id=posted.id) }}">{{ posted.title }}</a>.{% endcall %}
+{% else %}
+{% call table(['Name', 'Rang', 'Betrag']) %}
+{% for s in shares %}
+<tr><td class="{{ cell }}">{{ s.member.full_name }}</td><td class="{{ cell }}">{{ s.rank.label if s.rank else '–' }}</td><td class="{{ cell }} text-right tabular-nums">{{ s.share_cents|cents }}</td></tr>
+{% else %}
+{{ empty_row('Niemand gehört in diesem Monat zur Zielgruppe.', 3) }}
+{% endfor %}
+{% if shares %}<tr class="bg-slate-50 font-semibold"><td class="{{ cell }}">{{ sums.people }} Personen</td><td class="{{ cell }}"></td><td class="{{ cell }} text-right tabular-nums">{{ sums.share|cents }}</td></tr>{% endif %}
+{% endcall %}
+{% if shares %}
+<form method="post" class="mt-4">{{ button_form.hidden_tag() }}{{ button('Für ' ~ month_label ~ ' buchen') }}</form>
+<p class="mt-2 {{ muted }}">Gebucht wird auf den 1. des Monats; die Zielgruppe gilt an diesem Tag.</p>
+{% endif %}
+{% endif %}
+{{ section_header('Bearbeiten') }}
+{% call card(class='max-w-3xl') %}
+<form method="post" action="{{ url_for('finance.edit_recurring', recurring_id=item.id) }}" class="space-y-4">
+{{ edit_form.hidden_tag() }}
+<div class="grid gap-4 sm:grid-cols-2">
+{{ field(edit_form.title) }}
+{{ field(edit_form.amount, inputmode='decimal') }}
+{{ field(edit_form.target) }}
+{{ field(edit_form.category) }}
+</div>
+{{ checkbox_list(edit_form.rank_keys, 'sm:grid-cols-4') }}
+{{ field(edit_form.group_id) }}
+<p class="{{ muted }}">Änderungen gelten für Monate, die noch nicht gebucht sind.</p>
+{{ submit(edit_form.submit) }}
+</form>
+{% endcall %}
+{{ back_link('Monatliche Belastungen', url_for('finance.recurring_list')) }}
+{% endblock %}

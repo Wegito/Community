@@ -1,0 +1,7 @@
+{% from 'macros/ui.html' import panel, stat %}
+{% call panel('Der Bund in Zahlen', url_for('members.directory'), 'Verzeichnis') %}
+<div class="grid grid-cols-2 gap-2">
+{{ stat(widget.total, 'Mitglieder') }}
+{% for label, count in widget.rows %}{{ stat(count, label) }}{% endfor %}
+</div>
+{% endcall %}

@@ -1,0 +1,9 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, link_button %}
+{% block title %}Ankündigungen{% endblock %}
+{% block content %}
+{% call page_header('Ankündigungen') %}
+{% if can('announcements.create') %}{{ link_button('Neue Ankündigung', url_for('announcements.create'), 'primary') }}{% endif %}
+{% endcall %}
+{% with empty = 'Keine Ankündigungen.' %}{% include 'announcements/_list.html' %}{% endwith %}
+{% endblock %}

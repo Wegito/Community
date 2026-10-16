@@ -1,0 +1,47 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import checkbox, actions %}
+{% from 'macros/ui.html' import page_header, alert, badge, table, cell, btn_class, link_button, muted %}
+{% block title %}Import prüfen{% endblock %}
+{% block content %}
+{% set summary %}{% if filename %}{{ filename }} · {% endif %}{{ rows|length }} {{ 'Zeile' if rows|length == 1 else 'Zeilen' }}, davon <span data-valid="{{ valid|length }}">{{ valid|length }} gültig</span>{% if rows|length > valid|length %}, {{ rows|length - valid|length }} mit Fehlern (werden nicht importiert){% endif %}{% endset %}
+{{ page_header('Import prüfen', summary) }}
+
+{% if unknown_columns %}
+{% call alert('warning', class='mb-4') %}Nicht erkannte Spalten (ignoriert): {{ unknown_columns|join(', ') }}{% endcall %}
+{% endif %}
+
+{% call table(['Zeile', 'Status', 'Vorname', 'Nachname', 'Biername', 'E-Mail', 'Telefon', 'Rang', 'Eintritt'], class='mb-6') %}
+{% for row in rows %}
+<tr class="{{ 'bg-red-50' if not row.is_valid else ('bg-amber-50' if row.warnings else '') }}" data-line="{{ row.line }}">
+<td class="{{ cell }}">{{ row.line }}</td>
+<td class="{{ cell }}">
+{% if not row.is_valid %}{{ badge('Fehler', 'danger') }}
+{% elif row.warnings %}{{ badge('OK, Hinweis', 'warning') }}
+{% else %}{{ badge('OK', 'success') }}{% endif %}
+{% for error in row.errors %}<div class="mt-1 text-red-700">{{ error }}</div>{% endfor %}
+{% for warning in row.warnings %}<div class="mt-1">{{ warning }}</div>{% endfor %}
+</td>
+<td class="{{ cell }}">{{ row.values.first_name }}</td>
+<td class="{{ cell }}">{{ row.values.last_name }}</td>
+<td class="{{ cell }}">{{ row.values.biername }}</td>
+<td class="{{ cell }} break-all">{{ row.values.email }}</td>
+<td class="{{ cell }} whitespace-nowrap">{{ row.values.phone }}</td>
+<td class="{{ cell }}">{{ row.rank.label if row.rank else row.values.rank }}</td>
+<td class="{{ cell }} whitespace-nowrap">{{ row.joined_on|d if row.joined_on else row.values.joined_on }}</td>
+</tr>
+{% endfor %}
+{% endcall %}
+
+<form method="post" action="{{ url_for('members.import_confirm') }}" class="space-y-3">
+{{ form.hidden_tag() }}
+{% if can_invite %}
+{{ checkbox(form.send_invites) }}
+<p class="{{ muted }}">Jede Zeile mit E-Mail-Adresse bekommt einen persönlichen Einladungslink ({{ config['INVITE_LINK_DAYS'] }} Tage gültig).</p>
+{% endif %}
+<p class="{{ muted }}">Die Vorschau gilt eine Stunde. Ränge beginnen am Eintrittsdatum, ohne Datum heute.</p>
+{% call actions() %}
+<button type="submit" class="{{ btn_class('primary') }}"{% if not valid %} disabled{% endif %}>{{ valid|length }} {{ 'Mitglied' if valid|length == 1 else 'Mitglieder' }} importieren</button>
+{{ link_button('Andere Datei hochladen', url_for('members.import_upload'), 'ghost') }}
+{% endcall %}
+</form>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, checkbox, submit %}
+{% from 'macros/ui.html' import page_header, section_header, card, table, cell, empty_row, badge, link_class, link_button %}
+{% block title %}Getränke & Preise{% endblock %}
+{% block content %}
+{% call page_header('Getränke & Preise', 'Was der Bierwart verkauft. Ein neuer Preis gilt ab seinem Datum; alte Striche behalten ihren Preis.') %}
+{% if can('drinks.devices.manage') %}{{ link_button('Geräte', url_for('drinks.devices')) }}{% endif %}
+{% endcall %}
+{% call table(['Getränk', 'Preis heute', 'Bier?', 'Menge', none]) %}
+{% for product, price in items %}
+<tr>
+<td class="{{ cell }}">{{ product.name }}{% if not product.is_active %} {{ badge('archiviert') }}{% endif %}</td>
+<td class="{{ cell }} tabular-nums">{{ price|cents if price is not none else '–' }}</td>
+<td class="{{ cell }}">{{ 'ja' if product.counts_as_beer else '' }}</td>
+<td class="{{ cell }} tabular-nums">{{ (product.volume_ml ~ ' ml') if product.volume_ml else '' }}</td>
+<td class="{{ cell }} text-right"><a class="{{ link_class }}" href="{{ url_for('drinks.edit_product', product_id=product.id) }}">Bearbeiten</a></td>
+</tr>
+{% else %}
+{{ empty_row('Noch keine Getränke.', 5) }}
+{% endfor %}
+{% endcall %}
+{{ section_header('Neues Getränk') }}
+{% call card(class='max-w-xl') %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.name, placeholder='z. B. Pils 0,5') }}
+<div class="grid gap-4 sm:grid-cols-2">
+{{ field(form.price, inputmode='decimal', placeholder='1,20') }}
+{{ field(form.volume_ml, inputmode='numeric', placeholder='500') }}
+</div>
+{{ checkbox(form.counts_as_beer) }}
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+{% endblock %}

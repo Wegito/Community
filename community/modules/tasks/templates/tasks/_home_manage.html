@@ -1,0 +1,8 @@
+{% from 'macros/ui.html' import panel, stat %}
+{% call panel('Putzplan', url_for('tasks.list')) %}
+<div class="grid grid-cols-3 gap-2">
+{{ stat(widget.open, 'offen') }}
+{{ stat(widget.overdue, 'überfällig', tone='danger' if widget.overdue else 'neutral') }}
+{{ stat(widget.unassigned, 'ohne Zuständige', tone='warning' if widget.unassigned else 'neutral') }}
+</div>
+{% endcall %}

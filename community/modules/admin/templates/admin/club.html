@@ -1,0 +1,19 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% from 'macros/ui.html' import page_header, card, muted %}
+{% block title %}Verein{% endblock %}
+{% block content %}
+{{ page_header('Verein', 'Der Name steht in der Menüleiste, im Browser-Tab und in allen E-Mails.') }}
+{% call card(class='max-w-xl') %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.name) }}
+{{ field(form.short_name) }}
+<p class="-mt-2 {{ muted }}">Für die Menüleiste, wenn der Name dort zu lang ist.</p>
+{{ field(form.heimverein) }}
+<p class="-mt-2 {{ muted }}">Der Verein, dem euer Haus gehört, so wie ihr ihn nennt. Leer lassen, wenn es keinen gibt.</p>
+{% if from_env %}<p class="{{ muted }}">Noch nicht gespeichert: der Name kommt bisher aus der Server-Einstellung <code>CLUB_NAME</code>.</p>{% endif %}
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+{% endblock %}

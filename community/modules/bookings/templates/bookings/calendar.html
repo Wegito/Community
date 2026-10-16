@@ -1,0 +1,47 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import field, submit %}
+{% from 'macros/ui.html' import page_header, section_header, link_button, button, card, empty_state, stacked_list, row_class, muted %}
+{% block title %}Buchungen{% endblock %}
+{% block content %}
+{% call page_header('Buchungen') %}
+{% if can('bookings.manage_any') %}{{ link_button('Ressourcen verwalten', url_for('bookings.resources')) }}{% endif %}
+{% endcall %}
+
+{% if resources %}
+{% call card() %}
+<form method="post" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.resource_id) }}
+<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+{{ field(form.start) }}
+{{ field(form.end) }}
+</div>
+{{ submit(form.submit) }}
+</form>
+{% endcall %}
+{% else %}
+{{ empty_state('Noch keine Ressourcen zum Buchen. Ein Admin kann sie unter „Ressourcen verwalten“ anlegen.') }}
+{% endif %}
+
+{{ section_header('Kommende Buchungen') }}
+{% if items %}
+{% call stacked_list() %}
+{% for b in items %}
+<li class="{{ row_class }}">
+<div class="min-w-48 flex-1">
+<div class="font-medium">{{ b.resource.name }} – {{ b.start|dt }} → {{ b.end|dt }}</div>
+<div class="{{ muted }}">von {{ b.user.display_name }}</div>
+</div>
+{% if policies.can_cancel_booking(current_user, b) %}
+<form method="post" action="{{ url_for('bookings.cancel', booking_id=b.id) }}">
+{{ button_form.hidden_tag() }}
+{{ button('Stornieren', 'danger', 'sm') }}
+</form>
+{% endif %}
+</li>
+{% endfor %}
+{% endcall %}
+{% else %}
+{{ empty_state('Keine kommenden Buchungen.') }}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends 'layout.html' %}
+{% from 'macros/forms.html' import input_class %}
+{% from 'macros/ui.html' import page_header, link_button, button, badge, empty_state, stacked_list, row_class, link_class, muted %}
+{% block title %}Mitglieder{% endblock %}
+{% block content %}
+{% call page_header('Mitglieder') %}
+{% if can('members.invite') %}{{ link_button('Neues Mitglied', url_for('members.new'), 'primary') }}{% endif %}
+{% if can('members.import') %}{{ link_button('Importieren', url_for('members.import_upload')) }}{% endif %}
+{% endcall %}
+<form method="get" class="mb-4 flex flex-wrap items-end gap-3" role="search">
+<label class="min-w-48 flex-1">
+<span class="mb-1 block text-sm font-medium">Name oder Biername</span>
+<input type="search" name="q" value="{{ q }}" class="{{ input_class }}">
+</label>
+<label>
+<span class="mb-1 block text-sm font-medium">Rang</span>
+<select name="rank" class="{{ input_class }}">
+<option value="">Alle</option>
+{% for r in ranks %}<option value="{{ r.key }}"{% if r.key == rank_key %} selected{% endif %}>{{ r.label }}</option>{% endfor %}
+</select>
+</label>
+{% if can_see_former %}
+<label class="flex min-h-10 items-center gap-2"><input type="checkbox" name="ended" value="1" class="size-4 accent-slate-900"{% if include_ended %} checked{% endif %}> Ehemalige</label>
+{% endif %}
+{{ button('Suchen') }}
+</form>
+<p class="mb-2 {{ muted }}">{{ rows|length }} {{ 'Mitglied' if rows|length == 1 else 'Mitglieder' }}</p>
+{% if rows %}
+{% call stacked_list() %}
+{% for row in rows %}
+{% set m = row.member %}
+<li class="{{ row_class }}">
+<div class="min-w-48 flex-1">
+<a class="{{ link_class }}" href="{{ url_for('members.detail', public_id=m.public_id) }}">{{ m.full_name }}</a>
+{% if m.biername %}<span class="text-slate-600">({{ m.biername }})</span>{% endif %}
+{% if not m.is_active_member %}{{ badge('ehemalig' ~ (' seit ' ~ m.ended_on|d if m.ended_on else '')) }}{% endif %}
+<div class="{{ muted }}">
+{{ row.rank_entry.rank.label if row.rank_entry else 'kein Rang' }}
+{% for a in row.offices %} · {{ a.office.label }}{% if a.is_acting %} (kommissarisch){% endif %}{% endfor %}
+</div>
+</div>
+</li>
+{% endfor %}
+{% endcall %}
+{% else %}
+{{ empty_state('Niemand gefunden.') }}
+{% endif %}
+{% endblock %}

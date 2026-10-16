@@ -1,0 +1,49 @@
+{% extends 'layout.html' %}
+{% from 'macros/ui.html' import page_header, section_header, card, table, cell, back_link, badge, link_class, muted, alert, button %}
+{% from 'macros/forms.html' import field, submit %}
+{% block title %}Buchung {{ item.beleg or item.id }}{% endblock %}
+{% block content %}
+{{ page_header(item.title, item.kind_label ~ ' vom ' ~ (item.booked_on|d) ~ (' · Beleg ' ~ item.beleg if item.beleg else '')) }}
+{% if item.reversed_by %}
+{% call alert('warning', class='mb-4') %}Storniert durch <a class="{{ link_class }}" href="{{ url_for('finance.booking', journal_id=item.reversed_by.id) }}">{{ item.reversed_by.title }}</a> am {{ item.reversed_by.booked_on|d }}: {{ item.reversed_by.note }}{% endcall %}
+{% elif item.reverses %}
+{% call alert('info', class='mb-4') %}Storno von <a class="{{ link_class }}" href="{{ url_for('finance.booking', journal_id=item.reverses.id) }}">{{ item.reverses.title }}</a>. Grund: {{ item.note }}{% endcall %}
+{% endif %}
+{% call table(['Soll', 'Haben', 'Kostenstelle', 'Betrag']) %}
+{% for e in item.entries %}
+<tr>
+<td class="{{ cell }}">{{ e.debit_account|account_label }}</td>
+<td class="{{ cell }}">{{ e.credit_account|account_label }}</td>
+<td class="{{ cell }}">{{ e.category.name if e.category else '' }}{% if e.memo %}<div class="{{ muted }}">{{ e.memo }}</div>{% endif %}</td>
+<td class="{{ cell }} text-right tabular-nums">{{ e.amount_cents|cents }}</td>
+</tr>
+{% endfor %}
+{% endcall %}
+<dl class="mt-4 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+<dt class="text-slate-600">Gebucht</dt><dd>{{ item.posted_at|dt }} von {{ item.posted_by.member.full_name if item.posted_by else 'Server' }}</dd>
+{% if item.cosigned_by %}<dt class="text-slate-600">Gegengezeichnet</dt><dd>{{ item.cosigned_by.member.full_name }}</dd>{% endif %}
+{% if item.semester %}<dt class="text-slate-600">Semester</dt><dd>{{ item.semester.code }}</dd>{% endif %}
+{% if item.note and not item.reverses %}<dt class="text-slate-600">Notiz</dt><dd class="whitespace-pre-line">{{ item.note }}</dd>{% endif %}
+</dl>
+{% if pending %}
+{% call alert('info', class='mt-6') %}Ein <a class="{{ link_class }}" href="{{ url_for('finance.cosign_request', request_id=pending.id) }}">Storno dieser Buchung</a> wartet auf Gegenzeichnung.{% endcall %}
+{% elif can('finance.journal.reverse') and not item.reversed_by and item.kind != 'reversal' %}
+{{ section_header('Stornieren') }}
+{% call card(class='max-w-xl') %}
+<p class="mb-3 {{ muted }}">Buchungen werden nie geändert. Ein Storno bucht alle Beträge zurück; danach die richtige Buchung neu erfassen.</p>
+<form method="post" action="{{ url_for('finance.reverse', journal_id=item.id) }}" class="space-y-4">
+{{ form.hidden_tag() }}
+{{ field(form.reason) }}
+{% if cosign_needed %}
+{% call alert('warning') %}
+<p>Dieses Storno schreibt dir selbst etwas gut. Gebucht wird es erst, wenn ein Kassenprüfer es bestätigt.</p>
+<div class="mt-3">{{ button('Zur Gegenzeichnung vorlegen', name='vorlegen', value='1') }}</div>
+{% endcall %}
+{% else %}
+{{ submit(form.submit, 'danger') }}
+{% endif %}
+</form>
+{% endcall %}
+{% endif %}
+{{ back_link('Kassenbuch', url_for('finance.journal')) }}
+{% endblock %}
